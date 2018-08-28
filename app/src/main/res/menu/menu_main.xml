@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/show_changes"
+        android:title="@string/action_show_changes"
+        app:showAsAction="never"
+        android:orderInCategory="8"/>
+    <item
+        android:id="@+id/action_change_password"
+        android:title="@string/action_change_password"
+        app:showAsAction="never"
+        android:orderInCategory="10"/>
+    <item
+        android:id="@+id/disable_device_policy"
+        android:title="Disable Device Administration Policy"
+        app:showAsAction="never"
+        android:orderInCategory="12"/>
+    <item
+        android:id="@+id/action_logout"
+        android:title="@string/action_logout"
+        app:showAsAction="never"
+        android:orderInCategory="14"/>
+
+</menu>

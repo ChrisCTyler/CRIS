@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#1C22FF</color>
+    <color name="colorPrimaryDark">#1C22C0</color>
+    <color name="colorAccent">#A22D59</color>
+    <color name="red">#FF0000</color>
+    <color name="colorBackground">#F6F6F6</color>
+    <color name="grey">#c0c0c0</color>
+    <color name="text_grey">#737373</color>
+    <color name="holo_grey">#7C7C7C</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="header_background">#F2F2F2</color>
+    <color name="my_week_yellow">#FFC10E</color>
+    <color name="my_week_dark_yellow">#D69800</color>
+</resources>

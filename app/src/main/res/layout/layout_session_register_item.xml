@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/list_item_height"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageView
+        android:id="@+id/item_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_user" />
+
+    <TextView
+        android:id="@+id/item_main_text"
+        android:layout_width="0dp"
+        android:layout_weight="5"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:textSize="@dimen/text_size_large" />
+
+    <ImageView
+        android:id="@+id/attendance_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_tick_grey" />
+
+    <ImageView
+        android:id="@+id/status_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_star_grey" />
+
+    <ImageView
+        android:id="@+id/transport_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_transport_white" />
+
+
+    <ImageView
+        android:id="@+id/note_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_note_grey" />
+
+    <ImageView
+        android:id="@+id/pdf_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_pdf_grey" />
+
+    <ImageView
+        android:id="@+id/camera_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_camera_red" />
+
+
+</LinearLayout>

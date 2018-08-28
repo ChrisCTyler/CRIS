@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="id" name="tag_registry_entry"/>
+    <item type="id" name="tag_client_session"/>
+    <item type="id" name="tag_note_document"/>
+    <item type="id" name="tag_transport_document"/>
+    <item type="id" name="tag_pdf_document"/>
+    <item type="id" name="tag_status_document"/>
+    <item type="id" name="tag_note_icon"/>
+    <item type="id" name="tag_view_item_date"/>
+    <item type="id" name="tag_view_item_icon"/>
+    <item type="id" name="tag_main_text"/>
+    <item type="id" name="tag_attendance_icon"/>
+    <item type="id" name="tag_status_icon"/>
+    <item type="id" name="tag_transport_icon"/>
+    <item type="id" name="tag_pdf_document_icon"/>
+    <item type="id" name="tag_client_entry"/>
+    <item type="id" name="tag_additional_text"/>
+</resources>

@@ -1,0 +1,44 @@
+apply plugin: 'com.android.application'
+
+android {
+    signingConfigs {
+        config {
+            keyAlias 'CRISkey'
+            keyPassword '39GingerShuttlecock1'
+            storeFile file('C:/Android/keystore/CRIS.jks')
+            storePassword 'atom42Peacock'
+        }
+    }
+    compileSdkVersion 27
+    defaultConfig {
+        applicationId "solutions.cris"
+        minSdkVersion 21
+        targetSdkVersion 27
+        versionCode 106
+        versionName "2.1.106"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.config
+
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation('com.google.api-client:google-api-client-android:1.22.0') {
+        exclude group: 'org.apache.httpcomponents'
+    }
+    implementation('com.google.apis:google-api-services-sheets:v4-rev477-1.22.0') {
+        exclude group: 'org.apache.httpcomponents'
+    }
+
+    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.android.support:design:27.1.1'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
+    implementation 'com.google.android.gms:play-services-auth:15.0.1'
+    implementation 'pub.devrel:easypermissions:0.3.0'
+}

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/list_item_height"
+    android:padding="5dp">
+
+    <ProgressBar
+        android:id="@+id/sync_progress"
+        style="@android:style/Widget.ProgressBar.Small"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginLeft="14dp"
+        android:layout_marginRight="14dp"
+        android:visibility="gone"/>
+
+    <ImageView
+        android:id="@+id/item_icon"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_alignParentLeft="true"
+        android:layout_centerVertical="true"
+        android:layout_toRightOf="@id/sync_progress"
+        android:layout_marginLeft="@dimen/icon_margin"
+        android:layout_marginRight="@dimen/icon_margin"
+        android:src="@drawable/ic_user"/>
+
+
+    <TextView
+        android:id="@+id/item_title"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:textSize="@dimen/text_size_large"
+        android:layout_toEndOf="@id/item_icon"
+        android:layout_toRightOf="@id/item_icon"
+        android:gravity="fill_vertical|center_vertical"
+        android:visibility="gone"
+        />
+
+    <TextView
+        android:id="@+id/item_main_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="@dimen/text_size_large"
+        android:layout_toEndOf="@id/item_icon"
+        android:layout_toRightOf="@id/item_icon"
+        />
+
+    <TextView
+        android:id="@+id/item_additional_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/item_main_text"
+        android:layout_toEndOf="@id/item_icon"
+        android:layout_toRightOf="@id/item_icon"
+        android:textSize="@dimen/text_size_summary"
+        android:textStyle="italic"
+        android:maxLines="1"/>
+
+
+
+    <TextView
+        android:id="@+id/item_date"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:textSize="@dimen/text_size_date"
+        android:layout_alignParentRight="true"
+/>
+
+</RelativeLayout>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_show_previous_users"
+        android:title="@string/action_show_previous_users"
+        app:showAsAction="never"
+        android:orderInCategory="11"/>
+
+    <item
+        android:id="@+id/action_change_password"
+        android:title="@string/action_change_password"
+        app:showAsAction="never"
+        android:orderInCategory="12"/>
+
+    <item
+        android:id="@+id/action_change_user"
+        android:title="@string/action_change_user"
+        app:showAsAction="never"
+        android:orderInCategory="12"/>
+
+</menu>

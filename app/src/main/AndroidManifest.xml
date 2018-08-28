@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="solutions.cris">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <service
+            android:name=".sync.AuthenticatorService"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+        <service
+            android:name=".sync.SyncService"
+            android:exported="true"
+            android:process=":sync">
+            <intent-filter>
+                <action android:name="android.content.SyncAdapter" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/syncadapter" />
+        </service>
+
+        <provider
+            android:name=".sync.StubProvider"
+            android:authorities="solutions.cris.sync.provider"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:syncable="true" />
+        <provider
+            android:name="android.support.v4.content.FileProvider"
+            android:authorities="solutions.cris.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity
+            android:name=".Main"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".edit.EditUser"
+            android:label="@string/title_activity_edit_user" />
+        <activity
+            android:name=".utils.AlertAndContinue"
+            android:label="@string/title_activity_first_time_use" />
+        <activity
+            android:name=".list.ListUsers"
+            android:label="@string/title_activity_list_users"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListLibrary"
+            android:label="@string/title_activity_list_documents"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListErrors"
+            android:label="@string/title_activity_list_errors"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.EditLibraryDocument"
+            android:label="@string/title_activity_edit_pdf_document"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListListTypes"
+            android:label="@string/title_activity_list_lists"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListListItems"
+            android:label="@string/title_activity_list_list_items"
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="adjustPan" />
+        <activity android:name=".read.ReadUser" />
+        <activity
+            android:name=".list.ListSyncActivity"
+            android:label="@string/title_activity_list_sync_results"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListSysAdmin"
+            android:label="@string/title_activity_list_menu"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListComplexListItems"
+            android:label="@string/title_activity_list_complex_list_items"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.EditRole"
+            android:label="@string/title_activity_edit_role"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.ChangePassword"
+            android:label="@string/title_activity_change_password"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListClientHeader"
+            android:label="@string/title_activity_list_client_new"
+            android:launchMode="singleTop"
+            android:theme="@style/AppTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable" />
+        </activity>
+        <activity
+            android:name=".list.ListClients"
+            android:label="@string/title_activity_list_clients2"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".read.ReadClientHeader"
+            android:label="@string/title_activity_read_client_header"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.EditNoteType"
+            android:label="@string/title_activity_edit_note_type"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".Login"
+            android:label="@string/title_activity_login"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.EditSchool"
+            android:label="@string/title_activity_edit_school"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.EditAgency"
+            android:label="@string/title_activity_edit_agency"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.EditGroup"
+            android:label="@string/title_activity_edit_group"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListSessions"
+            android:label="@string/title_activity_list_sessions"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListSessionClients"
+            android:label="@string/title_activity_list_session_clients"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".edit.EditTransportOrganisation"
+            android:label="@string/title_activity_edit_transport_organisation"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".utils.SheetTest"
+            android:label="SheetTest"
+            android:theme="@style/AppTheme"/>
+
+        <receiver android:name=".utils.CRISDeviceAdmin"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data android:name="android.app.device_admin"
+                android:resource="@xml/policies" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+
+
+</manifest>
