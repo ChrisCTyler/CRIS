@@ -1,8 +1,20 @@
 package solutions.cris.sync;
 
-/**
- * Copyright CRIS.Solutions 31/10/2016.
- */
+//        CRIS - Client Record Information System
+//        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
+//
+//        This program is free software: you can redistribute it and/or modify
+//        it under the terms of the GNU General Public License as published by
+//        the Free Software Foundation, either version 3 of the License, or
+//        (at your option) any later version.
+//
+//        This program is distributed in the hope that it will be useful,
+//        but WITHOUT ANY WARRANTY; without even the implied warranty of
+//        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//        GNU General Public License for more details.
+//
+//        You should have received a copy of the GNU General Public License
+//        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import android.accounts.Account;
 import android.app.Notification;
@@ -189,7 +201,11 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
             try {
                 // Create a Sync Result record
                 syncActivity = new SyncActivity(currentUser);
+                syncActivity.appendLog(String.format(Locale.UK, "Diag date: %d", syncActivity.getCreationDate().getTime()) );
                 syncActivityID = syncActivity.getRecordID().toString();
+                // Build 107 - Added Upload Test
+                //uploadTest();
+                syncActivity.appendLog("Upload Test Complete" );
                 // The sync date must be later than the latest sync date already
                 // on the web server. Due to tablets potentially having incorrect time/date
                 // settings, it is necessary to get the latest Sync record from the webserver
@@ -198,19 +214,20 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 // Get the number of unread documents pre-sync
                 int unreadDocCount = localDB.getUnreadDocuments(currentUser).size();
                 // Check web database exists and create tables if necessary
-                checkWebDatabaseVersion(organisation);
+                checkWebDatabaseVersion(organisation);  // Done
                 // Download new records
                 downloadCount = downloadRecords();
 
                 // Upload unsynced records
-                uploadCount += uploadBlobTable();
-                uploadCount += uploadReadAudits();
-                uploadCount += uploadListItems();
-                uploadCount += uploadUsers();
-                uploadCount += uploadSystemErrors();
-                uploadCount += uploadDocuments();
-                uploadCount += uploadReadAudits();
-                uploadCount += uploadFollows();
+
+                uploadCount += uploadBlobTable();       // Done
+                uploadCount += uploadReadAudits();      // Done
+                uploadCount += uploadListItems();       // Done
+                uploadCount += uploadUsers();           // Done
+                uploadCount += uploadSystemErrors();    // Done
+                uploadCount += uploadDocuments();       // Done
+                uploadCount += uploadReadAudits();      // Done
+                uploadCount += uploadFollows();         // Done
 
                 // Check for new unread documents if the organisation is the current pref
                 if (runningOrganisation) {
@@ -307,7 +324,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         //JSONObject postJSON = getPostJSON(localDB);
         WebConnection webConnection = new WebConnection(localDB);
         //JSONObject jsonOutput = postJSON("check_database.php", postJSON);
-        JSONObject jsonOutput = webConnection.post("check_database.php");
+        JSONObject jsonOutput = webConnection.post("pdo_check_database.php");
         try {
             String result = jsonOutput.getString("result");
             if (result.equals("SUCCESS")) {
@@ -351,7 +368,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 throw new CRISException("Error creating JSON object: " + ex.getMessage());
             }
             //JSONObject jsonOutput = postJSON("upgrade_database.php", postJSON);
-            JSONObject jsonOutput = webConnection.post("upgrade_database.php");
+            JSONObject jsonOutput = webConnection.post("pdo_upgrade_database.php");
             try {
                 String result = jsonOutput.getString("result");
                 if (result.equals("SUCCESS")) {
@@ -397,10 +414,10 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                         //json.put("sync", syncValues);
                         webConnection.getInputJSON().put("sync", syncValues);
                         //jsonOutput = postJSON("get_records.php", json);
-                        jsonOutput = webConnection.post("get_records.php");
+                        jsonOutput = webConnection.post("pdo_get_records.php");
                         String result = jsonOutput.getString("result");
                         if (result.equals("FAILURE")) {
-                            throw new CRISException("get_records.php: " + jsonOutput.getString("error_message"));
+                            throw new CRISException("pdo_get_records.php: " + jsonOutput.getString("error_message"));
                         } else {
                             int records;
                             switch (row.getString("TableName")) {
@@ -453,10 +470,10 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
             //json.put("sync", values);
             webConnection.getInputJSON().put("sync", values);
             //jsonOutput = postJSON("get_sync_records.php", json);
-            jsonOutput = webConnection.post("get_sync_records.php");
+            jsonOutput = webConnection.post("pdo_get_sync_records.php");
             String result = jsonOutput.getString("result");
             if (result.equals("FAILURE")) {
-                throw new CRISException("get_sync_records.php: " + jsonOutput.getString("error_message"));
+                throw new CRISException("pdo_get_sync_records.php: " + jsonOutput.getString("error_message"));
             }
 
         } catch (Exception ex) {
@@ -470,8 +487,11 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         Sync sync = new Sync("ReadAudit", syncTimeOffset);
 
         // Update SyncID
-        localDB.updateSyncID("ReadAudit", sync.getSyncID());
-        Cursor cursor = localDB.getRecordsBySyncID("ReadAudit", sync.getSyncID());
+        // Build 107 -29 Aug 2018
+        // Separate update and get replaced due to timing issue, see localDB for more details
+        //localDB.updateSyncID("Document", sync.getSyncID());
+        //Cursor cursor = localDB.getRecordsBySyncID("ReadAudit", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecords("ReadAudit", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -482,7 +502,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     JSONObject values = new JSONObject();
                     values.put("ReadByID", cursor.getString(0));
                     values.put("DocumentID", cursor.getString(1));
-                    values.put("SyncID", cursor.getString(2));
+                    // Build 107 29 Aug 2018 return from record set cannot be trusted see above
+                    //values.put("SyncID", cursor.getString(3));
+                    values.put("SyncID", sync.getSyncID().toString());
                     values.put("ReadDate", cursor.getLong(3));
                     //json.put("ReadAudit_" + Integer.toString(count++), values);
                     webConnection.getInputJSON().put("ReadAudit_" + Integer.toString(count++), values);
@@ -496,7 +518,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 //json.put("sync", values);
                 webConnection.getInputJSON().put("sync", values);
                 //JSONObject jsonOutput = postJSON("insert_read_audits.php", json);
-                JSONObject jsonOutput = webConnection.post("insert_read_audits.php");
+                JSONObject jsonOutput = webConnection.post("pdo_insert_read_audits.php");
                 try {
                     String result = jsonOutput.getString("result");
                     if (result.equals("FAILURE")) {
@@ -528,8 +550,11 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         Sync sync = new Sync("Follow", syncTimeOffset);
 
         // Update SyncID
-        localDB.updateSyncID("Follow", sync.getSyncID());
-        Cursor cursor = localDB.getRecordsBySyncID("Follow", sync.getSyncID());
+        // Build 107 -29 Aug 2018
+        // Separate update and get replaced due to timing issue, see localDB for more details
+        //localDB.updateSyncID("Document", sync.getSyncID());
+        //Cursor cursor = localDB.getRecordsBySyncID("Follow", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecords("Follow", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -540,7 +565,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     JSONObject values = new JSONObject();
                     values.put("UserID", cursor.getString(0));
                     values.put("ClientID", cursor.getString(1));
-                    values.put("SyncID", cursor.getString(2));
+                    // Build 107 29 Aug 2018 return from record set cannot be trusted see above
+                    //values.put("SyncID", cursor.getString(3));
+                    values.put("SyncID", sync.getSyncID().toString());
                     values.put("Cancelled", cursor.getInt(3));
                     values.put("StartDate", cursor.getLong(4));
                     //json.put("Follow_" + Integer.toString(count++), values);
@@ -555,7 +582,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 //json.put("sync", values);
                 webConnection.getInputJSON().put("sync", values);
                 //JSONObject jsonOutput = postJSON("insert_follows_2.php", json);
-                JSONObject jsonOutput = webConnection.post("insert_follows_2.php");
+                JSONObject jsonOutput = webConnection.post("pdo_insert_follows_2.php");
                 try {
                     String result = jsonOutput.getString("result");
                     if (result.equals("FAILURE")) {
@@ -581,8 +608,11 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         Sync sync = new Sync("ListItem", syncTimeOffset);
 
         // Update SyncID
-        localDB.updateSyncID("ListItem", sync.getSyncID());
-        Cursor cursor = localDB.getRecordsBySyncID("ListItem", sync.getSyncID());
+        // Build 107 -29 Aug 2018
+        // Separate update and get replaced due to timing issue, see localDB for more details
+        //localDB.updateSyncID("Document", sync.getSyncID());
+        //Cursor cursor = localDB.getRecordsBySyncID("ListItem", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecords("ListItem", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -594,7 +624,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("RecordID", cursor.getString(0));
                     values.put("ListItemID", cursor.getString(1));
                     values.put("HistoryDate", cursor.getLong(2));
-                    values.put("SyncID", cursor.getString(3));
+                    // Build 107 29 Aug 2018 return from record set cannot be trusted see above
+                    //values.put("SyncID", cursor.getString(3));
+                    values.put("SyncID", sync.getSyncID().toString());
                     values.put("CreationDate", cursor.getLong(4));
                     values.put("CreatedByID", cursor.getString(5));
                     values.put("ListType", cursor.getString(6));
@@ -619,7 +651,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 //json.put("sync", values);
                 webConnection.getInputJSON().put("sync", values);
                 //JSONObject jsonOutput = postJSON("insert_list_items.php", json);
-                JSONObject jsonOutput = webConnection.post("insert_list_items.php");
+                JSONObject jsonOutput = webConnection.post("pdo_insert_list_items.php");
                 try {
                     String result = jsonOutput.getString("result");
                     if (result.equals("FAILURE")) {
@@ -643,9 +675,13 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
     private int uploadUsers() {
         int count = 0;
         Sync sync = new Sync("User", syncTimeOffset);
+
         // Update SyncID
-        localDB.updateSyncID("User", sync.getSyncID());
-        Cursor cursor = localDB.getRecordsBySyncID("User", sync.getSyncID());
+        // Build 107 -29 Aug 2018
+        // Separate update and get replaced due to timing issue, see localDB for more details
+        //localDB.updateSyncID("Document", sync.getSyncID());
+        //Cursor cursor = localDB.getRecordsBySyncID("User", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecords("User", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -657,7 +693,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("RecordID", cursor.getString(0));
                     values.put("UserID", cursor.getString(1));
                     values.put("HistoryDate", cursor.getLong(2));
-                    values.put("SyncID", cursor.getString(3));
+                    // Build 107 29 Aug 2018 return from record set cannot be trusted see above
+                    //values.put("SyncID", cursor.getString(3));
+                    values.put("SyncID", sync.getSyncID().toString());
                     values.put("CreationDate", cursor.getLong(4));
                     values.put("CreatedByID", cursor.getString(5));
                     values.put("EmailAddress", cursor.getString(6));
@@ -682,7 +720,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 //json.put("sync", values);
                 webConnection.getInputJSON().put("sync", values);
                 //JSONObject jsonOutput = postJSON("insert_users.php", json);
-                JSONObject jsonOutput = webConnection.post("insert_users.php");
+                JSONObject jsonOutput = webConnection.post("pdo_insert_users.php");
                 try {
                     String result = jsonOutput.getString("result");
                     if (result.equals("FAILURE")) {
@@ -708,8 +746,11 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         Sync sync = new Sync("SystemError", syncTimeOffset);
 
         // Update SyncID
-        localDB.updateSyncID("SystemError", sync.getSyncID());
-        Cursor cursor = localDB.getRecordsBySyncID("SystemError", sync.getSyncID());
+        // Build 107 -29 Aug 2018
+        // Separate update and get replaced due to timing issue, see localDB for more details
+        //localDB.updateSyncID("Document", sync.getSyncID());
+        //Cursor cursor = localDB.getRecordsBySyncID("SystemError", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecords("SystemError", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -719,7 +760,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     // Create JSON Object for this record
                     JSONObject values = new JSONObject();
                     values.put("RecordID", cursor.getString(0));
-                    values.put("SyncID", cursor.getString(1));
+                    // Build 107 29 Aug 2018 return from record set cannot be trusted see above
+                    //values.put("SyncID", cursor.getString(3));
+                    values.put("SyncID", sync.getSyncID().toString());
                     values.put("CreationDate", cursor.getLong(2));
                     values.put("CreatedByID", cursor.getString(3));
                     /*
@@ -744,7 +787,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 //json.put("sync", values);
                 webConnection.getInputJSON().put("sync", values);
                 //JSONObject jsonOutput = postJSON("insert_system_errors.php", json);
-                JSONObject jsonOutput = webConnection.post("insert_system_errors.php");
+                JSONObject jsonOutput = webConnection.post("pdo_insert_system_errors.php");
                 try {
                     String result = jsonOutput.getString("result");
                     if (result.equals("FAILURE")) {
@@ -769,12 +812,53 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         return count;
     }
 
+    private void uploadTest() {
+
+        Sync sync = new Sync("SystemError", syncTimeOffset);
+        syncActivity.appendLog(String.format(Locale.UK, "Upload Test (Sync): %d", sync.getSyncDate().getTime()) );
+            try {
+                WebConnection webConnection = new WebConnection(localDB);
+                // Add in the Sync record
+                JSONObject values = new JSONObject();
+                values.put("SyncID", sync.getSyncID().toString());
+                values.put("SyncDate", sync.getSyncDate().getTime());
+                values.put("TableName", sync.getTableName());
+                //json.put("sync", values);
+                webConnection.getInputJSON().put("sync", values);
+                //JSONObject jsonOutput = postJSON("insert_system_errors.php", json);
+                JSONObject jsonOutput = webConnection.post("pdo_insert_test.php");
+                try {
+                    String result = jsonOutput.getString("result");
+                    if (result.equals("FAILURE")) {
+                        throw new CRISException("test - " + jsonOutput.getString("error_message"));
+                    }
+                } catch (JSONException ex) {
+                    throw new CRISException("Error parsing JSON data: " + ex.getMessage());
+                }
+                localDB.save(sync);
+                syncActivity.appendLog(String.format(Locale.UK, "Upload Test Completed"));
+            } catch (JSONException ex) {
+                // Remove the SyncID
+                localDB.nullSyncID("SystemError", sync.getSyncID());
+                throw new CRISException("Error parsing JSON data: " + ex.getMessage());
+            } catch (Exception ex) {
+                // Remove the SyncID
+                localDB.nullSyncID("SystemError", sync.getSyncID());
+                throw ex;
+            }
+
+    }
+
     private int uploadDocuments() {
         int count = 0;
         Sync sync = new Sync("Document", syncTimeOffset);
+
         // Update SyncID
-        localDB.updateSyncID("Document", sync.getSyncID());
-        Cursor cursor = localDB.getRecordsBySyncID("Document", sync.getSyncID());
+        // Build 107 -29 Aug 2018
+        // Separate update and get replaced due to timing issue, see localDB for more details
+        //localDB.updateSyncID("Document", sync.getSyncID());
+        //Cursor cursor = localDB.getRecordsBySyncID("Document", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecords("Document", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -786,7 +870,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("RecordID", cursor.getString(0));
                     values.put("DocumentID", cursor.getString(1));
                     values.put("HistoryDate", cursor.getLong(2));
-                    values.put("SyncID", cursor.getString(3));
+                    // Build 107 29 Aug 2018 return from record set cannot be trusted see above
+                    //values.put("SyncID", cursor.getString(3));
+                    values.put("SyncID", sync.getSyncID().toString());
                     values.put("CreationDate", cursor.getLong(4));
                     values.put("CreatedByID", cursor.getString(5));
                     values.put("Cancelled", cursor.getLong(6));
@@ -830,7 +916,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 //JSONObject jsonOutput = postJSON("insert_documents_2.php", json);
                 //JSONObject jsonOutput = webConnection.post("insert_documents_2.php");
                 // SessionID added in version 18
-                JSONObject jsonOutput = webConnection.post("insert_documents_18.php");
+                JSONObject jsonOutput = webConnection.post("pdo_insert_documents_18.php");
                 try {
                     String result = jsonOutput.getString("result");
                     if (result.equals("FAILURE")) {
@@ -895,7 +981,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 //json.put("sync", values);
                 webConnection.getInputJSON().put("sync", values);
                 //JSONObject jsonOutput = postJSON("insert_blob.php", json);
-                JSONObject jsonOutput = webConnection.post("insert_blob.php");
+                JSONObject jsonOutput = webConnection.post("pdo_insert_blob.php");
                 String result = jsonOutput.getString("result");
                 if (result.equals("FAILURE")) {
                     throw new CRISException(jsonOutput.getString("error_message"));

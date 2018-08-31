@@ -32,9 +32,21 @@ import static solutions.cris.object.Case.AMBER;
 import static solutions.cris.object.Case.GREEN;
 import static solutions.cris.object.Case.RED;
 
-/**
- * Copyright CRIS.Solutions 01-Oct-16.
- */
+//        CRIS - Client Record Information System
+//        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
+//
+//        This program is free software: you can redistribute it and/or modify
+//        it under the terms of the GNU General Public License as published by
+//        the Free Software Foundation, either version 3 of the License, or
+//        (at your option) any later version.
+//
+//        This program is distributed in the hope that it will be useful,
+//        but WITHOUT ANY WARRANTY; without even the implied warranty of
+//        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//        GNU General Public License for more details.
+//
+//        You should have received a copy of the GNU General Public License
+//        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 public class Client extends Document implements Serializable {
 
     // Fixed UID for this class 12345 nnn vv (nnn = class code, vv = version)

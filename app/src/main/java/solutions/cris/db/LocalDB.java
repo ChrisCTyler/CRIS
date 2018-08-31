@@ -51,9 +51,22 @@ import solutions.cris.object.TransportOrganisation;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISUtil;
 
-/**
- * Copyright CRIS.Solutions 29-Sep-16.
- */
+//        CRIS - Client Record Information System
+//        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
+//
+//        This program is free software: you can redistribute it and/or modify
+//        it under the terms of the GNU General Public License as published by
+//        the Free Software Foundation, either version 3 of the License, or
+//        (at your option) any later version.
+//
+//        This program is distributed in the hope that it will be useful,
+//        but WITHOUT ANY WARRANTY; without even the implied warranty of
+//        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//        GNU General Public License for more details.
+//
+//        You should have received a copy of the GNU General Public License
+//        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 public class LocalDB {
 
     private SQLiteDatabase database;
@@ -473,16 +486,40 @@ public class LocalDB {
         return names.length() - 1;
     }
 
-    public Cursor getRecordsBySyncID(String tableName, UUID syncID) {
-        String[] tableColumns = new String[]{"*"};
-        String whereClause = "SyncID = ?";
-        String[] whereArgs = new String[]{syncID.toString()};
-        return database.query(tableName, tableColumns, whereClause, whereArgs, null, null, null);
-    }
+    // Build 107 29 Aug 2018
+    // It looks as if there is a problem with calling UpdateSyncID immediately followed by
+    // getRecordsbySyncID. There apperas to be an optimisation such that the update returns
+    // after updating the indexes and continues to update the data in the background.
+    // This leads to the record set returned by getRecordsBySyncID (called using the newly
+    // updated SyncID) returning records where the syncID has not yet been updated. This leads
+    // to a knock-on error where the records sent to the server (SyncAdapter) have a null syncID
+    // which causes a database constraint error.
+    // The solution is to replace the two functions with a single function which does both actions
+    // and then to not rely on the syncID in the returned record set. Note: combining the functions
+    // does not fix the problem, but deprecating the two exiting functions and commenting the
+    // replacement should help to avoid the problem in the future.
+    //public Cursor getRecordsBySyncID(String tableName, UUID syncID) {
+    //    String[] tableColumns = new String[]{"*"};
+    //    String whereClause = "SyncID = ?";
+    //    String[] whereArgs = new String[]{syncID.toString()};
+    //    return database.query(tableName, tableColumns, whereClause, whereArgs, null, null, null);
+    //}
+    //
+    //public void updateSyncID(String tableName, UUID syncID) {
+    //     String sql = "UPDATE " + tableName + " SET SyncID = \"" + syncID.toString() + "\" WHERE SyncID is null";
+    //    database.execSQL(sql);
+    //}
 
-    public void updateSyncID(String tableName, UUID syncID) {
-        String sql = "UPDATE " + tableName + " SET SyncID = \"" + syncID.toString() + "\" WHERE SyncID is null";
-        database.execSQL(sql);
+    public Cursor getUnsyncedRecords(String tableName, UUID newSyncID) {
+        String[] tableColumns = new String[]{"*"};
+        String whereClause = "SyncID is null";
+        //String[] whereArgs = new String[]{newSyncID.toString()};
+        Cursor systemErrors = database.query(tableName, tableColumns, whereClause, null, null, null, null);
+        if (systemErrors.getCount() > 0) {
+            String sql = "UPDATE " + tableName + " SET SyncID = \"" + newSyncID.toString() + "\" WHERE SyncID is null";
+            database.execSQL(sql);
+        }
+        return systemErrors;
     }
 
     public void nullSyncID(String tableName, UUID syncID) {
@@ -630,10 +667,11 @@ public class LocalDB {
         try {
             database.execSQL("BEGIN TRANSACTION");
             names = jsonOutput.names();
+
             for (int i = 0; i < names.length(); i++) {
                 String name = names.getString(i);
-
                 if (!name.equals("result")) {
+
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
                     ContentValues values = new ContentValues();
                     values.put("RecordID", row.getString("RecordID"));
@@ -654,14 +692,18 @@ public class LocalDB {
                     values.put("SerialisedObject", encrypted);
                     database.replaceOrThrow("User", null, values);
                 }
+
             }
+
             // Save the sync
             save(sync);
             database.execSQL("COMMIT");
-        } catch (JSONException ex) {
-            database.execSQL("ROLLBACK");
+        }
+        catch (JSONException ex) {
+           database.execSQL("ROLLBACK");
             throw new CRISException("Error parsing JSON data: " + ex.getMessage());
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             database.execSQL("ROLLBACK");
             throw ex;
         }
@@ -1141,7 +1183,7 @@ public class LocalDB {
         }
     }
 
-    public int downloadDocuments(JSONObject jsonOutput, Sync sync) {
+    public int downloadDocuments(JSONObject jsonOutput, Sync sync)  {
         JSONArray names;
         try {
             database.execSQL("BEGIN TRANSACTION");
@@ -1186,10 +1228,12 @@ public class LocalDB {
                     values.put("SessionID", sessionID);
                     database.replaceOrThrow("Document", null, values);
                 }
+
             }
             // Save the sync
             save(sync);
             database.execSQL("COMMIT");
+
         } catch (JSONException ex) {
             database.execSQL("ROLLBACK");
             throw new CRISException("Error parsing JSON data: " + ex.getMessage());

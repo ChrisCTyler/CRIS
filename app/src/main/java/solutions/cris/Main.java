@@ -1,4 +1,5 @@
-// CRIS - Client Record Information System
+package solutions.cris;
+//        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
 //
 //        This program is free software: you can redistribute it and/or modify
@@ -13,8 +14,6 @@
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
-package solutions.cris;
-
 import android.Manifest;
 import android.app.ActivityManager;
 import android.app.admin.DevicePolicyManager;
@@ -336,7 +335,9 @@ public class Main extends CRISActivity {
 
     private void showChanges() {
 
-        String changes = "Added 'Automatically invite to Group Sessions' checkbox to Case " +
+        String changes = "Upgraded database interface.\n\n"  +
+                "--------------- Older Changes ---------------\n\n" +
+                "Added 'Automatically invite to Group Sessions' checkbox to Case " +
                 "document and use to control client register for new sessions.\n\n" +
                 "Added 'Photography/Media Consent' checkbox to Case document. Replaced PDF " +
                 "icon in session register with red/green camera reflecting consent setting. \n\n" +
@@ -344,10 +345,8 @@ public class Main extends CRISActivity {
                 "for individual scores\n\n" +
                 "Automatically confirm associated taxi journeys when session is marked attended\n\n" +
                 "Added search option when adding further clients to a session\n\n" +
-                "--------------- Older Changes ---------------\n\n" +
                 "Added share at client level\n\n" +
                 "Added Case Summary to Case documents\n\n" +
-
                 "Change to 'Follow' mechanism to ensure that a note which " +
                 "triggers a follow is visible as the first unread document. Previously, " +
                  "the follow start was set marginally after the creation date of the " +

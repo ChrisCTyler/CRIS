@@ -10,15 +10,28 @@ import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
 import solutions.cris.object.User;
 
-/**
- * Copyright CRIS.Solutions 29-Sep-2016.
- */
+//        CRIS - Client Record Information System
+//        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
+//
+//        This program is free software: you can redistribute it and/or modify
+//        it under the terms of the GNU General Public License as published by
+//        the Free Software Foundation, either version 3 of the License, or
+//        (at your option) any later version.
+//
+//        This program is distributed in the hope that it will be useful,
+//        but WITHOUT ANY WARRANTY; without even the implied warranty of
+//        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//        GNU General Public License for more details.
+//
+//        You should have received a copy of the GNU General Public License
+//        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 public class LocalDBOpenHelper extends SQLiteOpenHelper {
 
     // Update History:
     // Version 2: Added ReferenceDate column to Document
     // Version 3: Added Commissioner list items and Follow table
-    private static final int VERSION = 19;
+    private static final int VERSION = 20;
     private String organisation;
     private int oldVersion = 0;
     private int newVersion = 0;
@@ -302,6 +315,7 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
                 sqlList.add("UPDATE Document SET SessionID = ''");
                 sqlList.add("CREATE INDEX DocumentDocumentTypeHistoryDateSessionID ON Document(DocumentType, HistoryDate, SessionID);");
                 break;
+
         }
         return sqlList;
     }
@@ -411,6 +425,10 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
                 sqlList.add("ALTER TABLE Document ADD COLUMN SessionID CHAR(36)");
                 break;
             case 19:
+                break;
+            // Build 107 31 Aug 2018 Added as a test - should have no effect
+            case 20:
+                sqlList.add("DELETE FROM ListItem WHERE ListType = 'TRANSPORT_ORGANISATION' AND ItemValue = 'Taxi Company 1'; ");
                 break;
         }
         return sqlList;
