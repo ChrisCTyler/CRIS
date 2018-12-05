@@ -57,9 +57,21 @@ public class ExceptionHandler implements java.lang.Thread.UncaughtExceptionHandl
         try {
             LocalDB localDB = LocalDB.getInstance();
             localDB.save(systemError);
-            message += "The details have been saved and will be sent to your System " +
-                    "Administrator when you next sync with the server. It is very likely " +
-                    "that your last action will have failed and will need to be repeated.\n\n";
+
+
+            if (currentUser == null){
+                // Build 109 - 19 Nov 2018 If user is null then link to server may
+                // not have been established so sync may not be possible. Therefore, display
+                // the error message.
+                message += "Please copy and paste the following information into an email " +
+                        "and send to your system administrator\n\n";
+                message += systemError.getTextSummary();
+            }
+            else {
+                message += "The details have been saved and will be sent to your System " +
+                        "Administrator when you next sync with the server. It is very likely " +
+                        "that your last action will have failed and will need to be repeated.\n\n";
+            }
             // Remove the following line in production copy
             //message += systemError.getTextSummary();
             message += systemError.getExceptionMessage();

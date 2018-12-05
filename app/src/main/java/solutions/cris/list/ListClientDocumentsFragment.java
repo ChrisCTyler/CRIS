@@ -154,6 +154,8 @@ public class ListClientDocumentsFragment extends Fragment {
     private DocumentAdapter adapter;
     private String footerText;
 
+    private MenuItem shareOption;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -315,7 +317,10 @@ public class ListClientDocumentsFragment extends Fragment {
                 footer.setText(footerText);
             }
         }
-
+        // Build 110 - Set the share action text based on the currently selected documents
+        if (shareOption!= null) {
+            createShareActionProvider(shareOption);
+        }
     }
 
     private boolean selectDocument(Document document) {
@@ -664,9 +669,10 @@ public class ListClientDocumentsFragment extends Fragment {
         // Build 102 Add Share at client level
         //MenuItem shareOption = menu.findItem(R.id.menu_item_share);
         //shareOption.setVisible(false);
-        MenuItem shareOption = menu.findItem(R.id.menu_item_share);
+        shareOption = menu.findItem(R.id.menu_item_share);
         shareOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
-        createShareActionProvider(shareOption);
+        // Build 110 - Call moved to onResume so that it reflects current set of documents
+        //createShareActionProvider(shareOption);
         MenuItem selectAllOption = menu.add(0, MENU_SELECT_ALL, 10, "Show All Documents");
         selectAllOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem selectCancelledOption = menu.add(0, MENU_SELECT_UNCANCELLED, 11, "Show Uncancelled Documents");

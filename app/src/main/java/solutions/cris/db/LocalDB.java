@@ -939,10 +939,54 @@ public class LocalDB {
         return sessions;
     }
 
-    public ArrayList<ClientSession> getAllClientSessions(Session session, Date startDate, Date endDate) {
+    public ArrayList<Session> getFutureSessions() {
+        Date today = CRISUtil.midnightLater(new Date());
+        ArrayList<Session> sessions = new ArrayList<>();
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause = "DocumentType = ? AND HistoryDate = ?";
+        String[] whereArgs = new String[]{Integer.toString(Document.Session), Long.toString(Long.MIN_VALUE)};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Session session = (Session) deSerializeDocument(cursor.getBlob(0), Document.Session);
+                if (session != null) {
+                    if (session.getReferenceDate().after(today)) {
+                        sessions.add(session);
+                    }
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return sessions;
+    }
+    public ArrayList<ClientSession> getAllClientSessions(Session session) {
         ArrayList<Session> sessions = new ArrayList<>();
         sessions.add(session);
-        return getAllClientSessions(sessions, startDate, endDate);
+        return getAllClientSessions(sessions);
+    }
+
+    public ArrayList<ClientSession> getAllClientSessions(ArrayList<Session> sessions) {
+        ArrayList<ClientSession> clientSessions = new ArrayList<>();
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause = "DocumentType = ? AND HistoryDate = ? AND SessionID IN (";
+        for (Session session : sessions) {
+            whereClause += String.format("'%s',", session.getDocumentID());
+        }
+        whereClause = whereClause.substring(0, whereClause.length() - 1) + ")";
+        String[] whereArgs = new String[]{Integer.toString(Document.ClientSession), Long.toString(Long.MIN_VALUE)};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                ClientSession clientSession = (ClientSession) deSerializeDocument(cursor.getBlob(0), Document.ClientSession);
+                clientSessions.add(clientSession);
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return clientSessions;
     }
 
     public ArrayList<ClientSession> getAllClientSessions(ArrayList<Session> sessions, Date startDate, Date endDate) {
@@ -959,7 +1003,9 @@ public class LocalDB {
             cursor.moveToFirst();
             while (!cursor.isAfterLast()) {
                 ClientSession clientSession = (ClientSession) deSerializeDocument(cursor.getBlob(0), Document.ClientSession);
-                clientSessions.add(clientSession);
+                if (clientSession.getReferenceDate().after(startDate) && clientSession.getReferenceDate().before(endDate)) {
+                    clientSessions.add(clientSession);
+                }
                 cursor.moveToNext();
             }
         }

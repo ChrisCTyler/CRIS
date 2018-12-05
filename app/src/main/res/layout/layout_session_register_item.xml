@@ -70,5 +70,13 @@
         android:scaleType="fitCenter"
         android:src="@drawable/ic_camera_red" />
 
+    <ImageView
+        android:id="@+id/flag_icon"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="@dimen/register_icon_scale"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_flag_grey" />
+
 
 </LinearLayout>

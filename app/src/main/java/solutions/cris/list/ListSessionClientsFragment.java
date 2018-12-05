@@ -84,6 +84,11 @@ import solutions.cris.utils.LocalSettings;
 
 public class ListSessionClientsFragment extends Fragment {
 
+    // Build 110 - Added School, Agency
+    private enum AttendanceMode {
+        INVITED, RESERVED
+    }
+
     private ArrayList<RegisterEntry> registerAdapterList;
     private ArrayList<ClientEntry> clientAdapterList;
     private ListView listView;
@@ -176,26 +181,34 @@ public class ListSessionClientsFragment extends Fragment {
 
     private void onResumeRegister() {
         // Build 105 - Search visibility
-        if (searchItem != null){
+        if (searchItem != null) {
             searchItem.setVisible(false);
         }
-
         int attendees = 0;
+        // Build 110 - Add Reserved option
+        int reserves =0;
         // Create the adapter
         registerAdapterList = new ArrayList<>();
-        ArrayList<ClientSession> clientSessions = localDB.getAllClientSessions(session, new Date(Long.MIN_VALUE), new Date(Long.MAX_VALUE));
+        ArrayList<ClientSession> clientSessions = localDB.getAllClientSessions(session);
         for (ClientSession clientSession : clientSessions) {
             switch (selectMode) {
                 case ALL:
                     registerAdapterList.add(new RegisterEntry(clientSession));
                     if (clientSession.isAttended()) attendees++;
+                    if (clientSession.isReserved()){
+                        reserves++;
+                    }
                     break;
                 case UNCANCELLED:
                     if (!clientSession.getCancelledFlag()) {
                         registerAdapterList.add(new RegisterEntry(clientSession));
                         if (clientSession.isAttended()) attendees++;
+                        if (clientSession.isReserved()){
+                            reserves++;
+                        }
                     }
             }
+
         }
         // Sort the documents
         switch (sortMode) {
@@ -217,9 +230,9 @@ public class ListSessionClientsFragment extends Fragment {
         // Report the number of hidden documents in the footer.
         TextView footer = (TextView) getActivity().findViewById(R.id.footer);
         if (session.getReferenceDate().before(new Date())) {
-            footer.setText(String.format(Locale.UK, "Attended: %d, DNA: %d", attendees, registerAdapterList.size() - attendees));
+            footer.setText(String.format(Locale.UK, "Attended: %d, DNA: %d, Reserves: %d", attendees, registerAdapterList.size() - attendees - reserves, reserves));
         } else {
-            footer.setText(String.format(Locale.UK, "%d clients invited.", registerAdapterList.size()));
+            footer.setText(String.format(Locale.UK, "%d clients invited, %d reserves.", registerAdapterList.size()-reserves, reserves));
         }
     }
 
@@ -242,7 +255,7 @@ public class ListSessionClientsFragment extends Fragment {
                 hidden++;
             }
         }
-        setInvitedFlag();
+        setInvitedReservedFlags();
         switch (sortMode) {
             case FIRST_LAST:
                 Collections.sort(clientAdapterList, comparatorCEFirstLast);
@@ -274,7 +287,7 @@ public class ListSessionClientsFragment extends Fragment {
         footer.setText(footerText);
     }
 
-    private void setInvitedFlag() {
+    private void setInvitedReservedFlags() {
         for (RegisterEntry registerEntry : registerAdapterList) {
             UUID clientID = registerEntry.getClientSession().getClientID();
             for (ClientEntry clientEntry : clientAdapterList) {
@@ -282,8 +295,15 @@ public class ListSessionClientsFragment extends Fragment {
                     clientEntry.setClientSession(registerEntry.getClientSession());
                     if (registerEntry.getClientSession().getCancelledFlag()) {
                         clientEntry.setInvited(false);
+                        clientEntry.setReserved(false);
                     } else {
-                        clientEntry.setInvited(true);
+                        if (registerEntry.getClientSession().isReserved()){
+                            clientEntry.setInvited(false);
+                            clientEntry.setReserved(true);
+                        } else {
+                            clientEntry.setInvited(true);
+                            clientEntry.setReserved(false);
+                        }
                     }
                     break;
                 }
@@ -301,6 +321,7 @@ public class ListSessionClientsFragment extends Fragment {
     private static final int MENU_SORT_AGE = Menu.FIRST + 13;
 
     private MenuItem searchItem;
+
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
 
@@ -445,7 +466,11 @@ public class ListSessionClientsFragment extends Fragment {
         public int compare(RegisterEntry r1, RegisterEntry r2) {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
-            if (o1.getClient().getLastName().equals(o2.getClient().getLastName())) {
+            // Build 110 - Added reserved option
+            if (o1.isReserved() != o2.isReserved()){
+                if (o1.isReserved()) return 1;
+                else return -1;
+            } else if (o1.getClient().getLastName().equals(o2.getClient().getLastName())) {
                 return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
             } else {
                 return o1.getClient().getLastName().compareTo(o2.getClient().getLastName());
@@ -458,7 +483,11 @@ public class ListSessionClientsFragment extends Fragment {
         public int compare(RegisterEntry r1, RegisterEntry r2) {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
-            if (o1.isAttended() == o2.isAttended()) {
+            // Build 110 - Added reserved option
+            if (o1.isReserved() != o2.isReserved()){
+                if (o1.isReserved()) return 1;
+                else return -1;
+            } else if (o1.isAttended() == o2.isAttended()) {
                 if (o1.getClient().getLastName().equals(o2.getClient().getLastName())) {
                     return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
                 } else {
@@ -480,7 +509,11 @@ public class ListSessionClientsFragment extends Fragment {
         public int compare(RegisterEntry r1, RegisterEntry r2) {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
-            if (o1.getClient().getFirstNames().equals(o2.getClient().getFirstNames())) {
+            // Build 110 - Added reserved option
+            if (o1.isReserved() != o2.isReserved()){
+                if (o1.isReserved()) return 1;
+                else return -1;
+            } else if (o1.getClient().getFirstNames().equals(o2.getClient().getFirstNames())) {
                 return o1.getClient().getLastName().compareTo(o2.getClient().getLastName());
             } else {
                 return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
@@ -493,7 +526,11 @@ public class ListSessionClientsFragment extends Fragment {
         public int compare(RegisterEntry r1, RegisterEntry r2) {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
-            if (o1.getClient().getDateOfBirth().equals(o2.getClient().getDateOfBirth())) {
+            // Build 110 - Added reserved option
+            if (o1.isReserved() != o2.isReserved()){
+                if (o1.isReserved()) return 1;
+                else return -1;
+            } else if (o1.getClient().getDateOfBirth().equals(o2.getClient().getDateOfBirth())) {
                 // Probably twins so compare on first name
                 return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
             } else {
@@ -518,7 +555,10 @@ public class ListSessionClientsFragment extends Fragment {
                     this.note = note;
                     break;
                 }
-
+                // Build 110 If sticky note found
+                if (note.isStickyFlag()) {
+                    stickyNoteFlag = true;
+                }
             }
             ArrayList<Document> pdfDocuments = localDB.getAllDocumentsOfType(clientSession.getClientID(), Document.PdfDocument);
             for (Document document : pdfDocuments) {
@@ -593,6 +633,16 @@ public class ListSessionClientsFragment extends Fragment {
             this.statusDocument = statusDocument;
         }
 
+        // Build 110 Stick Note Flag
+        private boolean stickyNoteFlag;
+
+        boolean getStickyNoteFlag() {
+            return stickyNoteFlag;
+        }
+
+        void setStickyNoteFlag(boolean stickyNoteFlag) {
+            this.stickyNoteFlag = stickyNoteFlag;
+        }
 
     }
 
@@ -623,6 +673,25 @@ public class ListSessionClientsFragment extends Fragment {
                     clientSession.setAttended(false);
                 } else {
                     clientSession.setAttended(true);
+                    // Build 110 - If attended, cannot be reserved
+                    if (clientSession.isReserved()) {
+                        clientSession.setReserved(false);
+                        // Re-sort since client will move out of the reserved list
+                        switch (sortMode) {
+                            case FIRST_LAST:
+                                Collections.sort(registerAdapterList, comparatorREFirstLast);
+                                break;
+                            case LAST_FIRST:
+                                Collections.sort(registerAdapterList, comparatorRELastFirst);
+                                break;
+                            case ATTENDED:
+                                Collections.sort(registerAdapterList, comparatorREAttended);
+                                break;
+                            case AGE:
+                                Collections.sort(registerAdapterList, comparatorREAge);
+                                break;
+                        }
+                    }
                 }
                 clientSession.save(false);
                 // Build 105 - Automatically update the associated taxi document
@@ -832,6 +901,25 @@ public class ListSessionClientsFragment extends Fragment {
                     // Set attendance
                     if (!clientSession.isAttended()) {
                         clientSession.setAttended(true);
+                        /// Build 110 - If attended, cannot be reserved
+                        if (clientSession.isReserved()) {
+                            clientSession.setReserved(false);
+                            // Re-sort since client will move out of the reserved list
+                            switch (sortMode) {
+                                case FIRST_LAST:
+                                    Collections.sort(registerAdapterList, comparatorREFirstLast);
+                                    break;
+                                case LAST_FIRST:
+                                    Collections.sort(registerAdapterList, comparatorRELastFirst);
+                                    break;
+                                case ATTENDED:
+                                    Collections.sort(registerAdapterList, comparatorREAttended);
+                                    break;
+                                case AGE:
+                                    Collections.sort(registerAdapterList, comparatorREAge);
+                                    break;
+                            }
+                        }
                         clientSession.save(false);
                     }
                     // Build 105 - Automatically update the associated taxi document
@@ -918,6 +1006,8 @@ public class ListSessionClientsFragment extends Fragment {
             // Build 105 - Replaced PDF document with Camera Consent
             final PdfDocument pdfDocument = registerEntry.getPdfDocument();
             final Status statusDocument = registerEntry.getStatusDocument();
+            // Build 110 Stick Note Flag
+            final boolean stickyNoteFlag = registerEntry.getStickyNoteFlag();
             ImageView noteIcon = (ImageView) convertView.findViewById(R.id.note_icon);
             noteIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -996,6 +1086,26 @@ public class ListSessionClientsFragment extends Fragment {
                     return true;
                 }
             });
+
+            // Build 110 - If sticky note flag, display client record
+            ImageView flagIcon = (ImageView) convertView.findViewById(R.id.flag_icon);
+            flagIcon.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (stickyNoteFlag) {
+                        displayClientRecord(clientSession);
+                    }
+                }
+            });
+
+            // Build 110 - Added reserve as an option
+            if (clientSession.isReserved()) {
+                int backgroundColor = ContextCompat.getColor(convertView.getContext(), R.color.session_background_reserved);
+                convertView.setBackgroundColor(backgroundColor);
+            } else {
+                int backgroundColor = ContextCompat.getColor(convertView.getContext(), R.color.white);
+                convertView.setBackgroundColor(backgroundColor);
+            }
 
             // Set the colour (for cancellations)
             int color;
@@ -1184,6 +1294,13 @@ public class ListSessionClientsFragment extends Fragment {
             } else {
                 cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_red));
             }
+
+            // Build 110 added 'sticky note' flag
+            if (stickyNoteFlag) {
+                flagIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_flag_red));
+            } else {
+                flagIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_flag_grey));
+            }
             return convertView;
         }
     }
@@ -1194,7 +1311,13 @@ public class ListSessionClientsFragment extends Fragment {
             if (o1.isInvited() != o2.isInvited()) {
                 if (o1.isInvited()) return -1;
                 else return 1;
-            } else {
+            }
+            // Build 110 - Added reserved option
+            else if (o1.isReserved() != o2.isReserved()){
+                if (o1.isReserved()) return -1;
+                else return 1;
+            }
+            else {
                 if (o1.getClient().getLastName().equals(o2.getClient().getLastName())) {
                     return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
                 } else {
@@ -1210,7 +1333,13 @@ public class ListSessionClientsFragment extends Fragment {
             if (o1.isInvited() != o2.isInvited()) {
                 if (o1.isInvited()) return -1;
                 else return 1;
-            } else {
+            }
+            // Build 110 - Added reserved option
+            else if (o1.isReserved() != o2.isReserved()){
+                if (o1.isReserved()) return -1;
+                else return 1;
+            }
+            else {
                 if (o1.getClient().getFirstNames().equals(o2.getClient().getFirstNames())) {
                     return o1.getClient().getLastName().compareTo(o2.getClient().getLastName());
                 } else {
@@ -1226,7 +1355,13 @@ public class ListSessionClientsFragment extends Fragment {
             if (o1.isInvited() != o2.isInvited()) {
                 if (o1.isInvited()) return -1;
                 else return 1;
-            } else {
+            }
+            // Build 110 - Added reserved option
+            else if (o1.isReserved() != o2.isReserved()){
+                if (o1.isReserved()) return -1;
+                else return 1;
+            }
+            else {
                 if (o1.getClient().getDateOfBirth().equals(o2.getClient().getDateOfBirth())) {
                     // Probably twins so compare on first name
                     return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
@@ -1241,6 +1376,7 @@ public class ListSessionClientsFragment extends Fragment {
 
         ClientEntry(Client client) {
             invited = false;
+            reserved = false;
             this.client = client;
         }
 
@@ -1252,6 +1388,17 @@ public class ListSessionClientsFragment extends Fragment {
 
         void setInvited(boolean invited) {
             this.invited = invited;
+        }
+
+        // Build 110
+        private boolean reserved;
+
+        boolean isReserved() {
+            return reserved;
+        }
+
+        void setReserved(boolean reserved) {
+            this.reserved = reserved;
         }
 
         private Client client;
@@ -1294,16 +1441,196 @@ public class ListSessionClientsFragment extends Fragment {
             }
         }
 
-        private void toggleAttendance(final ClientEntry clientEntry) {
+        // Build 110 - Replaced function to handle reserve functionality
+        private void toggleAttendance(final ClientEntry clientEntry, final AttendanceMode mode) {
+            Client client = clientEntry.getClient();
+            // If this is a new ClientSession, create it here (final so that alert dialog can access
+            final ClientSession clientSession;
+            if (clientEntry.getClientSession() == null) {
+                clientSession = new ClientSession(currentUser, client.getClientID());
+                clientSession.setSessionID(session.getDocumentID());
+                clientSession.setReferenceDate(session.getReferenceDate());
+                clientSession.setSession(session);
+                clientSession.setAttended(false);
+                clientSession.setReserved(false);
+                // Set cancelled to true so that invite/reserve has the correct effect
+                clientSession.setCancelledFlag(true);
+                // No need to set clientSessionChanged since Invite to Reserve will set it
+                //clientSessionChanged = true;
+            } else {
+                clientSession = clientEntry.getClientSession();
+            }
+            // Action depends on current state of cancelled/reserved and the mode being toggled
+            if (clientSession.getCancelledFlag()) {
+                // This is either a cancelled invitation or a cancelled reservation
+                // Remove the cancellation
+                clientSession.setCancellationDate(null);
+                clientSession.setCancellationReason("");
+                clientSession.setCancelledByID(null);
+                clientSession.setCancelledFlag(false);
+                // Then set the reserved flag to set the required state
+                if (mode.equals(AttendanceMode.RESERVED)) {
+                    clientSession.setReserved(true);
+                    clientEntry.setReserved(true);
+                    clientEntry.setInvited(false);
+                } else {
+                    clientSession.setReserved(false);
+                    clientEntry.setReserved(false);
+                    clientEntry.setInvited(true);
+                }
+                // And save the change
+                clientSession.save(false);
+                switch (sortMode) {
+                    case FIRST_LAST:
+                        Collections.sort(clientAdapterList, comparatorCEFirstLast);
+                        break;
+                    case LAST_FIRST:
+                        Collections.sort(clientAdapterList, comparatorCELastFirst);
+                        break;
+                    case AGE:
+                        Collections.sort(clientAdapterList, comparatorCEAge);
+                        break;
+                    /*
+                    case GROUP:
+                        Collections.sort(clientAdapterList, Client.comparatorGroup);
+                        break;
+                    case KEYWORKER:
+                        Collections.sort(clientAdapterList, Client.comparatorKeyworker);
+                        break;
+                    case STATUS:
+                        Collections.sort(clientAdapterList, Client.comparatorStatus);
+                        break;
+                        */
+                }
+                notifyDataSetChanged();
+            } else {
+                // Not cancelled so currently either invited or reserved
+                if ((clientSession.isReserved() && mode.equals(AttendanceMode.INVITED) ||
+                        (!clientSession.isReserved() && mode.equals(AttendanceMode.RESERVED)))){
+                    // Switch to invited/reserved
+                    if (mode.equals(AttendanceMode.RESERVED)) {
+                        clientSession.setReserved(true);
+                        clientEntry.setReserved(true);
+                        clientEntry.setInvited(false);
+                    } else {
+                        clientSession.setReserved(false);
+                        clientEntry.setReserved(false);
+                        clientEntry.setInvited(true);
+                    }
+                    // And save the change
+                    clientSession.save(false);
+                    switch (sortMode) {
+                        case FIRST_LAST:
+                            Collections.sort(clientAdapterList, comparatorCEFirstLast);
+                            break;
+                        case LAST_FIRST:
+                            Collections.sort(clientAdapterList, comparatorCELastFirst);
+                            break;
+                        case AGE:
+                            Collections.sort(clientAdapterList, comparatorCEAge);
+                            break;
+                    /*
+                    case GROUP:
+                        Collections.sort(clientAdapterList, Client.comparatorGroup);
+                        break;
+                    case KEYWORKER:
+                        Collections.sort(clientAdapterList, Client.comparatorKeyworker);
+                        break;
+                    case STATUS:
+                        Collections.sort(clientAdapterList, Client.comparatorStatus);
+                        break;
+                        */
+                    }
+                    notifyDataSetChanged();
+
+                } else {
+                    // Do the cancellation
+                    // Cancel - Get the reason and then call the validate/save sequence.
+                    final EditText editText = new EditText(getActivity());
+                    editText.setInputType(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+                    new AlertDialog.Builder(getActivity())
+                            .setView(editText)
+                            .setTitle("Cancel Invite/Reservation")
+                            .setMessage("Please specify a cancellation reason. Note: if " +
+                                    "the cancellation was received after the session date then " +
+                                    "it should be recorded as a DNA (Did Not Attend) using the " +
+                                    "Session Register, not a cancellation since any resources will " +
+                                    "have been committed.")
+                            .setPositiveButton("CancelDocument", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    if (editText.getText().length() > 0) {
+                                        clientSession.setCancellationDate(new Date());
+                                        clientSession.setCancellationReason(editText.getText().toString());
+                                        clientSession.setCancelledByID(((ListActivity) getActivity()).getCurrentUser().getUserID());
+                                        clientSession.setCancelledFlag(true);
+                                        // Build 110 - If reserved then set flag
+                                        if (mode == AttendanceMode.RESERVED) {
+                                            clientSession.setReserved(true);
+                                        } else {
+                                            clientSession.setReserved(false);
+                                        }
+                                        clientSession.save(false);
+                                        clientEntry.setInvited(false);
+                                        clientEntry.setReserved(false);
+                                        switch (sortMode) {
+                                            case FIRST_LAST:
+                                                Collections.sort(clientAdapterList, comparatorCEFirstLast);
+                                                break;
+                                            case LAST_FIRST:
+                                                Collections.sort(clientAdapterList, comparatorCELastFirst);
+                                                break;
+                                            case AGE:
+                                                Collections.sort(clientAdapterList, comparatorCEAge);
+                                                break;
+                                    /*
+                                    case GROUP:
+                                        Collections.sort(clientAdapterList, Client.comparatorGroup);
+                                        break;
+                                    case KEYWORKER:
+                                        Collections.sort(clientAdapterList, Client.comparatorKeyworker);
+                                        break;
+                                    case STATUS:
+                                        Collections.sort(clientAdapterList, Client.comparatorStatus);
+                                        break;
+                                        */
+                                        }
+                                        notifyDataSetChanged();
+                                    }
+                                }
+                            })
+                            .setNegativeButton("DoNotCancel", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                }
+                            })
+                            .show();
+                }
+
+            }
+            if (session.getReferenceDate().before(tomorrow) &&
+                    !clientSession.isReserved() &&
+                    !clientSession.getCancelledFlag()) {       // PAST
+                // Assume client attended and this is late data entry
+                clientSession.setAttended(true);
+            } else {
+                // All other cases are non-attendance
+                clientSession.setAttended(false);
+            }
+        }
+
+        private void toggleAttendanceOld(final ClientEntry clientEntry) {
             Client client = clientEntry.getClient();
             if (clientEntry.isInvited()) {
+                // Build 110 - Reserve Option - Whichever option is ticked, cancel the
+                // invitation and the move to reserved or uninvited.
                 final ClientSession clientSession = clientEntry.getClientSession();
                 // Cancel - Get the reason and then call the validate/save sequence.
                 final EditText editText = new EditText(getActivity());
                 editText.setInputType(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
                 new AlertDialog.Builder(getActivity())
                         .setView(editText)
-                        .setTitle("Cancel Inivite")
+                        .setTitle("Cancel Invite")
                         .setMessage("Please specify a cancellation reason. Note: if " +
                                 "the cancellation was received after the session date then " +
                                 "it should be recorded as a DNA (Did Not Attend) using the " +
@@ -1354,7 +1681,8 @@ public class ListSessionClientsFragment extends Fragment {
                         .show();
 
             } else {
-                //Invite (possibly un-cancel)
+                // Not currently invited
+                //Check for cancelled
                 ClientSession clientSession;
                 if (clientEntry.getClientSession() != null) {
                     // Uncancel
@@ -1365,12 +1693,13 @@ public class ListSessionClientsFragment extends Fragment {
                     clientSession.setCancelledFlag(false);
                     // No need to update Register since cancels are included
                 } else {
+                    // Not yet invited/reserved
                     clientSession = new ClientSession(currentUser, client.getClientID());
                     clientSession.setSessionID(session.getDocumentID());
                     clientSession.setReferenceDate(session.getReferenceDate());
                     clientSession.setSession(session);
                     // Add to the Register
-                    // Unnecessary because FAB switch hcalls onResume which reloads registerAdapter
+                    // Unnecessary because FAB switch calls onResume which reloads registerAdapter
                     //registerAdapterList.add(new RegisterEntry(clientSession));
                 }
                 if (session.getReferenceDate().before(tomorrow)) {       // PAST
@@ -1433,25 +1762,41 @@ public class ListSessionClientsFragment extends Fragment {
             invitedIcon.setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View view, MotionEvent motionEvent) {
-                    toggleAttendance(clientEntry);
+                    toggleAttendance(clientEntry, AttendanceMode.INVITED);
+                    return false;
+                }
+            });
+            ImageView reserveIcon = (ImageView) convertView.findViewById(R.id.reserve_icon);
+            reserveIcon.setOnTouchListener(new View.OnTouchListener() {
+                @Override
+                public boolean onTouch(View view, MotionEvent motionEvent) {
+                    toggleAttendance(clientEntry, AttendanceMode.RESERVED);
                     return false;
                 }
             });
             TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
             TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
 
-
             // Display the client's name
             viewItemMainText.setText(client.getFullName());
 
             // Attendance Icon
+            // Build 110 - Added reserve as an option
             if (clientEntry.isInvited()) {
                 invitedIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_tick));
-                int backgroundColor = ContextCompat.getColor(convertView.getContext(), R.color.header_background);
+                reserveIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_session_reserve_grey));
+                int backgroundColor = ContextCompat.getColor(convertView.getContext(), R.color.white);
+
+                convertView.setBackgroundColor(backgroundColor);
+            } else if (clientEntry.isReserved()) {
+                invitedIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_tick_grey));
+                reserveIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_session_reserve));
+                int backgroundColor = ContextCompat.getColor(convertView.getContext(), R.color.session_background_reserved);
                 convertView.setBackgroundColor(backgroundColor);
             } else {
                 invitedIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_tick_grey));
-                int backgroundColor = ContextCompat.getColor(convertView.getContext(), R.color.white);
+                reserveIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_session_reserve_grey));
+                int backgroundColor = ContextCompat.getColor(convertView.getContext(), R.color.session_background_unreserved);
                 convertView.setBackgroundColor(backgroundColor);
             }
 
@@ -1460,6 +1805,7 @@ public class ListSessionClientsFragment extends Fragment {
 
             // Rest of information displayed depends on privilege and sort type
             // (privilege takes preference).
+            // Build 110 - Already set text colour as part of 'reserve' change
             int color = ContextCompat.getColor(convertView.getContext(), R.color.text_grey);
             // Additional text depends on sort/select
             String additionalText = "";

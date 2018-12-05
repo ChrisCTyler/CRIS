@@ -486,7 +486,9 @@ public class Login extends CRISActivity {
             //JSONObject postJSON = getPostJSON(localDB);
             WebConnection webConnection = new WebConnection(localDB);
             //JSONObject jsonOutput = postJSON("check_database.php", postJSON);
-            JSONObject jsonOutput = webConnection.post("check_database.php");
+            // Build 109 - 19 Nov 2018 Use new PDO calls
+            //JSONObject jsonOutput = webConnection.post("check_database.php");
+            JSONObject jsonOutput = webConnection.post("pdo_check_database.php");
             try {
                 String result = jsonOutput.getString("result");
                 if (result.equals("FAILURE")) {

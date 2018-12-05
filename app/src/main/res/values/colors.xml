@@ -13,4 +13,6 @@
     <color name="header_background">#F2F2F2</color>
     <color name="my_week_yellow">#FFC10E</color>
     <color name="my_week_dark_yellow">#D69800</color>
+    <color name="session_background_unreserved">#CCE9FF</color>
+    <color name="session_background_reserved">#E6F4FF</color>
 </resources>

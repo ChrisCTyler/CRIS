@@ -61,6 +61,7 @@ import solutions.cris.db.LocalDB;
 import solutions.cris.edit.EditClient;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
+import solutions.cris.object.Contact;
 import solutions.cris.object.Document;
 import solutions.cris.object.ListType;
 import solutions.cris.object.Role;
@@ -96,7 +97,8 @@ public class ListClientsFragment extends Fragment {
     private Parcelable listViewState;
     private UUID oldClientRecordID;
 
-    private enum SelectMode {ALL, OPEN, FOLLOWED, GROUP, KEYWORKER, COMMISSIONER, OVERDUE}
+    // Build 110 - Added School, Agency
+    private enum SelectMode {ALL, OPEN, FOLLOWED, GROUP, KEYWORKER, COMMISSIONER, OVERDUE, SCHOOL, AGENCY}
 
     private enum SortMode {FIRST_LAST, LAST_FIRST, GROUP, KEYWORKER, STATUS, CASE_START, AGE}
 
@@ -413,6 +415,39 @@ public class ListClientsFragment extends Fragment {
                         } else selected = false;
                     }
                     break;
+                //Build 110 Added School, Agency
+                case SCHOOL:
+                    if (client.getCurrentSchoolID() == null) {
+                        selected = false;
+                    }
+                    else {
+                        Contact contactDocument = client.getCurrentSchool();
+                        if (contactDocument == null) {
+                            selected = false;
+                        }
+                        else {
+                            if (!contactDocument.getSchoolID().equals(selectedID)){
+                                selected = false;
+                            }
+                        }
+                    }
+                    break;
+                case AGENCY:
+                    if (client.getCurrentAgencyID() == null) {
+                        selected = false;
+                    }
+                    else {
+                        Contact contactDocument = client.getCurrentAgency();
+                        if (contactDocument == null) {
+                            selected = false;
+                        }
+                        else {
+                            if (!contactDocument.getAgencyID().equals(selectedID)){
+                                selected = false;
+                            }
+                        }
+                    }
+                    break;
                 default:
                     // Awaiting Group, Keyworker etc.
                     selected = false;
@@ -430,13 +465,16 @@ public class ListClientsFragment extends Fragment {
     private static final int MENU_SELECT_GROUP = Menu.FIRST + 6;
     private static final int MENU_SELECT_KEYWORKER = Menu.FIRST + 7;
     private static final int MENU_SELECT_COMMISSIONER = Menu.FIRST + 8;
-    private static final int MENU_SORT_FIRST_LAST_NAME = Menu.FIRST + 9;
-    private static final int MENU_SORT_LAST_FIRST_NAME = Menu.FIRST + 10;
-    private static final int MENU_SORT_CASE_START = Menu.FIRST + 11;
-    private static final int MENU_SORT_AGE = Menu.FIRST + 12;
-    private static final int MENU_SORT_GROUP = Menu.FIRST + 13;
-    private static final int MENU_SORT_KEYWORKER = Menu.FIRST + 14;
-    private static final int MENU_SORT_STATUS = Menu.FIRST + 15;
+    //Build 110 Added School, Agency
+    private static final int MENU_SELECT_SCHOOL = Menu.FIRST + 9;
+    private static final int MENU_SELECT_AGENCY = Menu.FIRST + 10;
+    private static final int MENU_SORT_FIRST_LAST_NAME = Menu.FIRST + 11;
+    private static final int MENU_SORT_LAST_FIRST_NAME = Menu.FIRST + 12;
+    private static final int MENU_SORT_CASE_START = Menu.FIRST + 13;
+    private static final int MENU_SORT_AGE = Menu.FIRST + 14;
+    private static final int MENU_SORT_GROUP = Menu.FIRST + 15;
+    private static final int MENU_SORT_KEYWORKER = Menu.FIRST + 16;
+    private static final int MENU_SORT_STATUS = Menu.FIRST + 17;
 
 
     @Override
@@ -484,6 +522,13 @@ public class ListClientsFragment extends Fragment {
 
             MenuItem selectCommissionerOption = menu.add(0, MENU_SELECT_COMMISSIONER, 10, "Show One " + localSettings.Commisioner);
             selectCommissionerOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+            //Build 110 Added School, Agency
+            MenuItem selectSchoolOption = menu.add(0, MENU_SELECT_SCHOOL, 11, "Show One School");
+            selectSchoolOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+            MenuItem selectAgencyOption = menu.add(0, MENU_SELECT_AGENCY, 12, "Show One Agency");
+            selectAgencyOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
             MenuItem sortGroupOption = menu.add(0, MENU_SORT_GROUP, 24, "Sort by " + localSettings.Group);
             sortGroupOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -643,6 +688,15 @@ public class ListClientsFragment extends Fragment {
                 selectCommissioner();
                 return true;
 
+            //Build 110 Added School, Agency
+            case MENU_SELECT_SCHOOL:
+                selectSchool();
+                return true;
+
+            case MENU_SELECT_AGENCY:
+                selectAgency();
+                return true;
+
             case MENU_SORT_FIRST_LAST_NAME:
                 sortMode = SortMode.FIRST_LAST;
                 Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorFirstLast);
@@ -757,6 +811,54 @@ public class ListClientsFragment extends Fragment {
                 selectedID = groups.getListItems().get(which).getListItemID();
                 selectedValue = groups.getListItems().get(which).getItemValue();
                 selectMode = SelectMode.COMMISSIONER;
+                loadAdapter();
+            }
+        });
+
+        // Create the AlertDialog
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    // Build 110 - Added Show One School
+    private void selectSchool() {
+        // Use local settings for 'local' labels
+        final PickList schools = new PickList(localDB, ListType.SCHOOL, 0);
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        builder.setTitle("Show clients for the following School:");
+        ArrayList<String> itemList = schools.getOptions();
+        String[] items = itemList.toArray(new String[itemList.size()]);
+
+        builder.setItems(items, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                selectedID = schools.getListItems().get(which).getListItemID();
+                selectedValue = schools.getListItems().get(which).getItemValue();
+                selectMode = SelectMode.SCHOOL;
+                loadAdapter();
+            }
+        });
+
+        // Create the AlertDialog
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    // Build 110 - Added Show One Agency
+    private void selectAgency() {
+        // Use local settings for 'local' labels
+        final PickList agencies = new PickList(localDB, ListType.AGENCY, 0);
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        builder.setTitle("Show clients for the following Agency:");
+        ArrayList<String> itemList = agencies.getOptions();
+        String[] items = itemList.toArray(new String[itemList.size()]);
+
+        builder.setItems(items, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                selectedID = agencies.getListItems().get(which).getListItemID();
+                selectedValue = agencies.getListItems().get(which).getItemValue();
+                selectMode = SelectMode.AGENCY;
                 loadAdapter();
             }
         });

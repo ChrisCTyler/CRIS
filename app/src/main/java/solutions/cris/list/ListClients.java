@@ -39,7 +39,7 @@ import solutions.cris.R;
 import solutions.cris.object.Client;
 import solutions.cris.object.Document;
 import solutions.cris.object.User;
-import solutions.cris.utils.CRISDeviceAdmin;
+//import solutions.cris.utils.CRISDeviceAdmin;
 import solutions.cris.utils.ExceptionHandler;
 
 public class ListClients extends ListActivity {

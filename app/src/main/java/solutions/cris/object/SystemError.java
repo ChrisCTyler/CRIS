@@ -118,7 +118,13 @@ public class SystemError extends CrisObject implements Serializable {
     //public String getExceptionName()  {return exceptionName;}
     // ExceptionMessage
     private String exceptionMessage;
-    public String getExceptionMessage()  {return exceptionMessage;}
+    public String getExceptionMessage()  {
+        if (exceptionMessage == null){
+            return "Exception message was null";
+        } else {
+            return exceptionMessage;
+        }
+    }
     // StackTrace
     private String stackTrace;
     //public String getStackTrace()  {return stackTrace;}
@@ -126,7 +132,7 @@ public class SystemError extends CrisObject implements Serializable {
     public String getTextSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.UK);
         String text = "System Error: " + exceptionName + "\n\n";
-        text += exceptionMessage + "\n\n";
+        text += getExceptionMessage() + "\n\n";
         text += "Date: " + sDate.format(getCreationDate()) + "\n";
         text += "User: " + userName + "\n";
         text += "Email Address: " + userEmailAddress + "\n";

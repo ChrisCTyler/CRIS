@@ -101,6 +101,17 @@ public class ClientSession extends Document implements Serializable {
         this.attended = attended;
     }
 
+    // Build 110
+    private boolean reserved;
+
+    public boolean isReserved() {
+        return reserved;
+    }
+
+    public void setReserved(boolean reserved) {
+        this.reserved = reserved;
+    }
+
     // Status is not used. Use StatusDocument base class status.getScore() instead
     private int status;
 
@@ -159,6 +170,17 @@ public class ClientSession extends Document implements Serializable {
         } else {
             summary += "Attended: NO\n";
         }
+        // Build 110
+        if (reserved) {
+            summary += "Reserved: YES\n";
+        } else {
+            summary += "Reserved: NO\n";
+        }
+        if (getCancelledFlag()) {
+            summary += String.format("Cancelled: YES\n%s\n",getCancellationReason());
+        } else {
+            summary += "Cancelled: NO\n";
+        }
         return summary;
     }
 
@@ -171,6 +193,9 @@ public class ClientSession extends Document implements Serializable {
         fNames.add("Postcode");
         fNames.add("Session Date");
         fNames.add("Attended");
+        // Build 110
+        fNames.add("Reserved");
+        fNames.add("Cancelled");
         fNames.add("Score");
         fNames.add("Group");
         fNames.add("Session");
@@ -287,8 +312,8 @@ public class ClientSession extends Document implements Serializable {
                         .setRange(new DimensionRange()
                                 .setSheetId(sheetID)
                                 .setDimension("COLUMNS")
-                                .setStartIndex(8)
-                                .setEndIndex(11))
+                                .setStartIndex(10)
+                                .setEndIndex(13))
                 ));
         // 1st row is bold/Centered
         requests.add(new Request()
@@ -358,6 +383,18 @@ public class ClientSession extends Document implements Serializable {
             row.add("");
         }
         if (isAttended()){
+            row.add("True");
+        } else {
+            row.add("False");
+        }
+        // Build 110
+        if (isReserved()){
+            row.add("True");
+        } else {
+            row.add("False");
+        }
+        // Build 110
+        if (getCancelledFlag()){
             row.add("True");
         } else {
             row.add("False");

@@ -79,7 +79,7 @@ import solutions.cris.object.SystemError;
 import solutions.cris.object.User;
 import solutions.cris.read.ReadClientHeader;
 import solutions.cris.sync.SyncManager;
-import solutions.cris.utils.CRISDeviceAdmin;
+//import solutions.cris.utils.CRISDeviceAdmin;
 import solutions.cris.utils.CRISMenuItem;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.ExceptionHandler;
@@ -192,7 +192,9 @@ public class Main extends CRISActivity {
                     if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_SYSTEM_ADMINISTRATOR)) {
                         menuItems.add(new CRISMenuItem("System Administration", "", R.drawable.ic_system_administration, null));
                     }
-                    menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2016, cris.solutions", BuildConfig.VERSION_NAME), "",
+                    // Build 110 - Updated copyright date
+                    //menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2016, cris.solutions", BuildConfig.VERSION_NAME), "",
+                    menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2018, cris.solutions", BuildConfig.VERSION_NAME), "",
                             R.drawable.ic_cris_grey, null));
                     // Load the unread documents
                     getUnreadDocuments();
@@ -335,8 +337,22 @@ public class Main extends CRISActivity {
 
     private void showChanges() {
 
-        String changes = "Upgraded database interface.\n\n"  +
+        String changes = "Added icon in Session Register to show presence of sticky notes\n\n" +
+                "Added Show One School option to All Clients view to display a list of " +
+                "all active clients with school record for the given school.\n\n" +
+                "Added option to create a list of 'reserves' for a session. A client on the " +
+                "reserve list can be invited or removed from the list. Removing a reserve " +
+                "will request a cancellation reason, similar to cancelling an invitation.\n\n" +
+                "Share option on Client Document view modified to reflect the currently " +
+                "selected documents, so that cancelled documents can be shared.\n\n" +
+                "Added functionality to handle invites to already existing, future sessions when " +
+                "a client moves to a new group. All invites to the old group's future " +
+                "sessions will be cancelled automatically. The user will then be given the option " +
+                "of having invitations automatically added to any future session for the new " +
+                "group. Invitations to future ad-hoc sessions will not be affected by a change " +
+                "of group.\n\n" +
                 "--------------- Older Changes ---------------\n\n" +
+                "Upgraded database interface.\n\n"  +
                 "Added 'Automatically invite to Group Sessions' checkbox to Case " +
                 "document and use to control client register for new sessions.\n\n" +
                 "Added 'Photography/Media Consent' checkbox to Case document. Replaced PDF " +

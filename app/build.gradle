@@ -14,8 +14,8 @@ android {
         applicationId "solutions.cris"
         minSdkVersion 21
         targetSdkVersion 27
-        versionCode 108
-        versionName "2.1.108"
+        versionCode 111
+        versionName "2.1.111"
     }
     buildTypes {
         release {
@@ -38,7 +38,7 @@ dependencies {
 
     implementation 'com.android.support:appcompat-v7:27.1.1'
     implementation 'com.android.support:design:27.1.1'
-    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
-    implementation 'com.google.android.gms:play-services-auth:16.0.0'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.3'
+    implementation 'com.google.android.gms:play-services-auth:16.0.1'
     implementation 'pub.devrel:easypermissions:1.3.0'
 }

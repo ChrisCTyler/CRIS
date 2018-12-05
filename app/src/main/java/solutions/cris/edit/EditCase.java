@@ -14,6 +14,7 @@ package solutions.cris.edit;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.app.DatePickerDialog;
 import android.app.Fragment;
 import android.app.FragmentManager;
@@ -46,8 +47,10 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Locale;
+import java.util.UUID;
 
 import solutions.cris.Main;
 import solutions.cris.R;
@@ -56,10 +59,12 @@ import solutions.cris.list.ListActivity;
 import solutions.cris.list.ListClientHeader;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
+import solutions.cris.object.ClientSession;
 import solutions.cris.object.Document;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
 import solutions.cris.object.Role;
+import solutions.cris.object.Session;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.GroupPickList;
@@ -106,6 +111,9 @@ public class EditCase extends Fragment {
 
     private TextView hintTextView;
     private boolean hintTextDisplayed = true;
+
+    // Build 110 - Add to existing sessions
+    private UUID oldGroupID;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -158,7 +166,6 @@ public class EditCase extends Fragment {
         client = ((ListActivity) getActivity()).getClient();
         editDocument = (Case) ((ListActivity) getActivity()).getDocument();
         localDB = LocalDB.getInstance();
-
 
 
         // CANCEL BOX
@@ -247,7 +254,7 @@ public class EditCase extends Fragment {
         caseSummaryView.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View view) {
-                if (client.getCurrentCase() != null ) {
+                if (client.getCurrentCase() != null) {
                     Case currentCase = client.getCurrentCase();
                     String currentText = caseSummaryView.getText().toString();
                     caseSummaryView.setText(currentText + currentCase.getCaseSummary());
@@ -372,9 +379,147 @@ public class EditCase extends Fragment {
             @Override
             public void onClick(View view) {
                 if (validate()) {
-                    editDocument.save(isNewMode);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Deal with future invites if this is a new Case document and the group
+                    // has changed (or is being set for the first time, Case Start)
+                    if (isNewMode) {
+                        if (oldGroupID == null ||
+                                !editDocument.getGroupID().equals(oldGroupID)) {
+                            // Build 110 - The following code deals with invalidated invites to
+                            // existing future sessions. First, get the list of future sessions
+                            ArrayList<Session> futureSessionList = localDB.getFutureSessions();
+                            // Find sessions for the old  and new groups
+                            final ArrayList<Session> oldGroupSessions = new ArrayList<>();
+                            final ArrayList<Session> newGroupSessions = new ArrayList<>();
+                            for (Session session : futureSessionList) {
+                                if (session.getGroupID().equals(editDocument.getGroupID())) {
+                                    newGroupSessions.add(session);
+                                } else if (oldGroupID != null && session.getGroupID().equals(oldGroupID)) {
+                                    oldGroupSessions.add(session);
+                                }
+                            }
+                            // First deal with future sessions of the old group
+                            if (oldGroupSessions.size() > 0) {
+                                // Get all client sessions for all future sessions of the old group
+                                ArrayList<ClientSession> oldClientSessions =
+                                        localDB.getAllClientSessions(oldGroupSessions,
+                                                new Date(Long.MIN_VALUE),
+                                                new Date(Long.MAX_VALUE));
+
+                                // And cancel any that exist for this client
+                                for (ClientSession clientSession : oldClientSessions) {
+                                    if (clientSession.getClientID().equals(client.getClientID())) {
+                                        // If client session was already cancelled, do not cancel
+                                        // again so that the original reason is preserved
+                                        if (!clientSession.getCancelledFlag()) {
+                                            // Cancel this ClientSession
+                                            clientSession.setCancellationDate(new Date());
+                                            clientSession.setCancellationReason("Client moved to different group");
+                                            clientSession.setCancelledByID(((ListActivity) getActivity()).getCurrentUser().getUserID());
+                                            clientSession.setCancelledFlag(true);
+                                            clientSession.setReserved(false);
+                                            clientSession.save(false);
+                                        }
+                                    }
+                                }
+                            }
+                            // Now, deal with the future sessions of the new group
+                            if (newGroupSessions.size() > 0) {
+                                // Get all client sessions for all future sessions of the new group
+                                ArrayList<ClientSession> newClientSessions =
+                                        localDB.getAllClientSessions(newGroupSessions,
+                                                new Date(Long.MIN_VALUE),
+                                                new Date(Long.MAX_VALUE));
+                                // and check that this client isn't already invited to any future sessions for the new group
+                                for (ClientSession clientSession : newClientSessions) {
+                                    if (clientSession.getClientID().equals(client.getClientID())) {
+                                        // Remove session from newGroupSessions
+                                        for (Session session : newGroupSessions) {
+                                            if (session.getDocumentID().equals(clientSession.getSessionID())) {
+                                                newGroupSessions.remove(session);
+                                                break;
+                                            }
+                                        }
+                                        // It is possible that new group client sessions could be
+                                        // cancelled, if so, uncancel
+                                        if (clientSession.getCancelledFlag()) {
+                                            clientSession.setCancellationDate(null);
+                                            clientSession.setCancellationReason("");
+                                            clientSession.setCancelledByID(null);
+                                            clientSession.setCancelledFlag(false);
+                                            // And save the change
+                                            clientSession.save(false);
+                                        }
+                                    }
+                                }
+
+                                // If there are still new sessions, see if the user wants to add invites
+                                if (!editDocument.isDoNotInviteFlag() && newGroupSessions.size() > 0) {
+                                    final User currentUser = ((ListActivity) getActivity()).getCurrentUser();
+
+                                    String messageText = "";
+                                    if (oldGroupID == null) {
+                                        messageText = "Do you want invitations to be created for any " +
+                                                "existing, future sessions for the client's new group?";
+                                    } else {
+                                        messageText = "The client is moving to a new group so invitations " +
+                                                "to future sessions for the old group have been automatically cancelled. " +
+                                                "Do you want invitations to be created for any " +
+                                                "existing, future sessions for the client's new group?";
+                                    }
+                                    new AlertDialog.Builder(getActivity())
+                                            .setTitle("Invite to Existing Sessions")
+                                            .setMessage(messageText)
+                                            .setPositiveButton("Invite to Sessions", new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                    // Create the new sessions
+                                                    for (Session session : newGroupSessions) {
+                                                        ClientSession clientSession = new ClientSession(
+                                                                currentUser,
+                                                                client.getClientID());
+                                                        clientSession.setSessionID(session.getDocumentID());
+                                                        clientSession.setReferenceDate(session.getReferenceDate());
+                                                        clientSession.setSession(session);
+                                                        clientSession.setAttended(false);
+                                                        clientSession.setReserved(false);
+                                                        clientSession.setCancelledFlag(false);
+                                                        clientSession.save(true);
+
+                                                    }
+                                                    editDocument.save(isNewMode);
+                                                    FragmentManager fragmentManager = getFragmentManager();
+                                                    fragmentManager.popBackStack();
+                                                }
+                                            })
+                                            .setNegativeButton("Do Not Invite", new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                    editDocument.save(isNewMode);
+                                                    FragmentManager fragmentManager = getFragmentManager();
+                                                    fragmentManager.popBackStack();
+                                                }
+                                            })
+                                            .show();
+                                } else {
+                                    editDocument.save(isNewMode);
+                                    FragmentManager fragmentManager = getFragmentManager();
+                                    fragmentManager.popBackStack();
+                                }
+                            } else {
+                                editDocument.save(isNewMode);
+                                FragmentManager fragmentManager = getFragmentManager();
+                                fragmentManager.popBackStack();
+                            }
+                        } else {
+                            editDocument.save(isNewMode);
+                            FragmentManager fragmentManager = getFragmentManager();
+                            fragmentManager.popBackStack();
+                        }
+                    } else {
+                        editDocument.save(isNewMode);
+                        FragmentManager fragmentManager = getFragmentManager();
+                        fragmentManager.popBackStack();
+                    }
                 }
             }
         });
@@ -405,6 +550,8 @@ public class EditCase extends Fragment {
                         overdueThresholdView.setText(String.format(Locale.UK, "%d", currentCase.getOverdueThreshold()));
                         tierSpinner.setSelection(tierPickList.getPosition(currentCase.getTier()));
                         groupSpinner.setSelection(groupPickList.getPosition(currentCase.getGroup()));
+                        // Build 110 - Save current group for managing group changes
+                        oldGroupID = currentCase.getGroupID();
                         keyworkerSpinner.setSelection(keyworkerPickList.getPosition(currentCase.getKeyWorker()));
                         coworker1Spinner.setSelection(coworker1PickList.getPosition(currentCase.getCoWorker1()));
                         coworker2Spinner.setSelection(coworker2PickList.getPosition(currentCase.getCoWorker2()));
@@ -441,6 +588,8 @@ public class EditCase extends Fragment {
                 overdueThresholdView.setText(String.format(Locale.UK, "%d", editDocument.getOverdueThreshold()));
                 tierSpinner.setSelection(tierPickList.getPosition(editDocument.getTier()));
                 groupSpinner.setSelection(groupPickList.getPosition(editDocument.getGroup()));
+                // Build 110 - Save current group for managing group changes
+                oldGroupID = editDocument.getGroupID();
                 doNotInviteCheckbox.setChecked(editDocument.isDoNotInviteFlag());
                 keyworkerSpinner.setSelection(keyworkerPickList.getPosition(editDocument.getKeyWorker()));
                 coworker1Spinner.setSelection(coworker1PickList.getPosition(editDocument.getCoWorker1()));
@@ -622,7 +771,7 @@ public class EditCase extends Fragment {
         }
 
         // CaseSummary
-        if (caseSummaryView.getText().toString().isEmpty()){
+        if (caseSummaryView.getText().toString().isEmpty()) {
             editDocument.setCaseSummary("");
         } else {
             editDocument.setCaseSummary(caseSummaryView.getText().toString());

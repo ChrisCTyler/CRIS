@@ -146,7 +146,9 @@ public class ListSessionClients extends ListActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.menu_search_share, menu);
+        // Build 110 - Removed share from Session views as not relevant
+        //inflater.inflate(R.menu.menu_search_share, menu);
+        inflater.inflate(R.menu.menu_search, menu);
         super.onCreateOptionsMenu(menu);
         return true;
     }

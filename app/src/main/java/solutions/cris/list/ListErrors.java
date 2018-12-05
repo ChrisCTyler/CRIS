@@ -14,6 +14,7 @@ package solutions.cris.list;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -54,9 +55,10 @@ public class ListErrors extends CRISActivity {
     private ListView listView;
     public static List<SystemError> errors;
     public static List<SystemError> selectedErrors;
-    private enum SelectMode {ALL, NOSYNC}
-    private SelectMode selectMode = SelectMode.NOSYNC;
 
+    private enum SelectMode {ALL, NOSYNC}
+
+    private SelectMode selectMode = SelectMode.NOSYNC;
 
 
     @Override
@@ -114,6 +116,7 @@ public class ListErrors extends CRISActivity {
                             !error.getExceptionMessage().startsWith("Unable to start receiver") &&
                             !error.getExceptionMessage().startsWith("java.net.SocketTimeout")) {
                         selectedErrors.add(error);
+
                     }
                 }
         }
