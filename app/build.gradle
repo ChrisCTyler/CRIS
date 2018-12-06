@@ -14,8 +14,8 @@ android {
         applicationId "solutions.cris"
         minSdkVersion 21
         targetSdkVersion 27
-        versionCode 111
-        versionName "2.1.111"
+        versionCode 112
+        versionName "2.1.112"
     }
     buildTypes {
         release {

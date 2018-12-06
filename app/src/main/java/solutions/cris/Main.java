@@ -351,6 +351,8 @@ public class Main extends CRISActivity {
                 "of having invitations automatically added to any future session for the new " +
                 "group. Invitations to future ad-hoc sessions will not be affected by a change " +
                 "of group.\n\n" +
+                "Fixed crash when client invited to session before case start due " +
+                "to unknown status of 'consent to photography'.\n\n" +
                 "--------------- Older Changes ---------------\n\n" +
                 "Upgraded database interface.\n\n"  +
                 "Added 'Automatically invite to Group Sessions' checkbox to Case " +
@@ -367,7 +369,6 @@ public class Main extends CRISActivity {
                 "triggers a follow is visible as the first unread document. Previously, " +
                  "the follow start was set marginally after the creation date of the " +
                 "associated note so only subsequent documents were made visible. \n\n" +
-
                 "Fix to stop unread notes being incorrectly notified\n\n" +
                 "Bug fix to handle problem with unattached, unread notes\n\n" +
 

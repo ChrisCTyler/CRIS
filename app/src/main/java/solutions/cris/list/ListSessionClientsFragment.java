@@ -1289,10 +1289,15 @@ public class ListSessionClientsFragment extends Fragment {
             }
 
             ImageView cameraIcon = (ImageView) convertView.findViewById(R.id.camera_icon);
-            if (currentCase.isPhotographyConsentFlag()) {
-                cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_green));
+            // Build 111 - Fix bug where current case is null
+            if (currentCase == null){
+                cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_grey));
             } else {
-                cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_red));
+                if (currentCase.isPhotographyConsentFlag()) {
+                    cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_green));
+                } else {
+                    cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_red));
+                }
             }
 
             // Build 110 added 'sticky note' flag
