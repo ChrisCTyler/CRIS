@@ -60,8 +60,11 @@ public class CRISMenuItem implements Serializable {
             case "Library":
                 sortString = "08Library";
                 break;
+            case "Key Performance Indicators":
+                sortString = "09Key Performance Indicators";
+                break;
             case "System Administration":
-                sortString = "09System Administration";
+                sortString = "10System Administration";
                 break;
             default:
                 if (title.startsWith("CRIS")){

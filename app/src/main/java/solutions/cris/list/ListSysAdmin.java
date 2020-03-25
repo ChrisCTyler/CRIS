@@ -16,11 +16,12 @@ package solutions.cris.list;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -39,11 +40,13 @@ import java.util.List;
 import java.util.Locale;
 
 import solutions.cris.CRISActivity;
-import solutions.cris.Login;
-import solutions.cris.Main;
 import solutions.cris.R;
+import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.object.Note;
+import solutions.cris.object.Sync;
 import solutions.cris.object.User;
+import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISMenuItem;
 import solutions.cris.utils.ExceptionHandler;
 
@@ -74,6 +77,8 @@ public class ListSysAdmin extends CRISActivity {
             menuItems = new ArrayList<>();
             menuItems.add(new CRISMenuItem("List Manager", "", R.drawable.ic_list, null));
             menuItems.add(new CRISMenuItem("System Errors", "", R.drawable.ic_system_error, null));
+            // Build 128 Duplicate Text Message Fix
+            menuItems.add(new CRISMenuItem("Remove Duplicate Notes", "", R.drawable.ic_system_error, null));
 
             // Setup the List view listener
             ListView listView = (ListView) findViewById(R.id.list_view);
@@ -86,6 +91,9 @@ public class ListSysAdmin extends CRISActivity {
                             break;
                         case "System Errors":
                             doListErrors();
+                            break;
+                        case "Remove Duplicate Notes":
+                            doDuplicateNotes();
                             break;
                         default:
                             throw new CRISException("Invalid main Menu Option: " + title);
@@ -119,7 +127,39 @@ public class ListSysAdmin extends CRISActivity {
         startActivity(intent);
     }
 
-    private void doListLists() {
+    private void doDuplicateNotes(){
+        SimpleDateFormat sDateTime = new SimpleDateFormat("dd MMM HH:mm", Locale.UK);
+        LocalDB localDB = LocalDB.getInstance();
+        int count = 0;
+        int duplicates = 0;
+        String noteList = "";
+        String content = "";
+        String lastContent = "**Rubbish**";
+        String lastClient = "";
+        ArrayList<Note> notes = localDB.getAllBroadcastNotes();
+        for (Note note:notes){
+            if(note.getNoteType().getItemValue().equals("Text Message") ) {
+                if (!note.getClientID().toString().equals(lastClient)){
+                    lastContent = "**Rubbish**";
+                }
+                lastClient = note.getClientID().toString();
+                count++;
+                content = note.getContent();
+                if (content.equals(lastContent)){
+                    localDB.remove(note);
+                    duplicates++;
+                }
+                lastContent = content;
+            }
+        }
+        noteList += String.format("\nNotes Found = %d, Duplicates removed = %d",count,duplicates);
+        Intent intent = new Intent(this, AlertAndContinue.class);
+        intent.putExtra("title", String.format("Duplicate Notes"));
+        intent.putExtra("message", noteList);
+        startActivity(intent);
+    }
+
+   private void doListLists() {
         Intent intent = new Intent(this, ListListTypes.class);
         startActivity(intent);
     }

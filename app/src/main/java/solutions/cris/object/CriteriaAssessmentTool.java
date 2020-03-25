@@ -22,6 +22,8 @@ import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListClientHeader;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -46,8 +48,10 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
     // a way that older versions cannot be deserialised.
     private static final long serialVersionUID = CrisObject.SVUID_CAT;
 
+    // Build 139 - Added Grandparents to Home Situation
     public final static String[] homeSituationValues = {"Please select", "Lives with Single Parent",
-            "Lives with Both Parents", "Lives with Other Family Member", "Other"};
+            "Lives with Both Parents", "Lives with Other Family Member", "Lives with One Grandparent",
+            "Lives with Grandparents", "Other"};
 
     public final static String[] childStatusValues = {"Please select", "None",
             "CAF/TAF", "Children in Need Plan", "Child Protection Plan"};
@@ -67,6 +71,8 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         childStatus = "Please select";
         typeOfSupport = "Please select";
         personCaredForParent = 0;
+        // Build 139 - Added Grandparents to People Cared For
+        personCaredForGrandparent = 0;
         personCaredForSibling = 0;
         personCaredForOther = 0;
         typeOfCareDomestic1 = false;
@@ -125,6 +131,17 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
 
     public void setPersonCaredForParent(int personCaredForParent) {
         this.personCaredForParent = personCaredForParent;
+    }
+
+    // Build 139 - Added Grandparents to People Cared For
+    private int personCaredForGrandparent;
+
+    public int getPersonCaredForGrandparent() {
+        return personCaredForGrandparent;
+    }
+
+    public void setPersonCaredForGrandparent(int personCaredForGrandparent) {
+        this.personCaredForGrandparent = personCaredForGrandparent;
     }
 
     private int personCaredForSibling;
@@ -333,12 +350,19 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         } else {
             score += 2;
         }
+        // Build 139 - Added Grandparents to Home Situation
         switch (homeSituation) {
             case "Lives with Single Parent":
                 score += 5;
                 break;
             case "Lives with Both Parents":
                 score += 3;
+                break;
+            case "Lives with One Grandparent":
+                score += 6;
+                break;
+            case "Lives with Grandparents":
+                score += 4;
                 break;
             case "Lives with Other Family Member":
             case "Other":
@@ -372,6 +396,8 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         score += (personCaredForParent * 5);
         score += getPCFScore(personCaredForSibling);
         score += getPCFScore(personCaredForOther);
+        // Build 139 - Added Grandparents to People Cared For
+        score += (personCaredForGrandparent * 5);
 
         if (typeOfCareDomestic1) score += 3;
         if (typeOfCareDomestic2) score += 3;
@@ -427,7 +453,7 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         LocalDB localDB = LocalDB.getInstance();
 
         // Load the Document fields
-        if (isNewMode){
+        if (isNewMode) {
             setReferenceDate(getCreationDate());
         }
         setSummary(String.format(Locale.UK, "Score - %d", getScore()));
@@ -451,13 +477,18 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
 
     public String textSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
-        String summary = "Criteria Assessment Tool";
+        String summary = super.textSummary();
+        summary += "Criteria Assessment Tool";
         summary += "Date: " + sDate.format(getReferenceDate()) + "\n";
         summary += "Home Siuation: " + homeSituation + "\n";
         summary += "Child Status: " + childStatus + "\n";
         summary += "Type of Support: " + typeOfSupport + "\n";
         if (personCaredForParent > 0) {
             summary += String.format("Number of Parents Cared For: %d\n", personCaredForParent);
+        }
+        // Build 139 - Added Grandparents to People Cared For
+        if (personCaredForGrandparent > 0) {
+            summary += String.format("Number of Grandparents Cared For: %d\n", personCaredForGrandparent);
         }
         if (personCaredForSibling > 0) {
             summary += String.format("Number of Siblings Cared For: %d\n", personCaredForSibling);
@@ -489,31 +520,31 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
             summary += String.format(Locale.UK, "Number of People Supported with Mental Health Issues: %d\n",
                     typeOfConditionMentalHealth);
         }
-        if (typeOfConditionSubstanceMisuse > 0){
+        if (typeOfConditionSubstanceMisuse > 0) {
             summary += String.format(Locale.UK, "Number of People Supported with Subs. Misuse Issues: %d\n",
                     typeOfConditionSubstanceMisuse);
         }
-        if (typeOfConditionAlcoholMisuse > 0){
+        if (typeOfConditionAlcoholMisuse > 0) {
             summary += String.format(Locale.UK, "Number of People Supported with Alc. Mis. Issues: %d\n",
                     typeOfConditionAlcoholMisuse);
         }
-        if (typeOfConditionLearningDisability > 0){
+        if (typeOfConditionLearningDisability > 0) {
             summary += String.format(Locale.UK, "Number of People Supported with Learning Disability: %d\n",
                     typeOfConditionLearningDisability);
         }
-        if (typeOfConditionIllHealth > 0){
+        if (typeOfConditionIllHealth > 0) {
             summary += String.format(Locale.UK, "Number of People Supported with Physical Ill Health: %d\n",
                     typeOfConditionIllHealth);
         }
-        if (typeOfConditionPhysicalDisability > 0){
+        if (typeOfConditionPhysicalDisability > 0) {
             summary += String.format(Locale.UK, "Number of People Supported with Physical Disabilities: %d\n",
                     typeOfConditionPhysicalDisability);
         }
-        if (typeOfConditionAutism > 0){
+        if (typeOfConditionAutism > 0) {
             summary += String.format(Locale.UK, "Number of People Supported with Autistic Spectrum Disorder: %d\n",
                     typeOfConditionAutism);
         }
-        if (typeOfConditionTerminalIllness > 0){
+        if (typeOfConditionTerminalIllness > 0) {
             summary += String.format(Locale.UK, "Number of People Supported with Terminal Illness: %d\n",
                     typeOfConditionTerminalIllness);
         }
@@ -521,6 +552,41 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         summary += "Other Socialising: " + frequencyOfSocialising + "\n";
         summary += String.format(Locale.UK, "Score: %d\n", score);
         return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
+        CriteriaAssessmentTool previousDocument = (CriteriaAssessmentTool) localDB.getDocumentByRecordID(previousRecordID);
+        CriteriaAssessmentTool thisDocument = (CriteriaAssessmentTool) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.getHomeSituation(), thisDocument.getHomeSituation(), "Home Siuation");
+        changes += CRISUtil.getChanges(previousDocument.getChildStatus(), thisDocument.getChildStatus(), "Child Status");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfSupport(), thisDocument.getTypeOfSupport(), "Type of Support");
+        changes += CRISUtil.getChanges(previousDocument.getPersonCaredForParent(), thisDocument.getPersonCaredForParent(), "personCaredForParent");
+        // Build 139 - Added Grandparents to People Cared For
+        changes += CRISUtil.getChanges(previousDocument.getPersonCaredForGrandparent(), thisDocument.getPersonCaredForGrandparent(), "personCaredForGrandparent");
+        changes += CRISUtil.getChanges(previousDocument.getPersonCaredForSibling(), thisDocument.getPersonCaredForSibling(), "Number of Siblings Cared For");
+        changes += CRISUtil.getChanges(previousDocument.getPersonCaredForOther(), thisDocument.getPersonCaredForOther(), "Number of Others Cared For");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfCareDomestic1(), thisDocument.getTypeOfCareDomestic1(), "Care (Domestic - washing, cleaning, food)");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfCareDomestic2(), thisDocument.getTypeOfCareDomestic2(), "Care (Domestic - assistance with shopping)");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfCarePersonal(), thisDocument.getTypeOfCarePersonal(), "Care (Personal)");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfCareEmotional(), thisDocument.getTypeOfCareEmotional(), "Care (Emotional)");
+        changes += CRISUtil.getChanges(previousDocument.getPersonCaredForSibling(), thisDocument.getPersonCaredForSibling(), "Care (Supervising/supporting siblings)");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionMentalHealth(), thisDocument.getTypeOfConditionMentalHealth(), "Number of People Supported with Mental Health Issues");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionSubstanceMisuse(), thisDocument.getTypeOfConditionSubstanceMisuse(), "Number of People Supported with Subs. Misuse Issues");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionAlcoholMisuse(), thisDocument.getTypeOfConditionAlcoholMisuse(), "Number of People Supported with Alc. Mis. Issues");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionLearningDisability(), thisDocument.getTypeOfConditionLearningDisability(), "Number of People Supported with Learning Disability");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionTerminalIllness(), thisDocument.getTypeOfConditionIllHealth(), "Number of People Supported with Physical Ill Health");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionPhysicalDisability(), thisDocument.getTypeOfConditionPhysicalDisability(), "Number of People Supported with Physical Disabilities");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionAutism(), thisDocument.getTypeOfConditionAutism(), "Number of People Supported with Autistic Spectrum Disorder");
+        changes += CRISUtil.getChanges(previousDocument.getTypeOfConditionTerminalIllness(), thisDocument.getTypeOfConditionTerminalIllness(), "Number of People Supported with Terminal Illness");
+        changes += CRISUtil.getChanges(previousDocument.getFrequencyOfCare(), thisDocument.getFrequencyOfCare(), "Frequency of Support");
+        changes += CRISUtil.getChanges(previousDocument.getFrequencyOfSocialising(), thisDocument.getFrequencyOfSocialising(), "Other Socialising");
+        changes += CRISUtil.getChanges(previousDocument.getScore(), thisDocument.getScore(), "Score");
+        if (changes.length() == 0) {
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 
     private String displayBoolean(boolean value) {
@@ -534,12 +600,16 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Date");
         fNames.add("Home Siuation");
         fNames.add("Child Status");
         fNames.add("Type of Support");
         fNames.add("Parents Cared For");
+        // Build 139 - Added Grandparents to People Cared For
+        fNames.add("Grandparents Cared For");
         fNames.add("Siblings Cared For");
         fNames.add("Others Cared For");
         fNames.add("Care Dom. washing, cleaning, food");
@@ -660,8 +730,9 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(5)
-                                .setEndColumnIndex(6)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(6)
+                                .setEndColumnIndex(7)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -674,6 +745,8 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getReferenceDate()));
@@ -684,6 +757,8 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         row.add(childStatus);
         row.add(typeOfSupport);
         row.add(personCaredForParent);
+        // Build 139 - Added Grandparents to People Cared For
+        row.add(personCaredForGrandparent);
         row.add(personCaredForSibling);
         row.add(personCaredForOther);
         row.add(displayExportBoolean(typeOfCareDomestic1));

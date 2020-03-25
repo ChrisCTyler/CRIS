@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    tools:context="solutions.cris.list.ListLibrary">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:theme="@style/AppTheme.AppBarOverlay">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            app:popupTheme="@style/AppTheme.PopupOverlay" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+
+    <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/content_list_documents"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        tools:context="solutions.cris.list.ListLibrary"
+        tools:showIn="@layout/activity_list">
+
+        <LinearLayout
+            android:id="@+id/main_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top"
+                android:background="@color/header_background"
+                android:orientation="vertical"
+                android:paddingLeft="@dimen/activity_horizontal_margin"
+                android:paddingRight="@dimen/activity_horizontal_margin">
+
+
+                <TextView
+                    android:id="@+id/kpi_header_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/text_size_kpi_header"
+                    android:paddingTop="@dimen/activity_vertical_margin"
+                    android:paddingBottom="@dimen/activity_vertical_margin"
+                    android:gravity="fill_vertical|center"
+                    />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:src="@drawable/list_divider" />
+
+                <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/list_kpi_item_height"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/item_title"
+                        android:layout_width="0dp"
+                        android:layout_weight="5"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_1"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_2"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_3"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_4"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_5"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_6"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_7"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_8"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                    <TextView
+                        android:id="@+id/item_area_9"
+                        android:layout_width="0dp"
+                        android:layout_weight="10"
+                        android:layout_height="match_parent"
+                        android:textSize="@dimen/text_size_summary"
+                        android:textStyle="bold"
+                        android:gravity="fill_vertical|center"
+                        />
+                </LinearLayout>
+
+
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <ListView
+                    android:id="@+id/list_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:dividerHeight="1dp" />
+
+
+            </LinearLayout>
+
+
+        </LinearLayout>
+
+    </RelativeLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

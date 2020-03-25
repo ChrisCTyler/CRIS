@@ -20,12 +20,12 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -46,7 +46,6 @@ import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.CRISActivity;
-import solutions.cris.Login;
 import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
@@ -62,7 +61,6 @@ import solutions.cris.utils.ExceptionHandler;
 public class ListLibrary extends CRISActivity {
 
     public static final String INCLUDE_CANCELLED = "solutions.cris.IncludeCancelled";
-    public static final int REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE = 0;
 
     private ListView listView;
     public static List<Document> dbDocuments;
@@ -216,7 +214,7 @@ public class ListLibrary extends CRISActivity {
             } else {
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                        REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE);
+                        Main.REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE);
             }
         }
     }
@@ -243,7 +241,7 @@ public class ListLibrary extends CRISActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         switch (requestCode) {
-            case REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE: {
+            case Main.REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE: {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {

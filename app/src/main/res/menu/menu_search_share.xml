@@ -7,12 +7,12 @@
         android:title="@string/search_hint"
         android:icon="@drawable/ic_search"
         app:showAsAction = "ifRoom|collapseActionView"
-        app:actionViewClass="android.support.v7.widget.SearchView" />
+        app:actionViewClass="androidx.appcompat.widget.SearchView" />
 
     <item
         android:id="@+id/menu_item_share"
         app:showAsAction="always"
         android:title="Share"
-        app:actionProviderClass="android.support.v7.widget.ShareActionProvider" />
+        app:actionProviderClass="androidx.appcompat.widget.ShareActionProvider" />
 
 </menu>

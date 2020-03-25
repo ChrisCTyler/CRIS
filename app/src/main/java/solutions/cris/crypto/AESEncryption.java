@@ -96,61 +96,90 @@ public class AESEncryption {
 
     public byte[] encrypt(String mode, byte[] plainText) {
         byte[] output;
-        try {
-            //Generate random IV of 128-bit (AES block size)
-            SecureRandom rnd = new SecureRandom();
-            byte[] IV = new byte[128 / 8];
-            rnd.nextBytes(IV);
-            IvParameterSpec IVSpec = new IvParameterSpec(IV);
-            //Create the cipher object to perform AES operations.
-            Cipher AESCipher = Cipher.getInstance("AES/CFB/NoPadding");
-            //Initialize the Cipher with the key and initialization vector.
-            if (mode.equals(LOCAL_CIPHER)) {
-                AESCipher.init(Cipher.ENCRYPT_MODE, localKey, IVSpec);
-            } else {
-                AESCipher.init(Cipher.ENCRYPT_MODE, webKey, IVSpec);
+        /*
+        // Build 120 4 May 2019 - Removed local encryption
+        // 1. Modify Encrypt and Decrypt to simply return the sent parameter for mode=LOCAL_CIPHER
+        // 2. The mechanism for re-encrypting will then automatically handle existing databases
+        // It was designed for change of user but the check in Login.attemptLogin() will work
+        // because the attempt to get the user record will throw an exception bexause of the new
+        // decrypt functionality
+        */
+        if (mode.equals(LOCAL_CIPHER)){
+            output = plainText;
+        } else {
+
+            try {
+                //Generate random IV of 128-bit (AES block size)
+                SecureRandom rnd = new SecureRandom();
+                byte[] IV = new byte[128 / 8];
+                rnd.nextBytes(IV);
+                IvParameterSpec IVSpec = new IvParameterSpec(IV);
+                //Create the cipher object to perform AES operations.
+                Cipher AESCipher = Cipher.getInstance("AES/CFB/NoPadding");
+                //Initialize the Cipher with the key and initialization vector.
+                if (mode.equals(LOCAL_CIPHER)) {
+                    AESCipher.init(Cipher.ENCRYPT_MODE, localKey, IVSpec);
+                    //throw new CRISException("Code should not get here");
+                } else {
+                    AESCipher.init(Cipher.ENCRYPT_MODE, webKey, IVSpec);
+                }
+                //Encrypt the plaintext data
+                byte[] ciphertext = AESCipher.doFinal(plainText);
+                // Prepend the IV to the ciphertext message so that it's available for decryption
+                output = new byte[ciphertext.length + (128 / 8)];
+                //Copy the respective parts into the array.
+                System.arraycopy(IV, 0, output, 0, IV.length);
+                System.arraycopy(ciphertext, 0, output, IV.length, ciphertext.length);
+            } catch (Exception ex) {
+                throw new CRISException("Encryption error: " + ex.getMessage());
             }
-            //Encrypt the plaintext data
-            byte[] ciphertext = AESCipher.doFinal(plainText);
-            // Prepend the IV to the ciphertext message so that it's available for decryption
-            output = new byte[ciphertext.length + (128 / 8)];
-            //Copy the respective parts into the array.
-            System.arraycopy(IV, 0, output, 0, IV.length);
-            System.arraycopy(ciphertext, 0, output, IV.length, ciphertext.length);
-        } catch (Exception ex) {
-            throw new CRISException("Encryption error: " + ex.getMessage());
         }
         return output;
     }
 
     public byte[] decrypt(String mode, byte[] encryptedText) {
         byte[] plaintext;
-        //Extract the IV from the encryption output
-        byte[] IV = new byte[128 / 8];
-        byte[] ciphertext = new byte[encryptedText.length - (128 / 8)];
-        try {
-            System.arraycopy(encryptedText, 0, IV, 0, IV.length);
-            System.arraycopy(encryptedText, IV.length, ciphertext, 0, ciphertext.length);
-            //Create the cipher object to perform AES operations.
-            //Specify Advanced Encryption Standard - Cipher Feedback Mode - No Padding
-            Cipher AESCipher = Cipher.getInstance("AES/CFB/NoPadding");
-            //Create the IvParameterSpec object from the raw IV
-            IvParameterSpec IVSpec = new IvParameterSpec(IV);
-            //Initialize the Cipher with the key and initialization vector.
-            switch (mode) {
-                case LOCAL_CIPHER:
-                    AESCipher.init(Cipher.DECRYPT_MODE, localKey, IVSpec);
-                    break;
-                case OLD_CIPHER:
-                    AESCipher.init(Cipher.DECRYPT_MODE, oldLocalKey, IVSpec);
-                    break;
-                default:
-                    AESCipher.init(Cipher.DECRYPT_MODE, webKey, IVSpec);
+
+        /*
+        // Build 120 4 May 2019 - Removed local encryption
+        // 1. Modify Encrypt and Decrypt to simply return the sent parameter for mode=LOCAL_CIPHER
+        // 2. The mechanism for re-encrypting will then automatically handle existing databases
+        // It was designed for change of user but the check in Login.attemptLogin() will work
+        // because the attempt to get the user record will throw an exception bexause of the new
+        // decrypt functionality
+        */
+        if (mode.equals(LOCAL_CIPHER)){
+            plaintext = encryptedText;
+        } else {
+
+            //Extract the IV from the encryption output
+            byte[] IV = new byte[128 / 8];
+            byte[] ciphertext = new byte[encryptedText.length - (128 / 8)];
+            try {
+                System.arraycopy(encryptedText, 0, IV, 0, IV.length);
+                System.arraycopy(encryptedText, IV.length, ciphertext, 0, ciphertext.length);
+                //Create the cipher object to perform AES operations.
+                //Specify Advanced Encryption Standard - Cipher Feedback Mode - No Padding
+                Cipher AESCipher = Cipher.getInstance("AES/CFB/NoPadding");
+                //Create the IvParameterSpec object from the raw IV
+                IvParameterSpec IVSpec = new IvParameterSpec(IV);
+                //Initialize the Cipher with the key and initialization vector.
+                switch (mode) {
+                    case LOCAL_CIPHER:
+                       // AESCipher.init(Cipher.DECRYPT_MODE, localKey, IVSpec);
+                       //break;
+                       throw new CRISException("Code should not get here");
+                    case OLD_CIPHER:
+                        AESCipher.init(Cipher.DECRYPT_MODE, oldLocalKey, IVSpec);
+                        break;
+                    default:
+                        AESCipher.init(Cipher.DECRYPT_MODE, webKey, IVSpec);
+                }
+                //Decrypts the ciphertext data
+                plaintext = AESCipher.doFinal(ciphertext);
+            } catch (Exception ex) {
+                throw new CRISException("Encryption error: " + ex.getMessage());
             }
-            //Decrypts the ciphertext data
-            plaintext = AESCipher.doFinal(ciphertext);
-        } catch (Exception ex) {
-            throw new CRISException("Encryption error: " + ex.getMessage());
         }
         return plaintext;
     }

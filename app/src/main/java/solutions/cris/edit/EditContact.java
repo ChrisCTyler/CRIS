@@ -19,10 +19,10 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Patterns;
@@ -51,7 +51,6 @@ import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
 import solutions.cris.object.Agency;
 import solutions.cris.object.Client;
 import solutions.cris.object.Contact;
@@ -364,6 +363,10 @@ public class EditContact extends Fragment {
         } else {
             // Edit Mode
             contactTypeSpinner.setSelection(contactTypePickList.getPosition(editDocument.getContactType()));
+            // Build 125 - 18/07/2019 Odd case where crash happened because contact type was not set
+            // in edit mode. Should not be possible due to prior validation check. However, the
+            // following code change is safer
+            /*
             switch (editDocument.getContactType().getItemValue()) {
                 case "Agency Contact":
                     schoolLayout.setVisibility(View.GONE);
@@ -381,6 +384,27 @@ public class EditContact extends Fragment {
                     schoolLayout.setVisibility(View.GONE);
                     agencyLayout.setVisibility(View.GONE);
                     addressLayout.setVisibility(View.VISIBLE);
+            }
+            */
+            // Preset fo the default case
+            schoolLayout.setVisibility(View.GONE);
+            agencyLayout.setVisibility(View.GONE);
+            addressLayout.setVisibility(View.VISIBLE);
+            if (editDocument.getContactType() != null) {
+                switch (editDocument.getContactType().getItemValue()) {
+                    case "Agency Contact":
+                        schoolLayout.setVisibility(View.GONE);
+                        agencyLayout.setVisibility(View.VISIBLE);
+                        addressLayout.setVisibility(View.GONE);
+                        agencySpinner.setSelection(agencyPickList.getPosition(editDocument.getAgency()));
+                        break;
+                    case "School Contact":
+                        schoolLayout.setVisibility(View.VISIBLE);
+                        agencyLayout.setVisibility(View.GONE);
+                        addressLayout.setVisibility(View.GONE);
+                        schoolSpinner.setSelection(schoolPickList.getPosition(editDocument.getSchool()));
+                        break;
+                }
             }
             nameView.setText(editDocument.getContactName());
             addressView.setText(editDocument.getContactAddress());

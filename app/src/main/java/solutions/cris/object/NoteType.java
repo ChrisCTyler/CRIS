@@ -1,11 +1,16 @@
 package solutions.cris.object;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -46,8 +51,9 @@ public class NoteType extends ListItem implements Serializable {
         super(currentUser, ListType.NOTE_TYPE, itemValue, itemOrder);
         template = "";
         supervisorSetToFollow = false;
-        noteIcon = R.drawable.ic_note_blue;
-
+        // Build 128 Note Icon needs to be one of the above static ints
+        //noteIcon = R.drawable.ic_note_blue;
+        noteIcon = ICON_COLOUR_BLUE;
     }
 
     // Constructor for the response NoteType
@@ -81,11 +87,44 @@ public class NoteType extends ListItem implements Serializable {
     }
 
     private int noteIcon;
-    public int getNoteIcon() {return noteIcon;}
-    public void setNoteIcon(int noteIcon) {this.noteIcon = noteIcon;}
 
-    public void save(boolean isNewMode){
+    public int getNoteIcon() {
+        return noteIcon;
+    }
+
+    public void setNoteIcon(int noteIcon) {
+        this.noteIcon = noteIcon;
+    }
+
+    public void save(boolean isNewMode) {
         LocalDB localDB = LocalDB.getInstance();
         localDB.save(this, isNewMode, User.getCurrentUser());
+    }
+
+    public String textSummary() {
+        String summary = super.textSummary();
+        summary += String.format("Template: %s\n", getTemplate());
+        if (isSupervisorSetToFollow()) {
+            summary += "Supervisor set to Follow: Yes\n";
+        } else {
+            summary += "Supervisor set to Follow: No\n";
+        }
+        return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
+        NoteType previousItem = (NoteType) localDB.getListItemByRecordID(previousRecordID);
+        NoteType thisItem = (NoteType) localDB.getListItemByRecordID(thisRecordID);
+        String changes = ListItem.getChanges(previousItem, thisItem);
+        changes += CRISUtil.getChanges(previousItem.getTemplate(), thisItem.getTemplate(), "Template");
+        changes += CRISUtil.getChanges(previousItem.isSupervisorSetToFollow(), thisItem.isSupervisorSetToFollow(), "Supervisor set to Follow");
+        if (previousItem.getNoteIcon() != thisItem.getNoteIcon()){
+            changes += "Note Icon changed.";
+        }
+        if (changes.length() == 0) {
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 }

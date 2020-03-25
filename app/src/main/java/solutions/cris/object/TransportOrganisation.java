@@ -1,6 +1,14 @@
 package solutions.cris.object;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.UUID;
+
+import solutions.cris.db.LocalDB;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -75,8 +83,8 @@ public class TransportOrganisation extends ListItem implements Serializable {
     }
 
     public String textSummary(){
-        String summary = String.format("%s\n",getAddress());
-        summary += String.format("%s\n", getPostcode());
+        String summary = super.textSummary();
+        summary += String.format("Address:\n%s\n%s\n",getAddress(), getPostcode());
         summary += String.format("Contact Number: %s\n", getContactNumber());
         summary += String.format("Email: %s\n",getEmailAddress());
         if (!getAdditionalInformation().isEmpty()){
@@ -85,5 +93,23 @@ public class TransportOrganisation extends ListItem implements Serializable {
         return summary;
     }
 
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        LocalSettings localSettings = LocalSettings.getInstance();
+        TransportOrganisation previousItem = (TransportOrganisation) localDB.getListItemByRecordID(previousRecordID);
+        TransportOrganisation thisItem = (TransportOrganisation) localDB.getListItemByRecordID(thisRecordID);
+        String changes = ListItem.getChanges(previousItem, thisItem);
+        changes += CRISUtil.getChanges(previousItem.getAddress(), thisItem.getAddress(), "Address");
+        changes += CRISUtil.getChanges(previousItem.getPostcode(), thisItem.getPostcode(), "Postcode");
+        changes += CRISUtil.getChanges(previousItem.getContactNumber(), thisItem.getContactNumber(), "Contact Number");
+        changes += CRISUtil.getChanges(previousItem.getEmailAddress(), thisItem.getEmailAddress(), "Email Address");
+        changes += CRISUtil.getChanges(previousItem.getAdditionalInformation(), thisItem.getAdditionalInformation(), "Additional Information");
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
+    }
 }
 

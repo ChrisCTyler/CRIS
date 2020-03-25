@@ -3,11 +3,11 @@ package solutions.cris.read;
 import android.app.Fragment;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.widget.ShareActionProvider;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.widget.ShareActionProvider;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -19,7 +19,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -28,13 +27,9 @@ import java.util.Locale;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
-import solutions.cris.list.ListSessionClients;
-import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.User;
-import solutions.cris.utils.LocalSettings;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions

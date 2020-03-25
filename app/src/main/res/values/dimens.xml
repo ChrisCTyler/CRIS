@@ -6,6 +6,8 @@
     <dimen name="login_horizontal_margin">50dp</dimen>
     <dimen name="login_vertical_margin">20dp</dimen>
     <dimen name="list_item_height">55dp</dimen>
+    <dimen name="list_kpi_item_height">45dp</dimen>
+    <dimen name="list_broadcast_item_height">65dp</dimen>
     <dimen name="text_size_extra_large">25sp</dimen>
     <dimen name="text_size_large">18sp</dimen>
     <dimen name="text_size_action_bar_menu">18sp</dimen>
@@ -13,6 +15,7 @@
     <dimen name="text_size_hint">11sp</dimen>
     <dimen name="text_size_summary">14sp</dimen>
     <dimen name="text_size_date">11sp</dimen>
+    <dimen name="text_size_kpi_header">12sp</dimen>
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="icon_margin">4dp</dimen>
     <dimen name="icon_width">50dp</dimen>

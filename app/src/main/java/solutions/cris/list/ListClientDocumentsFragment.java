@@ -10,18 +10,19 @@ import android.database.MatrixCursor;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.BaseColumns;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
 
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v4.widget.CursorAdapter;
-import android.support.v4.widget.SimpleCursorAdapter;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.SearchView;
-import android.support.v7.widget.ShareActionProvider;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
+import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.cursoradapter.widget.CursorAdapter;
+import androidx.cursoradapter.widget.SimpleCursorAdapter;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.ShareActionProvider;
+import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -42,6 +43,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
@@ -75,9 +77,11 @@ import solutions.cris.read.ReadContact;
 import solutions.cris.read.ReadImage;
 import solutions.cris.read.ReadMyWeek;
 import solutions.cris.read.ReadTransport;
+import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.PickList;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -108,6 +112,7 @@ public class ListClientDocumentsFragment extends Fragment {
     private static final int MENU_SORT_TYPE = Menu.FIRST + 7;
     private static final int MENU_FOLLOW_CLIENT = Menu.FIRST + 8;
     private static final int MENU_UNFOLLOW_CLIENT = Menu.FIRST + 9;
+    private static final int MENU_SEND_MYWEEK_LINK = Menu.FIRST + 10;
 
     private ArrayList<Document> adapterList;
     private ListView listView;
@@ -177,13 +182,26 @@ public class ListClientDocumentsFragment extends Fragment {
         localDB = LocalDB.getInstance();
         currentUser = User.getCurrentUser();
 
+        // Build 125 - Tablet re-orientation not working because read mode will be set and
+        // adapter will not be refreshed in onResume. Set to Edit mode to force a reload
+        if (savedInstanceState != null){
+            ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
+        }
+
 
         // Initialise the list view
         this.listView = (ListView) parent.findViewById(R.id.list_view);
+        final SwipeDetector swipeDetector = new SwipeDetector();
+        this.listView.setOnTouchListener(swipeDetector);
         this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                doReadDocument(position);
+                if (swipeDetector.swipeDetected()) {
+                    displayDocumentHistory(position, swipeDetector.getAction());
+                } else {
+                    doReadDocument(position);
+                }
+
             }
         });
         listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
@@ -318,7 +336,7 @@ public class ListClientDocumentsFragment extends Fragment {
             }
         }
         // Build 110 - Set the share action text based on the currently selected documents
-        if (shareOption!= null) {
+        if (shareOption != null) {
             createShareActionProvider(shareOption);
         }
     }
@@ -640,11 +658,15 @@ public class ListClientDocumentsFragment extends Fragment {
     }
 
     private void addToDocumentTypes(Document document) {
-        String newDocumentType;
+        String newDocumentType = null;
         switch (document.getDocumentType()) {
             case Document.Note:
                 Note note = (Note) document;
-                newDocumentType = note.getNoteType().getItemValue();
+                // Build 119 2 May 2019 Introduced an error where note could be created with a
+                // null note type id. In this case it can be ignored
+                if (note.getNoteTypeID() != null) {
+                    newDocumentType = note.getNoteType().getItemValue();
+                }
                 break;
             case Document.PdfDocument:
                 PdfDocument pdfDocument = (PdfDocument) document;
@@ -653,7 +675,7 @@ public class ListClientDocumentsFragment extends Fragment {
             default:
                 newDocumentType = document.getDocumentTypeString();
         }
-        if (!documentTypes.contains(newDocumentType)) {
+        if (newDocumentType != null && !documentTypes.contains(newDocumentType)) {
             documentTypes.add(newDocumentType);
         }
     }
@@ -693,6 +715,9 @@ public class ListClientDocumentsFragment extends Fragment {
             followOption = menu.add(0, MENU_FOLLOW_CLIENT, 30, "Follow Client");
             followOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         }
+        MenuItem sendMyWeekOption = menu.add(0, MENU_SEND_MYWEEK_LINK, 40, "Send MyWeek Link");
+        sortTypeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
 
 
         final MenuItem searchItem = menu.findItem(R.id.action_search);
@@ -778,16 +803,19 @@ public class ListClientDocumentsFragment extends Fragment {
                 sDateTime.format(now.getTime()),
                 currentUser.getFullName());
         summary += String.format("%s\n", client.textSummary());
-        for (int i=0; i<adapterList.size();i++){
-            Document document = adapterList.get(i);
+        // Build 125 - A crash has occurred due to a null adapterList at this point
+        if (adapterList != null) {
+            for (int i = 0; i < adapterList.size(); i++) {
+                Document document = adapterList.get(i);
                 summary += String.format("------ %s ",
                         document.getDocumentTypeString().toUpperCase());
-            if (document.getReferenceDate().getTime() != Long.MIN_VALUE) {
-                summary += String.format("---- %s ",
-                        sDate.format(document.getReferenceDate()));
+                if (document.getReferenceDate().getTime() != Long.MIN_VALUE) {
+                    summary += String.format("---- %s ",
+                            sDate.format(document.getReferenceDate()));
+                }
+                summary += String.format("----\n%s\n",
+                        document.textSummary());
             }
-            summary += String.format("----\n%s\n",
-                     document.textSummary());
         }
         // Generate share Intent
         shareIntent.putExtra(Intent.EXTRA_TEXT, summary);
@@ -877,6 +905,10 @@ public class ListClientDocumentsFragment extends Fragment {
                 // Search is displayed automatically
                 return true;
 
+            case MENU_SEND_MYWEEK_LINK:
+
+                return true;
+
             default:
                 throw new CRISException("Unexpected menu option:" + item.getItemId());
 
@@ -917,6 +949,7 @@ public class ListClientDocumentsFragment extends Fragment {
                                 // Set the icon to the appropriate response type
                                 NoteType initialNoteType = (NoteType) initialNote.getNoteType();
                                 switch (initialNoteType.getNoteIcon()) {
+
                                     case NoteType.ICON_COLOUR_RED:
                                         responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_RED);
                                         break;
@@ -1374,6 +1407,147 @@ public class ListClientDocumentsFragment extends Fragment {
         dialog.show();
     }
 
+    private void displayDocumentHistory(int position, SwipeDetector.Action action) {
+        Document document = adapterList.get(position);
+        listViewState = listView.onSaveInstanceState();
+        // Check access
+        boolean accessAllowed = false;
+        // Build 086 - Replaced by Demographic document check
+        //if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+        //    accessAllowed = true;
+        //} else if (document.getDocumentType() == Document.Note &&
+        //        currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
+        //    accessAllowed = true;
+        ///}
+        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+            accessAllowed = true;
+        } else {
+            // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
+            switch (document.getDocumentType()) {
+                case Document.Client:
+                case Document.Case:
+                case Document.Contact:
+                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
+                        accessAllowed = true;
+                    }
+                    break;
+                case Document.Note:
+                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
+                        // Build 086 - Special case for Notes. If READ_NOTES (demographic documents)
+                        // only sticky notes are allowed
+                        Note note = (Note) document;
+                        if (note.isStickyFlag()) {
+                            accessAllowed = true;
+                        }
+                    }
+                    break;
+                default:
+                    accessAllowed = false;
+            }
+        }
+        if (accessAllowed) {
+            //Loop through all instances of the document gathering data
+            String history = "";
+            ArrayList<UUID> recordIDs = localDB.getRecordIDs(document);
+            for (int i = 0; i < recordIDs.size(); i++) {
+                boolean isEarliest = (i == recordIDs.size() - 1);
+                history += localDB.getDocumentMetaData(recordIDs.get(i), isEarliest, action);
+                if (!isEarliest) {
+                    switch (document.getDocumentType()) {
+                        case Document.Case:
+                            history += Case.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                        case Document.Client:
+                            history += Client.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                        case Document.Contact:
+                            history += Contact.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                        case Document.ClientSession:
+                            history += ClientSession.getChanges(localDB,
+                                    recordIDs.get(i + 1),
+                                    recordIDs.get(i),
+                                    action);
+                            break;
+                        case Document.CriteriaAssessmentTool:
+                            history += CriteriaAssessmentTool.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                        case Document.Image:
+                            history += Image.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                        case Document.MyWeek:
+                            history += MyWeek.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                        case Document.Note:
+                            history += Note.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                        case Document.PdfDocument:
+                            history += PdfDocument.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                        case Document.Transport:
+                            history += Transport.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+                            break;
+                    }
+                }
+            }
+            // Add some detail about the session
+            if (action.equals(SwipeDetector.Action.RL)) {
+                switch (document.getDocumentType()) {
+                    case Document.ClientSession:
+                        ClientSession clientSession = (ClientSession) document;
+                        if (clientSession.getSession() != null) {
+                            history += String.format("\nAssociated Session:\n\nName: %s\nDate: %s\nID: %s\n",
+                                    clientSession.getSession().getSessionName(),
+                                    sDateTime.format(clientSession.getSession().getReferenceDate()),
+                                    clientSession.getSession().getDocumentID());
+                        }
+                        break;
+                    case Document.MyWeek:
+                        MyWeek myWeek = (MyWeek) document;
+                        if (myWeek.getSession() != null) {
+                            history += String.format("\nAssociated Session:\n\nName: %s\nDate: %s\nID: %s\n",
+                                    myWeek.getSession().getSessionName(),
+                                    sDateTime.format(myWeek.getSession().getReferenceDate()),
+                                    myWeek.getSession().getDocumentID());
+                        }
+                        break;
+                    case Document.Note:
+                        Note note = (Note) document;
+                        if (note.getSession() != null) {
+                            history += String.format("\nAssociated Session:\n\nName: %s\nDate: %s\nID: %s\n",
+                                    note.getSession().getSessionName(),
+                                    sDateTime.format(note.getSession().getReferenceDate()),
+                                    note.getSession().getDocumentID());
+                        }
+                        break;
+                    case Document.PdfDocument:
+                        PdfDocument pdfDocument = (PdfDocument) document;
+                        if (pdfDocument.getSession() != null) {
+                            history += String.format("\nAssociated Session:\n\nName: %s\nDate: %s\nID: %s\n",
+                                    pdfDocument.getSession().getSessionName(),
+                                    sDateTime.format(pdfDocument.getSession().getReferenceDate()),
+                                    pdfDocument.getSession().getDocumentID());
+                        }
+                        break;
+                }
+            }
+            if (document.getDocumentType() == Document.Client) {
+                history += String.format("\nThe current document contents are:\n\n%s\n",
+                        document.textSummary());
+            } else {
+                history += String.format("\nThe current document contents are:\n\n%s\n%s\n",
+                        client.textSummary(),
+                        document.textSummary());
+            }
+            Intent intent = new Intent(getActivity(), AlertAndContinue.class);
+            intent.putExtra("title", String.format("Change History - %s", document.getDocumentTypeString()));
+            intent.putExtra("message", history);
+            startActivity(intent);
+        } else {
+            doNoPrivilege();
+        }
+    }
+
+
     private void doSelectDocumentType() {
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
         builder.setTitle("Only Display Documents of Type:");
@@ -1578,6 +1752,10 @@ public class ListClientDocumentsFragment extends Fragment {
                             } else {
                                 viewItemIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_note_blue));
                             }
+                            break;
+                        // Build 128 - Automatically generated Text/Email/Phone Notes may have odd NoteType due to earlier bug
+                        default:
+                            viewItemIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_note_blue));
                             break;
                     }
                     break;

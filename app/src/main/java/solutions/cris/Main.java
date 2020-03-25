@@ -15,10 +15,7 @@ package solutions.cris;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.Manifest;
-import android.app.ActivityManager;
-import android.app.admin.DevicePolicyManager;
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -27,16 +24,15 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
-import android.util.Log;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -49,9 +45,7 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,6 +57,7 @@ import solutions.cris.db.LocalDB;
 import solutions.cris.edit.ChangePassword;
 import solutions.cris.exceptions.CRISException;
 import solutions.cris.list.ListClients;
+import solutions.cris.list.ListKPI;
 import solutions.cris.list.ListLibrary;
 import solutions.cris.list.ListSessions;
 import solutions.cris.list.ListSyncActivity;
@@ -87,6 +82,8 @@ import solutions.cris.utils.ExceptionHandler;
 public class Main extends CRISActivity {
 
     public static final int REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE = 0;
+    // Build 119 30 May 2019 Addition of SEND_SMS permission
+    public static final int REQUEST_PERMISSION_SEND_SMS = 2;
     public static final String EXTRA_CLIENT_ID = "solutions.cris.ClientId";
     public static final String EXTRA_IS_NEW_MODE = "solutions.cris.EditMode";
     public static final String EXTRA_PASSWORD_EXPIRED = "solutions.cris.PasswordExpired";
@@ -105,6 +102,10 @@ public class Main extends CRISActivity {
     public static final String EXTRA_UNREAD_MENU_ITEM = "solutions.cris.UnreadMenuItem";
     public static final String EXTRA_GROUP = "solutions.cris.Group";
     public static final String EXTRA_TRANSPORT_ORGANISATION = "solutions.cris.TransportOrganisation";
+    public static final String EXTRA_SHARE_TEXT = "solutions.cris.ShareText";
+    // Builod 139 - Added KPIs
+    public static final String EXTRA_KPI_TYPE = "solutions.cris.KPIType";
+
 
     // Receiver for broadcasts when Sync Adapter completes each sync
     private SyncReceiver myReceiver;
@@ -114,11 +115,26 @@ public class Main extends CRISActivity {
     private LocalDB localDB;
     private User currentUser;
     private SyncManager syncManager;
+    // Build 116 22 May 2019 Add handler for incoming text via share
+    private String shareText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
+
+        // Build 116 22 May 2019 Add handler for incoming text via share
+        // At this stage, simply load a text variable with the text.
+        // If there is shared text, All Client view will be triggered
+        shareText = "";
+        Intent intent = getIntent();
+        String action = intent.getAction();
+        if (Intent.ACTION_SEND.equals(action) ) {
+            if (intent.getStringExtra(Intent.EXTRA_TEXT) != null) {
+                shareText = intent.getStringExtra(Intent.EXTRA_TEXT);
+            }
+        }
+
         setContentView(R.layout.activity_list);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -164,50 +180,78 @@ public class Main extends CRISActivity {
             }
 
             if (!passwordExpired) {
-                // Initialise the main menu. Firstly setup the List view listeners
-                ListView listView = findViewById(R.id.list_view);
-                listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                        doListClick(view, position);
+                // Build 116 22 May 2019 Add handler for incoming text via share
+                // If there is shared text, All Client view will be triggered
+                if (shareText.length() > 0) {
+                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_ACCESS_ALL_CLIENTS)) {
+                        Intent intent = new Intent(this, ListClients.class);
+                        intent.putExtra(Main.EXTRA_MY_CLIENTS, false);
+                        intent.putExtra(Main.EXTRA_SHARE_TEXT, shareText);
+                        startActivity(intent);
+                    } else if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_ACCESS_MY_CLIENTS)) {
+                        Intent intent = new Intent(this, ListClients.class);
+                        intent.putExtra(Main.EXTRA_MY_CLIENTS, true);
+                        intent.putExtra(Main.EXTRA_SHARE_TEXT, shareText);
+                        startActivity(intent);
+                    } else {
+                        doNoPrivilege();
                     }
-                });
-                listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-                    @Override
-                    public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                        return doListLongClick(view);
-                    }
-                });
-                // Initialise the list of Static Menu Items
-                menuItems = new ArrayList<>();
-                menuItems.add(0, getSyncMenuItem());
+                    finish();
+                } else {
+                    // Initialise the main menu. Firstly setup the List view listeners
+                    ListView listView = findViewById(R.id.list_view);
+                    listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                            doListClick(view, position);
+                        }
+                    });
+                    listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+                        @Override
+                        public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                            return doListLongClick(view);
+                        }
+                    });
+                    // Initialise the list of Static Menu Items
+                    menuItems = new ArrayList<>();
+                    menuItems.add(0, getSyncMenuItem());
+                    // Build 138 - Add partial Initialisation - Check if still initialising
+                    SyncActivity syncActivity = localDB.getLatestSyncActivity(currentUser);
+                    if (syncActivity != null) {
+                        String syncStatus = syncActivity.getResult();
+                        if (!syncStatus.equals("PARTIAL")) {
+                            // If the database is being initialised from the web the current user's role will
+                            // be NoPriv in which case don't offer any menu items
+                            if (currentUser.getRoleID() != Role.noPrivilegeID) {
+                                menuItems.add(new CRISMenuItem("My Clients", "", R.drawable.ic_group_red, null));
+                                menuItems.add(new CRISMenuItem("My Sessions", "", R.drawable.ic_sessions, null));
+                                menuItems.add(new CRISMenuItem("All Clients", "", R.drawable.ic_group_green, null));
+                                menuItems.add(new CRISMenuItem("Users", "", R.drawable.ic_group_blue, null));
+                                menuItems.add(new CRISMenuItem("Library", "", R.drawable.ic_pdf_document, null));
+                                // Build 139 - Added KPIs
+                                menuItems.add(new CRISMenuItem("Key Performance Indicators", "", R.drawable.ic_chart, null));
 
-                // If the database is being initialised from the web the current user's role will
-                // be NoPriv in which case don't offer any menu items
-                if (currentUser.getRoleID() != Role.noPrivilegeID) {
-                    menuItems.add(new CRISMenuItem("My Clients", "", R.drawable.ic_group_red, null));
-                    menuItems.add(new CRISMenuItem("My Sessions", "", R.drawable.ic_sessions, null));
-                    menuItems.add(new CRISMenuItem("All Clients", "", R.drawable.ic_group_green, null));
-                    menuItems.add(new CRISMenuItem("Users", "", R.drawable.ic_group_blue, null));
-                    menuItems.add(new CRISMenuItem("Library", "", R.drawable.ic_pdf_document, null));
-                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_SYSTEM_ADMINISTRATOR)) {
-                        menuItems.add(new CRISMenuItem("System Administration", "", R.drawable.ic_system_administration, null));
+                                if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_SYSTEM_ADMINISTRATOR)) {
+                                    menuItems.add(new CRISMenuItem("System Administration", "", R.drawable.ic_system_administration, null));
+                                }
+                                // Build 110 - Updated copyright date
+                                //menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2016, cris.solutions", BuildConfig.VERSION_NAME), "",
+                                menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2018, cris.solutions", BuildConfig.VERSION_NAME), "",
+                                        R.drawable.ic_cris_grey, null));
+                                // Load the unread documents
+                                getUnreadDocuments();
+                            }
+                        }
                     }
-                    // Build 110 - Updated copyright date
-                    //menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2016, cris.solutions", BuildConfig.VERSION_NAME), "",
-                    menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2018, cris.solutions", BuildConfig.VERSION_NAME), "",
-                            R.drawable.ic_cris_grey, null));
-                    // Load the unread documents
-                    getUnreadDocuments();
+
+                    Collections.sort(menuItems, CRISMenuItem.comparatorAZ);
+                    // Create the Main menu
+                    adapter = new MainMenuAdapter(this, menuItems);
+                    // Display in the List View
+                    listView.setAdapter(adapter);
+
+                    // Create the /CRIS directory if necessary
+                    checkCRISDirectoryExists();
                 }
-
-                Collections.sort(menuItems, CRISMenuItem.comparatorAZ);
-                // Create the Main menu
-                adapter = new MainMenuAdapter(this, menuItems);
-                // Display in the List View
-                listView.setAdapter(adapter);
-
-                // Create the /CRIS directory if necessary
-                checkCRISDirectoryExists();
             }
         }
     }
@@ -236,6 +280,7 @@ public class Main extends CRISActivity {
                 if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_ACCESS_ALL_CLIENTS)) {
                     intent = new Intent(view.getContext(), ListClients.class);
                     intent.putExtra(Main.EXTRA_MY_CLIENTS, false);
+                    intent.putExtra(Main.EXTRA_SHARE_TEXT, shareText);
                     startActivity(intent);
                 } else {
                     doNoPrivilege();
@@ -248,6 +293,11 @@ public class Main extends CRISActivity {
             case "Library":
                 intent = new Intent(view.getContext(), ListLibrary.class);
                 intent.putExtra(Main.EXTRA_CLIENT_ID, Document.nonClientDocumentID.toString());
+                startActivity(intent);
+                break;
+            // Build 139 - Added KPIs
+            case "Key Performance Indicators":
+                intent = new Intent(view.getContext(), ListKPI.class);
                 startActivity(intent);
                 break;
             case "System Administration":
@@ -337,7 +387,28 @@ public class Main extends CRISActivity {
 
     private void showChanges() {
 
-        String changes = "Added icon in Session Register to show presence of sticky notes\n\n" +
+        String changes = "Added facility to complete MyWeek from link to website.\n\n" +
+                "--------------- Older Changes ---------------\n\n" +
+                "Added Key Performance Indicator Menu - Active Cases and Percentage Session Attendance.\n\n" +
+                "Modified CAT Tool to include Living With/Caring for Grandparents.\n\n" +
+                "Add the facility to link a second group to a client's case.\n\n" +
+                "Add School Year Group to Export (new column after age)\n\n" +
+                "Add a counter and better diagnostics to initialisation of new smartphones/tablets.\n\n" +
+                                "Send SMS broadcast messages in batches to solve a problem with some network providers.\n\n" +
+                "Only display current schools when 'selecting clients by school'\n\n" +
+                "Only display current agencies when 'selecting clients by agency'\n\n" +
+                "Fixed bug that created multiple Text Message Notes.\n\n" +
+                "Created option to remove invalid multiple Text Message Notes.\n\n" +
+                "Removed Email and Text Message Notes from Notification list.\n\n" +
+                "Fixed crash when reading MyWeek from within a Session Register.\n\n" +
+                "Fixed crash when creating new Case documents to reject or close a case. \n\n" +
+                "Fixed issue that client's document list was not reloaded on tablet/smartphone re-orientation.\n\n" +
+                "Removed redundant local encryption (Android devices have hardware encryption as standard)" +
+                "Added facility to broadcast text/email messages to a group of carers " +
+                "from Session and Client Lists.\n\n" +
+                "CRIS modified to act as a 'share target' for text shares, creating a note under the selected client." +
+                "When Note type is Email/Text Message, Share mechanism formats the information for the appropriate application (Email/SMS).\n\n" +
+                "Added icon in Session Register to show presence of sticky notes\n\n" +
                 "Added Show One School option to All Clients view to display a list of " +
                 "all active clients with school record for the given school.\n\n" +
                 "Added option to create a list of 'reserves' for a session. A client on the " +
@@ -353,7 +424,8 @@ public class Main extends CRISActivity {
                 "of group.\n\n" +
                 "Fixed crash when client invited to session before case start due " +
                 "to unknown status of 'consent to photography'.\n\n" +
-                "--------------- Older Changes ---------------\n\n" +
+                "Added audit trail displaying change history for documents. Swipe the document " +
+                "from left to right to see the changes.\n\n" +
                 "Upgraded database interface.\n\n"  +
                 "Added 'Automatically invite to Group Sessions' checkbox to Case " +
                 "document and use to control client register for new sessions.\n\n" +
@@ -725,8 +797,13 @@ public class Main extends CRISActivity {
                         summary = "Last update failed.";
                         icon = R.drawable.ic_sync_activity_red;
                         break;
+                    case "PARTIAL":
+                        summary = syncActivity.getSummary();
+                        icon = R.drawable.ic_sync_activity_red;
+                        syncManager.requestManualSync();
+                        break;
                     default:
-                        summary = "Initialising..." + status;
+                        summary = "Initialising: " + status;
                         syncManager.requestManualSync();
                 }
             }
@@ -812,6 +889,13 @@ public class Main extends CRISActivity {
                             localDB.save(systemError);
                             // No change to current user since we don't know the state of the
                             // database. User has been authenticated so acn, at least, sync again
+                            break;
+                        case "PARTIAL":
+                            // Build 138 - Add Partial Initialisation
+                            // Initialisation not complete so kick off another sync
+                            syncManager.requestManualSync();
+                            // Call onResume to display the result an allow the user to see the progress
+                            onResume();
                             break;
                         default:
                             throw new CRISException("Unexpected status return from Sync Adpter: " + status);

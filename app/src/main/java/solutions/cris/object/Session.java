@@ -22,7 +22,9 @@ import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
+import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -262,6 +264,8 @@ public class Session extends Document implements Serializable {
         ArrayList<Client> clients = localDB.getAllClients();
         User currentUser = User.getCurrentUser();
         for (Client client : clients) {
+            // Build 139 - Second Group, Test both groups when deciding whether to create Client Session
+            /*
             if (client.getCurrentCase() != null && client.getCurrentCase().getGroupID() != null) {
                 //if (client.getCurrentCase().getGroupID().equals(getGroupID()) &&
                 // Use original groupID in case user has changed the name, creating AdHoc Session
@@ -278,6 +282,30 @@ public class Session extends Document implements Serializable {
                         clientSession.save(true);
                     }
                 }
+            }
+            */
+            boolean addSession = false;
+            if (client.getCurrentCase() != null) {
+                if (client.getCurrentCase().getCaseType().equals("Start") ||
+                    client.getCurrentCase().getCaseType().equals("Update")){
+                    if (client.getCurrentCase().getGroupID().equals(groupID) &&
+                            !client.getCurrentCase().isDoNotInviteFlag()) {
+                        addSession = true;
+                    } else if (client.getCurrentCase().getGroup2ID() != null){
+                        if (client.getCurrentCase().getGroup2ID().equals(groupID) &&
+                                !client.getCurrentCase().isDoNotInvite2Flag()) {
+                            addSession = true;
+                        }
+                    }
+                }
+            }
+            if (addSession){
+                ClientSession clientSession = new ClientSession(currentUser, client.getClientID());
+                clientSession.setSessionID(getDocumentID());
+                clientSession.setReferenceDate(getReferenceDate());
+                clientSession.setSummary(getSessionName());
+                clientSession.setSession(this);
+                clientSession.save(true);
             }
         }
     }
@@ -452,5 +480,30 @@ public class Session extends Document implements Serializable {
         } else {
             return user.getFullName();
         }
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        LocalSettings localSettings = LocalSettings.getInstance();
+
+        Session previousDocument = (Session) localDB.getDocumentByRecordID(previousRecordID);
+        Session thisDocument = (Session) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.getGroup(), thisDocument.getGroup(), localSettings.Group);
+        changes += CRISUtil.getChanges(previousDocument.getSessionName(), thisDocument.getSessionName(), "Session Name");
+        changes += CRISUtil.getChanges(previousDocument.getKeyWorker(), thisDocument.getKeyWorker(), localSettings.Keyworker);
+        changes += CRISUtil.getChanges(previousDocument.getSessionCoordinator(), thisDocument.getSessionCoordinator(), "Session Coordinator");
+        changes += CRISUtil.getChanges(previousDocument.getOtherStaffIDList(), thisDocument.getOtherStaffIDList(), "Other Staff");
+
+        changes += CRISUtil.getChanges(previousDocument.getAddress(), thisDocument.getAddress(), "Address");
+        changes += CRISUtil.getChanges(previousDocument.getPostcode(), thisDocument.getPostcode(), "Postcode");
+        changes += CRISUtil.getChanges(previousDocument.getDuration(), thisDocument.getDuration(), "Duration");
+        changes += CRISUtil.getChanges(previousDocument.getAdditionalInformation(), thisDocument.getAdditionalInformation(), "Additional Information");
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 }

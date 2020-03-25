@@ -6,7 +6,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Environment;
-import android.support.v7.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.api.services.sheets.v4.model.CellData;
 import com.google.api.services.sheets.v4.model.CellFormat;
@@ -33,8 +33,10 @@ import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.SwipeDetector;
 
-import static android.support.v4.content.FileProvider.getUriForFile;
+import static androidx.core.content.FileProvider.getUriForFile;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -139,7 +141,8 @@ public class PdfDocument extends Document implements Serializable {
         LocalDB localDB = LocalDB.getInstance();
         SimpleDateFormat sDate = new SimpleDateFormat("EEE dd MMM yyyy", Locale.UK);
         // Build the string
-        String summary = "Type: " + getPdfType().getItemValue() + "\n";
+        String summary = super.textSummary();
+        summary += "Type: " + getPdfType().getItemValue() + "\n";
         summary += "Date: ";
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             summary += sDate.format(getReferenceDate());
@@ -148,6 +151,19 @@ public class PdfDocument extends Document implements Serializable {
         summary += "Summary: " + getSummary() + "\n";
         summary += "See attached document.\n";
         return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        PdfDocument previousDocument = (PdfDocument) localDB.getDocumentByRecordID(previousRecordID);
+        PdfDocument thisDocument = (PdfDocument) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.getPdfType(), thisDocument.getPdfType(), "Pdf Type");
+        if (changes.length() == 0) {
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 
     private static PdfDocument displayDocument;
@@ -229,6 +245,8 @@ public class PdfDocument extends Document implements Serializable {
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Date");
         fNames.add("Pdf Type");
@@ -306,8 +324,9 @@ public class PdfDocument extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(5)
-                                .setEndColumnIndex(6)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(6)
+                                .setEndColumnIndex(7)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -320,6 +339,8 @@ public class PdfDocument extends Document implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getReferenceDate()));

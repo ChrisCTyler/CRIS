@@ -17,14 +17,12 @@ package solutions.cris.read;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -33,15 +31,11 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
-import solutions.cris.Login;
 import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
@@ -51,7 +45,6 @@ import solutions.cris.list.ListActivity;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.Document;
-import solutions.cris.object.Image;
 import solutions.cris.object.PdfDocument;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISMenuItem;
@@ -342,6 +335,10 @@ public class ReadClientHeader extends ListActivity {
             }
             if (currentCase.getGroup() != null) {
                 group = currentCase.getGroup().getItemValue();
+            }
+            // Build 139 - Second Group (Indicate a second group)
+            if (currentCase.getGroup2ID() != null) {
+                group += " +1";
             }
             if (currentCase.getKeyWorker() != null) {
                 keyworkerName = currentCase.getKeyWorker().getFullName();

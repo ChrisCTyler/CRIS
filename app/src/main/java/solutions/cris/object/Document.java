@@ -1,12 +1,16 @@
 package solutions.cris.object;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Locale;
 import java.util.UUID;
 
+import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
 
 ///        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -164,6 +168,38 @@ public abstract class Document extends CrisObject implements Serializable, Docum
             }
         }
         return line1;
+    }
+
+    public String textSummary() {
+        SimpleDateFormat sDate = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+
+        String summary = "";
+
+        if (getCancelledFlag()){
+            String cancellationDate = "Unknown Date";
+            if (getCancellationDate() != null &&
+                    !getCancellationDate().equals(Long.MIN_VALUE)){
+                cancellationDate = sDate.format(getCancellationDate());
+            }
+            String cancellationReason = "Reason not given";
+            if (getCancellationReason() != null){
+                cancellationReason = getCancellationReason();
+            }
+            String cancelledBy = "Unknown User";
+            if (getCancelledByID() != null){
+                LocalDB localDB = LocalDB.getInstance();
+                User user = localDB.getUser(getCancelledByID());
+                if (user != null){
+                    cancelledBy = user.getFullName();
+                }
+            }
+            summary += String.format("Document cancelled by %s on %s\nReason:%s\n",
+                    cancelledBy,
+                    cancellationDate,
+                    cancellationReason);
+        }
+
+        return summary;
     }
 
     public static Comparator<Document> comparatorDate = new Comparator<Document>() {
@@ -406,6 +442,52 @@ public abstract class Document extends CrisObject implements Serializable, Docum
                 throw new CRISException(String.format(Locale.UK,
                         "Unexpected DocumentType: %d", documentType));
         }
+    }
+
+    public static String getDocumentTypeString(int documentType){
+        switch (documentType) {
+            case Document.Case:
+                return "Case";
+            case Document.Client:
+                return "Client";
+            case Document.ClientSession:
+                return "ClientSession";
+            case Document.Contact:
+                return "Contact";
+            case Document.CriteriaAssessmentTool:
+                return "Criteria Assessment Tool";
+            case Document.Image:
+                return "Image";
+            case Document.MyWeek:
+                return "My Week";
+            case Document.Note:
+                return "Note";
+            case Document.PdfDocument:
+                return "PdfDocument";
+            case Document.Session:
+                return "Session";
+            case Document.Status:
+                return "Status";
+            case Document.Transport:
+                return "Transport";
+            case Document.TransportRequestAssessment:
+                return "Transport Request Assesssment";
+            default:
+                return String.format(Locale.UK,"Unexpected DocumentType: %d", documentType);
+        }
+    }
+
+    public static String getChanges(Document previousDocument, Document thisDocument){
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        LocalSettings localSettings = LocalSettings.getInstance();
+        String changes = "";
+        changes += CRISUtil.getChangesDate(previousDocument.getReferenceDate(), thisDocument.getReferenceDate(), "Document Date");
+        //changes += CRISUtil.getChanges(previousDocument.getSummary(), thisDocument.getSummary(), "Document Summary");
+        changes += CRISUtil.getChanges(previousDocument.getCancelledFlag(), thisDocument.getCancelledFlag(), "Cancelled flag");
+        changes += CRISUtil.getChangesDateTime(previousDocument.getCancellationDate(), thisDocument.getCancellationDate(), "Cancellation Date");
+        changes += CRISUtil.getChanges(previousDocument.getCancellationReason(), thisDocument.getCancellationReason(), "Cancellation Reason");
+        return changes;
     }
 
 

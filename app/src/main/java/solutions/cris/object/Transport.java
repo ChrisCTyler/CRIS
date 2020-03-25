@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -280,7 +281,8 @@ public class Transport extends Document implements Serializable {
     public String textSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
         // Build the string
-        String summary = String.format("%s\n%s\n%s\ntel: %s\nemail: %s\n\n",
+        String summary = super.textSummary();
+        summary += String.format("%s\n%s\n%s\ntel: %s\nemail: %s\n\n",
                 getTransportOrganisation().getItemValue(),
                 getTransportOrganisation().getAddress(),
                 getTransportOrganisation().getPostcode(),
@@ -307,6 +309,30 @@ public class Transport extends Document implements Serializable {
             summary += String.format("Additional Information:\n%s\n", getAdditionalInformation());
         }
         return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        Transport previousDocument = (Transport) localDB.getDocumentByRecordID(previousRecordID);
+        Transport thisDocument = (Transport) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.isBooked(), thisDocument.isBooked(), "Booked");
+        changes += CRISUtil.getChanges(previousDocument.isRequiredOutbound(), thisDocument.isRequiredOutbound(), "Required Outbound");
+        changes += CRISUtil.getChangesDateTime(previousDocument.getOutboundDate(), thisDocument.getOutboundDate(), "Outbound Date");
+        changes += CRISUtil.getChanges(previousDocument.isUsedReturn(), thisDocument.isUsedReturn(), "Used Return");
+        changes += CRISUtil.getChanges(previousDocument.isRequiredReturn(), thisDocument.isRequiredReturn(), "Required Return");
+        changes += CRISUtil.getChangesDateTime(previousDocument.getReturnDate(), thisDocument.getReturnDate(), "Return Date");
+        changes += CRISUtil.getChanges(previousDocument.isUsedReturn(), thisDocument.isUsedReturn(), "Used Return");
+        changes += CRISUtil.getChanges(previousDocument.getFromAddress(), thisDocument.getFromAddress(), "From Address");
+        changes += CRISUtil.getChanges(previousDocument.getFromPostcode(), thisDocument.getFromPostcode(), "From Postcode");
+        changes += CRISUtil.getChanges(previousDocument.getToAddress(), thisDocument.getToAddress(), "To Address");
+        changes += CRISUtil.getChanges(previousDocument.getToPostcode(), thisDocument.getToPostcode(), "To Postcode");
+        changes += CRISUtil.getChanges(previousDocument.getAdditionalInformation(), thisDocument.getAdditionalInformation(), "Additional Information");
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
@@ -380,8 +406,9 @@ public class Transport extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(10)
-                                .setEndColumnIndex(11)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(11)
+                                .setEndColumnIndex(12)
                                 .setStartRowIndex(1))));
         // 13th column is a date
         requests.add(new Request()
@@ -396,8 +423,9 @@ public class Transport extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(13)
-                                .setEndColumnIndex(14)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(14)
+                                .setEndColumnIndex(15)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -409,6 +437,8 @@ public class Transport extends Document implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         row.add(getItemValue(getTransportOrganisation()));
         if (isBooked()){
@@ -471,6 +501,8 @@ public class Transport extends Document implements Serializable {
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Organisation");
         fNames.add("Booked");

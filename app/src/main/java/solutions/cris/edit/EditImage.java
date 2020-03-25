@@ -24,11 +24,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.FileProvider;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.FileProvider;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -61,20 +61,13 @@ import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
-import solutions.cris.list.ListSessionClients;
 import solutions.cris.object.Document;
 import solutions.cris.object.Image;
-import solutions.cris.object.ListItem;
-import solutions.cris.object.ListType;
-import solutions.cris.object.PdfDocument;
-import solutions.cris.object.Session;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISUtil;
-import solutions.cris.utils.PickList;
 
 import static android.app.Activity.RESULT_OK;
-import static android.support.v4.content.FileProvider.getUriForFile;
+import static androidx.core.content.FileProvider.getUriForFile;
 
 /**
  * Copyright CRIS.Solutions 06/03/2017.

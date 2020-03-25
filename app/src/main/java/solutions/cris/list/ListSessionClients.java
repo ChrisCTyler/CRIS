@@ -14,22 +14,18 @@ package solutions.cris.list;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import android.Manifest;
-import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -44,22 +40,17 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.UUID;
 
-import solutions.cris.Login;
 import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
-import solutions.cris.edit.EditPdfDocument;
 import solutions.cris.exceptions.CRISException;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
-import solutions.cris.object.CriteriaAssessmentTool;
 import solutions.cris.object.Document;
 import solutions.cris.object.Session;
 import solutions.cris.object.User;
 import solutions.cris.utils.ExceptionHandler;
 import solutions.cris.utils.LocalSettings;
-
-import static solutions.cris.list.ListLibrary.REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE;
 
 public class ListSessionClients extends ListActivity {
 
@@ -149,6 +140,9 @@ public class ListSessionClients extends ListActivity {
         // Build 110 - Removed share from Session views as not relevant
         //inflater.inflate(R.menu.menu_search_share, menu);
         inflater.inflate(R.menu.menu_search, menu);
+        // Build 126 - Add share option so that Readfragments can offer a share
+        //inflater.inflate(R.menu.menu_search, menu);
+        inflater.inflate(R.menu.menu_search_share, menu);
         super.onCreateOptionsMenu(menu);
         return true;
     }
@@ -372,6 +366,10 @@ public class ListSessionClients extends ListActivity {
             }
             if (currentCase.getGroup() != null) {
                 group = currentCase.getGroup().getItemValue();
+            }
+            // Build 139 - Second Group
+            if (currentCase.getGroup2() != null) {
+                group += " +1";
             }
             if (currentCase.getKeyWorker() != null) {
                 keyworkerName = currentCase.getKeyWorker().getFullName();

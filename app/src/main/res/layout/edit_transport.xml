@@ -148,11 +148,11 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
 
-                        <android.support.design.widget.TextInputLayout
+                        <com.google.android.material.textfield.TextInputLayout
                             android:layout_width="170dp"
                             android:layout_height="wrap_content">
 
-                            <android.support.design.widget.TextInputEditText
+                            <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/outbound_date"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -160,13 +160,13 @@
                                 android:inputType="date"
                                 android:maxLines="1" />
 
-                        </android.support.design.widget.TextInputLayout>
+                        </com.google.android.material.textfield.TextInputLayout>
 
-                        <android.support.design.widget.TextInputLayout
+                        <com.google.android.material.textfield.TextInputLayout
                             android:layout_width="130dp"
                             android:layout_height="wrap_content">
 
-                            <android.support.design.widget.TextInputEditText
+                            <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/outbound_time"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -174,7 +174,7 @@
                                 android:inputType="time"
                                 android:maxLines="1" />
 
-                        </android.support.design.widget.TextInputLayout>
+                        </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
 
 
@@ -240,11 +240,11 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
-                    <android.support.design.widget.TextInputLayout
+                    <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="170dp"
                         android:layout_height="wrap_content">
 
-                        <android.support.design.widget.TextInputEditText
+                        <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/return_date"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -252,13 +252,13 @@
                             android:inputType="date"
                             android:maxLines="1" />
 
-                    </android.support.design.widget.TextInputLayout>
+                    </com.google.android.material.textfield.TextInputLayout>
 
-                    <android.support.design.widget.TextInputLayout
+                    <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="130dp"
                         android:layout_height="wrap_content">
 
-                        <android.support.design.widget.TextInputEditText
+                        <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/return_time"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -266,7 +266,7 @@
                             android:inputType="time"
                             android:maxLines="1" />
 
-                    </android.support.design.widget.TextInputLayout>
+                    </com.google.android.material.textfield.TextInputLayout>
 
                 </LinearLayout>
 
@@ -310,11 +310,11 @@
 
                 </LinearLayout>
 
-                <android.support.design.widget.TextInputLayout
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <android.support.design.widget.TextInputEditText
+                    <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/from_address"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -322,13 +322,13 @@
                         android:inputType="textMultiLine|textCapWords"
                         android:maxLines="4" />
 
-                </android.support.design.widget.TextInputLayout>
+                </com.google.android.material.textfield.TextInputLayout>
 
-                <android.support.design.widget.TextInputLayout
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <android.support.design.widget.TextInputEditText
+                    <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/from_postcode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -336,7 +336,7 @@
                         android:inputType="textCapCharacters"
                         android:maxLines="1" />
 
-                </android.support.design.widget.TextInputLayout>
+                </com.google.android.material.textfield.TextInputLayout>
 
             </LinearLayout>
 
@@ -373,11 +373,11 @@
 
                 </LinearLayout>
 
-                <android.support.design.widget.TextInputLayout
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <android.support.design.widget.TextInputEditText
+                    <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/to_address"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -385,13 +385,13 @@
                         android:inputType="textMultiLine|textCapWords"
                         android:maxLines="4" />
 
-                </android.support.design.widget.TextInputLayout>
+                </com.google.android.material.textfield.TextInputLayout>
 
-                <android.support.design.widget.TextInputLayout
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <android.support.design.widget.TextInputEditText
+                    <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/to_postcode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -399,22 +399,22 @@
                         android:inputType="textCapCharacters"
                         android:maxLines="1" />
 
-                </android.support.design.widget.TextInputLayout>
+                </com.google.android.material.textfield.TextInputLayout>
 
             </LinearLayout>
 
-            <android.support.design.widget.TextInputLayout
+            <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <android.support.design.widget.TextInputEditText
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/additional_information"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/prompt_additional_information"
                     android:inputType="textMultiLine|textCapSentences"/>
 
-            </android.support.design.widget.TextInputLayout>
+            </com.google.android.material.textfield.TextInputLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"

@@ -27,15 +27,33 @@ import android.view.View;
 public class OnSwipeTouchListener implements View.OnTouchListener {
 
     private final GestureDetector gestureDetector;
+    public static enum Action {
+        LR, // Left to Right
+        RL, // Right to Left
+        TB, // Top to bottom
+        BT, // Bottom to Top
+        None // when no action was detected
+    }
+    private Action mSwipeDetected = Action.None;
+
+    public boolean swipeDetected() {
+        return mSwipeDetected != Action.None;
+    }
+
+    public Action getAction() {
+        return mSwipeDetected;
+    }
 
     public OnSwipeTouchListener(Context context) {
         gestureDetector = new GestureDetector(context, new GestureListener());
     }
 
     public void onSwipeLeft() {
+        mSwipeDetected = Action.RL;
     }
 
     public void onSwipeRight() {
+        mSwipeDetected = Action.LR;
     }
 
     public boolean onTouch(View v, MotionEvent event) {
@@ -49,6 +67,8 @@ public class OnSwipeTouchListener implements View.OnTouchListener {
 
         @Override
         public boolean onDown(MotionEvent e) {
+
+            mSwipeDetected = Action.None;
             return true;
         }
 

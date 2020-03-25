@@ -31,7 +31,8 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
     // Update History:
     // Version 2: Added ReferenceDate column to Document
     // Version 3: Added Commissioner list items and Follow table
-    private static final int VERSION = 20;
+    // Build 140 - Version 23 added index on DocumentType, HistoryDate,ReferenceDate
+    private static final int VERSION = 23;
     private String organisation;
     private int oldVersion = 0;
     private int newVersion = 0;
@@ -179,6 +180,14 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
             case 14:
                 // No Change
                 break;
+            case 21:
+                // Build 119 2 May 2019 - Text/Email Broadcasting
+                // Build 121 4 June - Removed these. Note_Type is a complex list item so
+                // this method is inappropriate
+                //list.add(new ListItem(user, ListType.NOTE_TYPE, "Text Message", 0));
+                //list.add(new ListItem(user, ListType.NOTE_TYPE, "Email", 1));
+                //list.add(new ListItem(user, ListType.NOTE_TYPE, "Phone Message", 1));
+                break;
         }
 
         return list;
@@ -315,6 +324,15 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
                 sqlList.add("UPDATE Document SET SessionID = ''");
                 sqlList.add("CREATE INDEX DocumentDocumentTypeHistoryDateSessionID ON Document(DocumentType, HistoryDate, SessionID);");
                 break;
+            case 21:
+                // Updated list items only
+                break;
+            case 22:
+                sqlList.add("DELETE FROM ListItem WHERE ListType = 'NOTE_TYPE' AND ItemValue = 'Phone Message'; ");
+                break;
+            case 23:
+                sqlList.add("CREATE INDEX DocumentDocumentTypeHistoryDateReferenceDate ON Document(DocumentType, HistoryDate, ReferenceDate);");
+                break;
 
         }
         return sqlList;
@@ -429,6 +447,15 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
             // Build 107 31 Aug 2018 Added as a test - should have no effect
             case 20:
                 sqlList.add("DELETE FROM ListItem WHERE ListType = 'TRANSPORT_ORGANISATION' AND ItemValue = 'Taxi Company 1'; ");
+                break;
+            case 21:
+                // Updated list items only
+                break;
+            case 22:
+                sqlList.add("DELETE FROM ListItem WHERE ListType = 'NOTE_TYPE' AND ItemValue = 'Phone Message'; ");
+                break;
+            case 23:
+                // No change
                 break;
         }
         return sqlList;

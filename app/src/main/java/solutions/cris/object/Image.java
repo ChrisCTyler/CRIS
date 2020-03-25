@@ -1,13 +1,6 @@
 package solutions.cris.object;
 
-import android.app.Dialog;
-import android.content.Context;
-import android.content.DialogInterface;
-import android.content.Intent;
-
-import android.net.Uri;
-import android.os.Environment;
-import android.support.v7.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.api.services.sheets.v4.model.CellData;
 import com.google.api.services.sheets.v4.model.CellFormat;
@@ -17,22 +10,17 @@ import com.google.api.services.sheets.v4.model.RepeatCellRequest;
 import com.google.api.services.sheets.v4.model.Request;
 import com.google.api.services.sheets.v4.model.TextFormat;
 
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
-import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.SwipeDetector;
 
-import static android.support.v4.content.FileProvider.getUriForFile;
+import static androidx.core.content.FileProvider.getUriForFile;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -100,12 +88,28 @@ public class Image extends Document implements Serializable {
         return summary;
     }
 
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+
+        Image previousDocument = (Image) localDB.getDocumentByRecordID(previousRecordID);
+        Image thisDocument = (Image) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
+    }
+
+
     private static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Date");
         fNames.add("Description");
@@ -187,8 +191,10 @@ public class Image extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(5)
-                                .setEndColumnIndex(6)
+
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(6)
+                                .setEndColumnIndex(7)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -201,6 +207,8 @@ public class Image extends Document implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getReferenceDate()));

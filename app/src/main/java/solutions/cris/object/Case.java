@@ -22,7 +22,9 @@ import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -90,6 +92,22 @@ public class Case extends Document implements Serializable {
             throw new CRISException(String.format(Locale.UK, "Invalid Client Status: %d", clientStatus));
         }
         this.clientStatus = clientStatus;
+    }
+
+    public static String getClientStatusString(int clientStatus){
+        switch (clientStatus){
+            case RED:
+                return "RED";
+
+            case AMBER:
+                return "AMBER";
+
+            case GREEN:
+                return "GREEN";
+
+            default:
+                return String.format("No such Client Status: %d\n", clientStatus);
+        }
     }
 
     private UUID keyWorkerID;
@@ -202,10 +220,33 @@ public class Case extends Document implements Serializable {
         }
         return group;
     }
-
     public void setGroup(ListItem group) {
         this.group = group;
     }
+
+    // Build 139 - Second Group
+    private UUID group2ID;
+    private ListItem group2;
+
+    public UUID getGroup2ID() {
+        return group2ID;
+    }
+
+    public void setGroup2ID(UUID group2ID) {
+        this.group2ID = group2ID;
+    }
+
+    public ListItem getGroup2() {
+        if (group2ID != null) {
+            LocalDB localDB = LocalDB.getInstance();
+            group2 = localDB.getListItem(group2ID);
+        }
+        return group2;
+    }
+    public void setGroup2(ListItem group2) {
+        this.group2 = group2;
+    }
+
 
     private UUID commissionerID;
     private ListItem commissioner;
@@ -301,8 +342,17 @@ public class Case extends Document implements Serializable {
         this.doNotInviteFlag = doNotInviteFlag;
     }
 
+    // Build 139 - Second Group
+    private boolean doNotInvite2Flag;
+    public boolean isDoNotInvite2Flag() {return doNotInvite2Flag;}
+    public void setDoNotInvite2Flag(boolean doNotInvite2Flag) {
+        this.doNotInvite2Flag = doNotInvite2Flag;
+    }
+
     public void clear(){
         setTier(null);
+        setGroup(null);
+        // Build 139 - Second Group
         setGroup(null);
         setKeyWorker(null);
         setCoWorker1(null);
@@ -314,6 +364,8 @@ public class Case extends Document implements Serializable {
         LocalDB localDB = LocalDB.getInstance();
         ListItem tier = getTier();
         ListItem group = getGroup();
+        ListItem group2 = getGroup2();
+        // Build 139 Second Group
         User keyWorker = getKeyWorker();
         User coWorker1 = getCoWorker1();
         User coWorker2 = getCoWorker2();
@@ -331,6 +383,13 @@ public class Case extends Document implements Serializable {
             }
             summaryText += group.getItemValue();
         }
+        // Build 139 - Second Group
+        if (group2 != null) {
+            if (!summaryText.isEmpty()){
+                summaryText += ", ";
+            }
+            summaryText += " plus 1";
+        }
         if (keyWorker != null) {
             if (!summaryText.isEmpty()){
                 summaryText += ", ";
@@ -345,6 +404,8 @@ public class Case extends Document implements Serializable {
 
         setTier(tier);
         setGroup(group);
+        // Build 139 - Second Group
+        setGroup2(group2);
         setKeyWorker(keyWorker);
         setCoWorker1(coWorker1);
         setCoWorker2(coWorker2);
@@ -369,6 +430,10 @@ public class Case extends Document implements Serializable {
             }
             if (getGroup() != null) {
                 text += getGroup().getItemValue() + " ";
+            }
+            // Build 139 - Second Group
+            if (getGroup2() != null) {
+                text += getGroup2().getItemValue() + " ";
             }
             switch (getClientStatus()) {
                 case RED:
@@ -397,12 +462,14 @@ public class Case extends Document implements Serializable {
         }
     }
 
+    @Override
     public String textSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
         // Use local settings for 'local' labels
         LocalSettings localSettings = LocalSettings.getInstance();
         // Build the string
-        String summary = "Case Type: " + getCaseType() + "\n";
+        String summary = super.textSummary();
+        summary += "Case Type: " + getCaseType() + "\n";
         summary += "Date: ";
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             summary += sDate.format(getReferenceDate());
@@ -434,13 +501,22 @@ public class Case extends Document implements Serializable {
         }
         summary += "\n";
         summary += localSettings.Group + ": ";
-        if (group != null) {
+        if (getGroup() != null) {
             summary += getGroup().getItemValue();
-        }
-        if (isDoNotInviteFlag()){
-            summary += " (Do not invite to Sessions)";
+            if (isDoNotInviteFlag()){
+                summary += " (Do not invite to Sessions)";
+            }
         }
         summary += "\n";
+        // Build 139 - Second Group
+        if (getGroup2() != null) {
+            summary += localSettings.Group + "2: ";
+            summary += getGroup2().getItemValue();
+            if (isDoNotInvite2Flag()){
+                summary += " (Do not invite to Sessions)";
+            }
+            summary += "\n";
+        }
         summary += "Transport Required: " + getTransportRequired() + "\n";
         summary += "Special Instructions: " + getTransportSpecialInstructions() + "\n";
         summary += localSettings.Keyworker + ": ";
@@ -466,6 +542,41 @@ public class Case extends Document implements Serializable {
         return summary;
     }
 
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        LocalSettings localSettings = LocalSettings.getInstance();
+
+        Case previousDocument = (Case) localDB.getDocumentByRecordID(previousRecordID);
+        Case thisDocument = (Case) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.getCaseType(), thisDocument.getCaseType(), "Case Type");
+        if (previousDocument.getClientStatus() != thisDocument.getClientStatus()){
+            changes += String.format("Client Status changed from %s to %s\n",
+                    getClientStatusString (previousDocument.getClientStatus()),
+                    getClientStatusString(thisDocument.getClientStatus()));
+        }
+        changes += CRISUtil.getChanges(previousDocument.getCaseSummary(), thisDocument.getCaseSummary(), "Case Summary");
+        changes += CRISUtil.getChanges(previousDocument.isPhotographyConsentFlag(), thisDocument.isPhotographyConsentFlag(), "Photography/Media Consent");
+        changes += CRISUtil.getChanges(previousDocument.getOverdueThreshold(), thisDocument.getOverdueThreshold(), "Overdue Days Threshold");
+        changes += CRISUtil.getChanges(previousDocument.getTier(), thisDocument.getTier(), localSettings.Tier);
+        changes += CRISUtil.getChanges(previousDocument.getGroup(), thisDocument.getGroup(), localSettings.Group);
+        // Build 139 - Second Group
+        changes += CRISUtil.getChanges(previousDocument.getGroup2(), thisDocument.getGroup2(), localSettings.Group +"2");
+        changes += CRISUtil.getChanges(previousDocument.isDoNotInviteFlag(), thisDocument.isDoNotInviteFlag(), "Do Not Invite flag");
+        changes += CRISUtil.getChanges(previousDocument.getTransportRequired(), thisDocument.getTransportRequired(), "Transport Required");
+        changes += CRISUtil.getChanges(previousDocument.getTransportSpecialInstructions(), thisDocument.getTransportSpecialInstructions(), "Special Transport Instructions");
+        changes += CRISUtil.getChanges(previousDocument.getKeyWorker(), thisDocument.getKeyWorker(), localSettings.Keyworker);
+        changes += CRISUtil.getChanges(previousDocument.getCoWorker1(), thisDocument.getCoWorker1(), localSettings.Coworker1);
+        changes += CRISUtil.getChanges(previousDocument.getCoWorker2(), thisDocument.getCoWorker2(), localSettings.Coworker2);
+        changes += CRISUtil.getChanges(previousDocument.getCommissioner(), thisDocument.getCommissioner(), localSettings.Commisioner);
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
+    }
+
     private static List<Object> getExportFieldNames(Activity activity) {
         final LocalSettings localSettings = LocalSettings.getInstance(activity);
         List<Object> fNames = new ArrayList<>();
@@ -473,11 +584,15 @@ public class Case extends Document implements Serializable {
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Case Date");
         fNames.add("Case Type");
         fNames.add("Status");
         fNames.add(localSettings.Group);
+        // Build 139 - Second Group
+        fNames.add(localSettings.Group + "2");
         fNames.add(localSettings.Keyworker);
         fNames.add(localSettings.Commisioner);
         fNames.add(localSettings.Tier);
@@ -560,6 +675,7 @@ public class Case extends Document implements Serializable {
                                 .setEndColumnIndex(3)
                                 .setStartRowIndex(1))));
         // 6th column is a date
+        // Build 139 - Adding Year Group to Export shifts column to right
         requests.add(new Request()
                 .setRepeatCell(new RepeatCellRequest()
                         .setCell(new CellData()
@@ -572,8 +688,9 @@ public class Case extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(5)
-                                .setEndColumnIndex(6)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(6)
+                                .setEndColumnIndex(7)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -585,6 +702,8 @@ public class Case extends Document implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         row.add(sDate.format(getReferenceDate()));
         row.add(getCaseType());
@@ -604,6 +723,12 @@ public class Case extends Document implements Serializable {
             row.add(getGroup().getItemValue());
         } else {
             row.add("");    // Group
+        }
+        // Build 139 - Second Group
+        if (getGroup2() != null) {
+            row.add(getGroup2().getItemValue());
+        } else {
+            row.add("");    // Group2
         }
         if (getKeyWorker() != null) {
             row.add(getKeyWorker().getFullName());

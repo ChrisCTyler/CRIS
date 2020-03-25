@@ -20,6 +20,9 @@ import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -44,7 +47,7 @@ public class ClientSession extends Document implements Serializable {
     // a way that older versions cannot be deserialised.
     private static final long serialVersionUID = CrisObject.SVUID_CLIENT_SESSION;
 
-    public ClientSession(User currentUser, UUID clientID){
+    public ClientSession(User currentUser, UUID clientID) {
         super(currentUser, clientID, Document.ClientSession);
         attended = false;
         status = 0;
@@ -123,7 +126,7 @@ public class ClientSession extends Document implements Serializable {
         this.status = status;
     }
 
-    public void clear(){
+    public void clear() {
         setSession(null);
         setClient(null);
     }
@@ -151,7 +154,7 @@ public class ClientSession extends Document implements Serializable {
         setClient(client);
     }
 
-    public boolean search(String searchText){
+    public boolean search(String searchText) {
         throw new CRISException("Invalid search() call from ClientSession");
     }
 
@@ -161,8 +164,8 @@ public class ClientSession extends Document implements Serializable {
         SimpleDateFormat sDate = new SimpleDateFormat("EEE dd MMM yyyy", Locale.UK);
         SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
         // Build the string
-        String summary = "";
-        if (getSession() != null){
+        String summary = super.textSummary();
+        if (getSession() != null) {
             summary += session.textSummary();
         }
         if (attended) {
@@ -177,11 +180,27 @@ public class ClientSession extends Document implements Serializable {
             summary += "Reserved: NO\n";
         }
         if (getCancelledFlag()) {
-            summary += String.format("Cancelled: YES\n%s\n",getCancellationReason());
+            summary += String.format("Cancelled: YES\n%s\n", getCancellationReason());
         } else {
             summary += "Cancelled: NO\n";
         }
         return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        LocalSettings localSettings = LocalSettings.getInstance();
+        ClientSession previousDocument = (ClientSession) localDB.getDocumentByRecordID(previousRecordID);
+        ClientSession thisDocument = (ClientSession) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.isAttended(), thisDocument.isAttended(), "Attended");
+        changes += CRISUtil.getChanges(previousDocument.isReserved(), thisDocument.isReserved(), "Reserved");
+        if (changes.length() == 0) {
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 
     private static List<Object> getExportFieldNames() {
@@ -190,6 +209,8 @@ public class ClientSession extends Document implements Serializable {
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Session Date");
         fNames.add("Attended");
@@ -226,7 +247,7 @@ public class ClientSession extends Document implements Serializable {
         content.add(getExportFieldNames());
         // Add each document (needs associated note/pdf/transport documents)
         for (Document document : documents) {
-            if (client == null || document.getClientID() != client.getClientID()){
+            if (client == null || document.getClientID() != client.getClientID()) {
                 // New client
                 client = (Client) localDB.getDocument(document.getClientID());
                 myWeeks = localDB.getAllDocumentsOfType(client.getClientID(), Document.MyWeek);
@@ -360,8 +381,9 @@ public class ClientSession extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(5)
-                                .setEndColumnIndex(6)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(6)
+                                .setEndColumnIndex(7)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -376,36 +398,38 @@ public class ClientSession extends Document implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getReferenceDate()));
         } else {
             row.add("");
         }
-        if (isAttended()){
+        if (isAttended()) {
             row.add("True");
         } else {
             row.add("False");
         }
         // Build 110
-        if (isReserved()){
+        if (isReserved()) {
             row.add("True");
         } else {
             row.add("False");
         }
         // Build 110
-        if (getCancelledFlag()){
+        if (getCancelledFlag()) {
             row.add("True");
         } else {
             row.add("False");
         }
-        if (sessionStatus == null){
+        if (sessionStatus == null) {
             row.add(0);
         } else {
             row.add(sessionStatus.getScore());
         }
         Session session = getSession();
-        if (session == null){
+        if (session == null) {
             row.add("Unknown");
             row.add("Unknown");
             row.add("Unknown");
@@ -416,17 +440,17 @@ public class ClientSession extends Document implements Serializable {
             row.add(getFullName(session.getSessionCoordinator()));
             row.add(session.getPostcode());
         }
-        if (note == null){
+        if (note == null) {
             row.add("True");
         } else {
             row.add("False");
         }
-        if (pdfDocument == null){
+        if (pdfDocument == null) {
             row.add("True");
         } else {
             row.add("False");
         }
-        if (transport == null){
+        if (transport == null) {
             row.add("");    // Transport
             row.add("");    // Booked
             row.add("");    // Outbound
@@ -435,28 +459,28 @@ public class ClientSession extends Document implements Serializable {
             row.add("");    // Used
         } else {
             row.add(getItemValue(transport.getTransportOrganisation()));
-            if (transport.isBooked()){          // Booked
+            if (transport.isBooked()) {          // Booked
                 row.add("True");
             } else {
                 row.add("False");
             }
 
-            if (transport.isRequiredOutbound()){// Outbound
+            if (transport.isRequiredOutbound()) {// Outbound
                 row.add("True");
             } else {
                 row.add("False");
             }
-            if (transport.isUsedOutbound()){    // Used
+            if (transport.isUsedOutbound()) {    // Used
                 row.add("True");
             } else {
                 row.add("False");
             }
-            if (transport.isRequiredReturn()){  // Return
+            if (transport.isRequiredReturn()) {  // Return
                 row.add("True");
             } else {
                 row.add("False");
             }
-            if (transport.isUsedReturn()){      // Used
+            if (transport.isUsedReturn()) {      // Used
                 row.add("True");
             } else {
                 row.add("False");
@@ -466,16 +490,16 @@ public class ClientSession extends Document implements Serializable {
 
     }
 
-    private String getItemValue(ListItem item){
-        if (item == null){
+    private String getItemValue(ListItem item) {
+        if (item == null) {
             return "Unknown";
         } else {
             return item.getItemValue();
         }
     }
 
-    private String getFullName(User user){
-        if (user == null){
+    private String getFullName(User user) {
+        if (user == null) {
             return "Unknown";
         } else {
             return user.getFullName();

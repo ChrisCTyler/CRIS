@@ -56,6 +56,7 @@
     <string name="prompt_is_displayed">Is Displayed?</string>
     <string name="prompt_issue_date">Issue Date*</string>
     <string name="prompt_last_name">Last Name*</string>
+    <string name="prompt_message_text">Message Text</string>
     <string name="prompt_name">Name*</string>
     <string name="prompt_note_type">Note Type*</string>
     <string name="prompt_role_name">Role</string>
@@ -109,6 +110,8 @@
     <string name="action_new_role">New Role</string>
     <string name="action_new_user">New User</string>
     <string name="action_save">Save</string>
+    <string name="action_send_emails">Send Emails</string>
+    <string name="action_send_texts">Send Texts</string>
     <string name="action_set_new_password">Set New Password</string>
     <string name="action_share">Share</string>
     <string name="action_show_cancelled_documents">Show Cancelled Documents</string>
@@ -188,6 +191,7 @@
     <string name="title_activity_edit_session">EditSession</string>
     <string name="title_activity_list_session_clients">ListSessionClients</string>
     <string name="title_activity_edit_my_week">EditMyWeek</string>
+    <string name="title_activity_list_kpi">KPI</string>
 
     <string name="my_week_school">School/College/Work*</string>
     <string name="my_week_friendship">Friendships and Me*</string>
@@ -197,4 +201,8 @@
     <string name="title_activity_edit_transport_organisation">EditTransportOrganisation</string>
     <string name="title_activity_edit_transport">EditTransport</string>
     <string name="title_activity_crisexport">CRISExport</string>
+    <string name="title_activity_list_share_manager">ListShareManager</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>

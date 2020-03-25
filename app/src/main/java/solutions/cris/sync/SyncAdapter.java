@@ -28,10 +28,13 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SyncResult;
 import android.database.Cursor;
+import android.icu.util.DateInterval;
 import android.os.Bundle;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.TaskStackBuilder;
-import android.support.v4.content.res.ResourcesCompat;
+
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.TaskStackBuilder;
+import androidx.core.content.res.ResourcesCompat;
+
 import android.util.Base64;
 
 import org.json.JSONArray;
@@ -88,7 +91,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
      * Set up the sync adapter. This form of the
      * constructor maintains compatibility with Android 3.0
      * and later platform versions
-    */
+     */
     public SyncAdapter(
             Context context,
             boolean autoInitialize,
@@ -201,11 +204,11 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
             try {
                 // Create a Sync Result record
                 syncActivity = new SyncActivity(currentUser);
-                syncActivity.appendLog(String.format(Locale.UK, "Diag date: %d", syncActivity.getCreationDate().getTime()) );
+                syncActivity.appendLog(String.format(Locale.UK, "Diag date: %d", syncActivity.getCreationDate().getTime()));
                 syncActivityID = syncActivity.getRecordID().toString();
                 // Build 107 - Added Upload Test
                 //uploadTest();
-                syncActivity.appendLog("Upload Test Complete" );
+                syncActivity.appendLog("Upload Test Complete");
                 // The sync date must be later than the latest sync date already
                 // on the web server. Due to tablets potentially having incorrect time/date
                 // settings, it is necessary to get the latest Sync record from the webserver
@@ -218,16 +221,44 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 // Download new records
                 downloadCount = downloadRecords();
 
+                // Build 128 - Unsynced records are in batches of 200 for repeat until count = 0
                 // Upload unsynced records
-
                 uploadCount += uploadBlobTable();       // Done
-                uploadCount += uploadReadAudits();      // Done
-                uploadCount += uploadListItems();       // Done
-                uploadCount += uploadUsers();           // Done
-                uploadCount += uploadSystemErrors();    // Done
-                uploadCount += uploadDocuments();       // Done
-                uploadCount += uploadReadAudits();      // Done
-                uploadCount += uploadFollows();         // Done
+                int count = 1;
+                while (count > 0) {
+                    count = uploadReadAudits();
+                    uploadCount += count;
+                }
+                count = 1;
+                while (count > 0) {
+                    count = uploadListItems();
+                    uploadCount += count;
+                }
+                count = 1;
+                while (count > 0) {
+                    count = uploadUsers();
+                    uploadCount += count;
+                }
+                count = 1;
+                while (count > 0) {
+                    count = uploadSystemErrors();
+                    uploadCount += count;
+                }
+                count = 1;
+                while (count > 0) {
+                    count = uploadDocuments();
+                    uploadCount += count;
+                }
+                count = 1;
+                while (count > 0) {
+                    count = uploadReadAudits();
+                    uploadCount += count;
+                }
+                count = 1;
+                while (count > 0) {
+                    count = uploadFollows();
+                    uploadCount += count;
+                }
 
                 // Check for new unread documents if the organisation is the current pref
                 if (runningOrganisation) {
@@ -245,16 +276,24 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 syncActivity.setCompletionDate(completionDate);
                 localDB.save(syncActivity);
             } catch (Exception ex) {
-                // Log a System Error
-                SystemError systemError = new SystemError(currentUser, ex);
-                localDB.save(systemError);
-                syncActivity.setResult("FAILURE");
-                syncActivity.setSummary("Exception - " + ex.getMessage());
-                StringWriter sbStackTrace = new StringWriter();
-                ex.printStackTrace(new PrintWriter(sbStackTrace));
-                syncActivity.appendLog("*************** Stack Trace *************\n" + sbStackTrace.toString());
-                syncActivity.setCompletionDate(new Date());
-                localDB.save(syncActivity);
+                // Build 138 - Add Partial Downloads. Load max of 200 syncs at a time
+                if (ex.getMessage().startsWith("PARTIAL")){
+                    syncActivity.setResult("PARTIAL");
+                    syncActivity.setSummary(ex.getMessage());
+                    syncActivity.setCompletionDate(new Date());
+                    localDB.save(syncActivity);
+                } else {
+                    // Log a System Error
+                    SystemError systemError = new SystemError(currentUser, ex);
+                    localDB.save(systemError);
+                    syncActivity.setResult("FAILURE");
+                    syncActivity.setSummary("Exception - " + ex.getMessage());
+                    StringWriter sbStackTrace = new StringWriter();
+                    ex.printStackTrace(new PrintWriter(sbStackTrace));
+                    syncActivity.appendLog("*************** Stack Trace *************\n" + sbStackTrace.toString());
+                    syncActivity.setCompletionDate(new Date());
+                    localDB.save(syncActivity);
+                }
             }
         } catch (Exception ex) {
             syncStatus = "FAILURE";
@@ -394,6 +433,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         try {
             // Get the SyncIDs for syncs since last successful SyncActivity start date (CreationDate)
             JSONObject jsonSync = getDownloadSyncIDs();
+            // Build 138 - Add Partial Downloads. Load max of 200 syncs at a time
+            int syncCount = 0;
+            int syncBatch = 100;
             // Loop through the output rows
             JSONArray names = jsonSync.names();
             for (int i = 0; i < names.length(); i++) {
@@ -402,6 +444,21 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     JSONObject row = jsonSync.getJSONObject(names.getString(i));
                     // Ignoring SyncIDs in local database (ones this tablet created in last sync)
                     if (localDB.getSync(UUID.fromString(row.getString("SyncID"))) == null) {
+                        // Build 138 - Add Partial Downloads. Load max of 200 syncs at a time
+                        syncCount ++;
+                        if (syncCount > syncBatch) {
+                            // Calculate the approximate time remaining
+                            int syncsRemaining = names.length()-i;
+                            Date timeNow = new Date();
+                            Date timeStart = syncActivity.getCreationDate();
+                            long interval = timeNow.getTime() - timeStart.getTime();
+                            long secondsRemaining = syncsRemaining * interval / syncBatch /1000;
+                            throw new CRISException(String.format("PARTIAL: %d remaining (approx. %d seconds)",syncsRemaining, secondsRemaining));
+                        }
+                        // Build 138 - Partial Initialisation - Add diagnostic
+                        String syncID = row.getString("SyncID");
+                        syncActivity.appendLog(String.format(Locale.UK,
+                                "Initiating downloaded using SyncID: %s", syncID));
                         Sync newSync = new Sync(row.getString("TableName"), 0);
                         newSync.setSyncID(UUID.fromString(row.getString("SyncID")));
                         newSync.setSyncDate(new Date(row.getLong("SyncDate")));
@@ -453,7 +510,10 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 }
             }
         } catch (JSONException ex) {
-            throw new CRISException("Error parsing JSON data: " + ex.getMessage());
+            // Build 138 - Add Partial Downloads
+            //throw new CRISException("Error parsing JSON data: " + ex.getMessage());
+            throw new CRISException("Error in DownloadRecords(): " + ex.getMessage());
+
         }
 
         return count;
@@ -529,8 +589,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 }
                 try {
                     localDB.save(sync);
-                }
-                catch (Exception ex){
+                } catch (Exception ex) {
                     throw new CRISException("Error saving sync - " + ex.getMessage());
                 }
                 syncActivity.appendLog(String.format(Locale.UK,
@@ -612,7 +671,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         // Separate update and get replaced due to timing issue, see localDB for more details
         //localDB.updateSyncID("Document", sync.getSyncID());
         //Cursor cursor = localDB.getRecordsBySyncID("ListItem", sync.getSyncID());
-        Cursor cursor = localDB.getUnsyncedRecords("ListItem", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecordsWithRecordID("ListItem", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -681,7 +740,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         // Separate update and get replaced due to timing issue, see localDB for more details
         //localDB.updateSyncID("Document", sync.getSyncID());
         //Cursor cursor = localDB.getRecordsBySyncID("User", sync.getSyncID());
-        Cursor cursor = localDB.getUnsyncedRecords("User", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecordsWithRecordID("User", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -701,9 +760,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("EmailAddress", cursor.getString(6));
                     values.put("Name", cursor.getString(7));
                     // Decrypt the Web blob using the Web cipher
-                    byte[] decrypted = aesEncryption.decrypt(AESEncryption.LOCAL_CIPHER,cursor.getBlob(8));
+                    byte[] decrypted = aesEncryption.decrypt(AESEncryption.LOCAL_CIPHER, cursor.getBlob(8));
                     // Encrypt using Local cipher
-                    byte[] encrypted  = aesEncryption.encrypt(AESEncryption.WEB_CIPHER,decrypted);
+                    byte[] encrypted = aesEncryption.encrypt(AESEncryption.WEB_CIPHER, decrypted);
                     // Write to the web
                     values.put("SerialisedObject", Base64.encodeToString(encrypted, Base64.DEFAULT));
                     syncActivity.appendLog("Name: " + cursor.getString(7));
@@ -750,7 +809,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         // Separate update and get replaced due to timing issue, see localDB for more details
         //localDB.updateSyncID("Document", sync.getSyncID());
         //Cursor cursor = localDB.getRecordsBySyncID("SystemError", sync.getSyncID());
-        Cursor cursor = localDB.getUnsyncedRecords("SystemError", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecordsWithRecordID("SystemError", sync.getSyncID());
         if (cursor.getCount() > 0) {
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
@@ -815,55 +874,54 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
     private void uploadTest() {
 
         Sync sync = new Sync("SystemError", syncTimeOffset);
-        syncActivity.appendLog(String.format(Locale.UK, "Upload Test (Sync): %d", sync.getSyncDate().getTime()) );
+        syncActivity.appendLog(String.format(Locale.UK, "Upload Test (Sync): %d", sync.getSyncDate().getTime()));
+        try {
+            WebConnection webConnection = new WebConnection(localDB);
+            // Add in the Sync record
+            JSONObject values = new JSONObject();
+            values.put("SyncID", sync.getSyncID().toString());
+            values.put("SyncDate", sync.getSyncDate().getTime());
+            values.put("TableName", sync.getTableName());
+            //json.put("sync", values);
+            webConnection.getInputJSON().put("sync", values);
+            //JSONObject jsonOutput = postJSON("insert_system_errors.php", json);
+            JSONObject jsonOutput = webConnection.post("pdo_insert_test.php");
             try {
-                WebConnection webConnection = new WebConnection(localDB);
-                // Add in the Sync record
-                JSONObject values = new JSONObject();
-                values.put("SyncID", sync.getSyncID().toString());
-                values.put("SyncDate", sync.getSyncDate().getTime());
-                values.put("TableName", sync.getTableName());
-                //json.put("sync", values);
-                webConnection.getInputJSON().put("sync", values);
-                //JSONObject jsonOutput = postJSON("insert_system_errors.php", json);
-                JSONObject jsonOutput = webConnection.post("pdo_insert_test.php");
-                try {
-                    String result = jsonOutput.getString("result");
-                    if (result.equals("FAILURE")) {
-                        throw new CRISException("test - " + jsonOutput.getString("error_message"));
-                    }
-                } catch (JSONException ex) {
-                    throw new CRISException("Error parsing JSON data: " + ex.getMessage());
+                String result = jsonOutput.getString("result");
+                if (result.equals("FAILURE")) {
+                    throw new CRISException("test - " + jsonOutput.getString("error_message"));
                 }
-                localDB.save(sync);
-                syncActivity.appendLog(String.format(Locale.UK, "Upload Test Completed"));
             } catch (JSONException ex) {
-                // Remove the SyncID
-                localDB.nullSyncID("SystemError", sync.getSyncID());
                 throw new CRISException("Error parsing JSON data: " + ex.getMessage());
-            } catch (Exception ex) {
-                // Remove the SyncID
-                localDB.nullSyncID("SystemError", sync.getSyncID());
-                throw ex;
             }
+            localDB.save(sync);
+            syncActivity.appendLog(String.format(Locale.UK, "Upload Test Completed"));
+        } catch (JSONException ex) {
+            // Remove the SyncID
+            localDB.nullSyncID("SystemError", sync.getSyncID());
+            throw new CRISException("Error parsing JSON data: " + ex.getMessage());
+        } catch (Exception ex) {
+            // Remove the SyncID
+            localDB.nullSyncID("SystemError", sync.getSyncID());
+            throw ex;
+        }
 
     }
 
     private int uploadDocuments() {
         int count = 0;
         Sync sync = new Sync("Document", syncTimeOffset);
-
         // Update SyncID
         // Build 107 -29 Aug 2018
         // Separate update and get replaced due to timing issue, see localDB for more details
         //localDB.updateSyncID("Document", sync.getSyncID());
         //Cursor cursor = localDB.getRecordsBySyncID("Document", sync.getSyncID());
-        Cursor cursor = localDB.getUnsyncedRecords("Document", sync.getSyncID());
+        Cursor cursor = localDB.getUnsyncedRecordsWithRecordID("Document", sync.getSyncID());
         if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
             try {
                 //JSONObject postJSON = getPostJSON(localDB);
                 WebConnection webConnection = new WebConnection(localDB);
-                cursor.moveToFirst();
                 while (!cursor.isAfterLast()) {
                     // Create JSON Object for this record
                     JSONObject values = new JSONObject();
@@ -926,7 +984,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     throw new CRISException("Error parsing JSON data: " + ex.getMessage());
                 }
                 localDB.save(sync);
-                syncActivity.appendLog(String.format(Locale.UK,"Upload Documents (%d)", count));
+                syncActivity.appendLog(String.format(Locale.UK, "Upload Documents (%d)", count));
             } catch (JSONException ex) {
                 // Remove the SyncID
                 localDB.nullSyncID("Document", sync.getSyncID());
@@ -1020,7 +1078,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 }
             } else {
                 String error_message = jsonOutput.getString("error_message");
-                if (error_message.equals("Table Sync is empty")) {
+                //Build 139 - Correct error message
+                //if (error_message.equals("Table Sync is empty")) {
+                if (error_message.equals("PHP:Table Sync is empty")) {
                     // No sync records yet
                     syncTimeOffset = 0;
                 } else {

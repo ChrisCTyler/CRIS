@@ -7,18 +7,26 @@ import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
+import android.telephony.SmsManager;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Locale;
 
 import solutions.cris.CRISActivity;
@@ -27,12 +35,13 @@ import solutions.cris.R;
 import solutions.cris.edit.EditImage;
 import solutions.cris.edit.EditPdfDocument;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.Document;
 import solutions.cris.object.Session;
 import solutions.cris.object.User;
+import solutions.cris.utils.LocalSettings;
 
-import static solutions.cris.list.ListLibrary.REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -52,10 +61,29 @@ import static solutions.cris.list.ListLibrary.REQUEST_PERMISSION_WRITE_EXTERNAL_
 
 public abstract class ListActivity extends CRISActivity {
 
+    // Build 125 - CRISExport crashes because export selection does not survive
+    // a tablet re-orientation.
+    // These variables are set by callbacks in fragments and need to be
+    // restored via saved instance state to survive a tablet orientation reload
+    public static final String EXPORT_LIST_TYPE = "solutions.cris.ExportListType";
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        // Save the state
+        savedInstanceState.putString(EXPORT_LIST_TYPE, getExportListType());
+        // Always call the superclass so it can save the view hierarchy state
+        super.onSaveInstanceState(savedInstanceState);
+    }
+
     protected ListActivity() {
     }
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            // Restore value of members from saved state
+            String exportSelection = savedInstanceState.getString(EXPORT_LIST_TYPE);
+            setExportListType(exportSelection);
+        }
     }
 
     private FloatingActionButton fab;
@@ -174,6 +202,27 @@ public abstract class ListActivity extends CRISActivity {
         this.sessionAdapterList = sessionAdapterList;
     }
 
+    // Build 119 30 May 2019 Added array of clients for passing the client list
+    // This is read in the BroadcastMessageFragment Fragment and written in the ListClients and
+    // ListSessionClients Fragments.
+    private ArrayList<Client> broadcastClientList;
+
+    public ArrayList<Client> getBroadcastClientList() {
+        return broadcastClientList;
+    }
+
+    public void setBroadcastClientList(ArrayList<Client> broadcastClientList) {
+        this.broadcastClientList = broadcastClientList;
+    }
+
+    // Build 116 22 May 2019 Add handler for incoming text via share. Trigger is non-empty
+    // text on shareText. Which must be accessible in ListClientFragment and EditNote.
+    // EditNote fragment may be invoked from ListSessionClients as well as ListClients(Header)
+    private String shareText = "";
+    // Build 116 22 May 2019 Add handler for incoming text via share
+    public String getShareText() {return shareText;}
+    public void setShareText(String shareText){this.shareText = shareText;}
+
     // This code is here rather than in the ListClientDocuments fragment because
     // the callback onRequestPermissionResult must be declared in this activity
     // not one of its fragments
@@ -189,7 +238,7 @@ public abstract class ListActivity extends CRISActivity {
         } else {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE);
+                    Main.REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE);
         }
     }
 
@@ -226,7 +275,7 @@ public abstract class ListActivity extends CRISActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         switch (requestCode) {
-            case REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE: {
+            case Main.REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE: {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -252,11 +301,45 @@ public abstract class ListActivity extends CRISActivity {
                     dialog.show();
                 }
                 break;
+
+            }
+            case Main.REQUEST_PERMISSION_SEND_SMS: {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                String message = "";
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    builder.setTitle("Send SMS Permission Granted");
+                    message = "You can now send the text messages.";
+                } else {
+
+                    builder.setTitle("Send SMS Permission Denied");
+                    message = "You cannot use the Broadcast Message facility " +
+                            "without granting the 'send sms' permission " +
+                            "for this application. Please repeat the operation and grant " +
+                            "the permission. (Note: if you " +
+                            "checked 'Do not ask again', you will have to set the permission " +
+                            "using the 'Settings' app on your tablet/phone.";
+
+
+            }
+                builder.setMessage(message);
+                // Add the Continue button
+                builder.setPositiveButton(R.string.action_continue, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        // User clicked Continue button
+                    }
+                });
+                // Create the AlertDialog
+                AlertDialog dialog = builder.create();
+                dialog.show();
+                break;
             }
             default:
                 throw new CRISException(String.format(Locale.UK, "Unexpected case value: %d", requestCode));
         }
     }
+
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

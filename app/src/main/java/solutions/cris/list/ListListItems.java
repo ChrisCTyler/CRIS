@@ -21,12 +21,12 @@ import android.content.Intent;
 import android.database.sqlite.SQLiteConstraintException;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
+import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AlertDialog;
 
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -43,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import solutions.cris.CRISActivity;
-import solutions.cris.Login;
 import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
@@ -294,13 +293,18 @@ public class ListListItems extends CRISActivity {
                     // Popup a dialog
                     final ListItem listItem = (ListItem) v.getTag();
                     final EditText editText = new EditText(v.getContext());
+
                     String currentText = listItem.getItemValue();
                     if (currentText.length() > 0 && currentText.compareTo("Enter New Value") != 0) {
                         editText.setText(currentText);
                     }
                     editText.setInputType(InputType.TYPE_TEXT_FLAG_CAP_WORDS);
 
+
+
                     new AlertDialog.Builder(v.getContext())
+                            // Build 139 - Restored Edit Text (only works without parameters
+                            .setView(editText)
                             //.setView(editText, 50, 10, 50, 10)
                             .setTitle("Enter a value (must be unique)")
                             .setMessage(currentText)
@@ -320,6 +324,7 @@ public class ListListItems extends CRISActivity {
                             })
 
                             .show();
+
                 }
             });
 

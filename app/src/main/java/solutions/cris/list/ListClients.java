@@ -16,28 +16,18 @@ package solutions.cris.list;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
-import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
-import android.util.Log;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
-import java.util.List;
-
-import pub.devrel.easypermissions.EasyPermissions;
-import solutions.cris.Login;
 import solutions.cris.Main;
 import solutions.cris.R;
-import solutions.cris.object.Client;
-import solutions.cris.object.Document;
 import solutions.cris.object.User;
 //import solutions.cris.utils.CRISDeviceAdmin;
 import solutions.cris.utils.ExceptionHandler;
@@ -45,6 +35,7 @@ import solutions.cris.utils.ExceptionHandler;
 public class ListClients extends ListActivity {
 
     private boolean myClients;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +54,7 @@ public class ListClients extends ListActivity {
             setSupportActionBar(getToolbar());
 
             myClients = getIntent().getBooleanExtra(Main.EXTRA_MY_CLIENTS, false);
+            setShareText(getIntent().getStringExtra(Main.EXTRA_SHARE_TEXT));
             setFab((FloatingActionButton) findViewById(R.id.fab));
 
             // Only display the fragment when not reloading destroyed instance
@@ -93,5 +85,7 @@ public class ListClients extends ListActivity {
     public boolean isMyClients() {
         return myClients;
     }
+
+
 
 }

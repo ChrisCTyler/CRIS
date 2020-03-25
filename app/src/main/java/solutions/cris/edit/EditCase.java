@@ -20,11 +20,14 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.Toolbar;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
+import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
+
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -47,7 +50,6 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Locale;
 import java.util.UUID;
@@ -56,7 +58,6 @@ import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.ClientSession;
@@ -74,10 +75,11 @@ import solutions.cris.utils.PickList;
 public class EditCase extends Fragment {
 
     private static final SimpleDateFormat sDate = new SimpleDateFormat("dd.MM.yyyy", Locale.UK);
-
+    // MENU BLOCK
+    private static final int MENU_CANCEL_DOCUMENT = Menu.FIRST + 1;
+    private static final int MENU_UNCANCEL_DOCUMENT = Menu.FIRST + 2;
     private Case editDocument;
     private Client client;
-
     private Spinner caseTypeSpinner;
     private EditText referenceDateView;
     private ImageView clientRedIcon;
@@ -87,6 +89,8 @@ public class EditCase extends Fragment {
     private EditText overdueThresholdView;
     private Spinner tierSpinner;
     private Spinner groupSpinner;
+    // Build 139 - Second Group
+    private Spinner group2Spinner;
     private Spinner keyworkerSpinner;
     private Spinner coworker1Spinner;
     private Spinner coworker2Spinner;
@@ -96,24 +100,26 @@ public class EditCase extends Fragment {
     // Build 105
     private CheckBox photographyConsentCheckbox;
     private CheckBox doNotInviteCheckbox;
-
+    // Build 139 - Second Group
+    private CheckBox doNotInvite2Checkbox;
     private LocalDB localDB;
     private View parent;
     private int clientStatus = Case.AMBER;
     private boolean isNewMode = false;
-
     private PickList tierPickList;
     private GroupPickList groupPickList;
+    // Build 139 - Second Group
+    private GroupPickList group2PickList;
     private PickList keyworkerPickList;
     private PickList coworker1PickList;
     private PickList coworker2PickList;
     private PickList commissionerPickList;
-
     private TextView hintTextView;
     private boolean hintTextDisplayed = true;
-
     // Build 110 - Add to existing sessions
     private UUID oldGroupID;
+    // Build 139 - Second Group
+    private UUID oldGroup2ID;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -191,6 +197,8 @@ public class EditCase extends Fragment {
         overdueThresholdView = (EditText) parent.findViewById(R.id.overdue_threshold);
         tierSpinner = (Spinner) parent.findViewById(R.id.tier_spinner);
         groupSpinner = (Spinner) parent.findViewById(R.id.group_spinner);
+        // Build 139 - Second Group
+        group2Spinner = (Spinner) parent.findViewById(R.id.group2_spinner);
         keyworkerSpinner = (Spinner) parent.findViewById(R.id.keyworker_spinner);
         coworker1Spinner = (Spinner) parent.findViewById(R.id.coworker1_spinner);
         coworker2Spinner = (Spinner) parent.findViewById(R.id.coworker2_spinner);
@@ -200,6 +208,8 @@ public class EditCase extends Fragment {
         // Build 105
         photographyConsentCheckbox = (CheckBox) parent.findViewById(R.id.photography_consent_flag);
         doNotInviteCheckbox = (CheckBox) parent.findViewById(R.id.do_not_invite_flag);
+        // Build 139 - Second Group
+        doNotInvite2Checkbox = (CheckBox) parent.findViewById(R.id.do_not_invite2_flag);
 
         // Set the 'local' labels
         final LocalSettings localSettings = LocalSettings.getInstance(getActivity());
@@ -207,6 +217,9 @@ public class EditCase extends Fragment {
         tierLabel.setText(localSettings.Tier);
         TextView groupLabel = (TextView) parent.findViewById(R.id.group_label_text);
         groupLabel.setText(localSettings.Group);
+        // Build 139 - Second Group
+        TextView group2Label = (TextView) parent.findViewById(R.id.group2_label_text);
+        group2Label.setText(localSettings.Group + "2");
         TextView keyworkerLabel = (TextView) parent.findViewById(R.id.keyworker_label_text);
         keyworkerLabel.setText(localSettings.Keyworker);
         TextView coworker1Label = (TextView) parent.findViewById(R.id.coworker1_label_text);
@@ -282,6 +295,8 @@ public class EditCase extends Fragment {
                             overdueThresholdView.setText("");
                             tierSpinner.setSelection(0);
                             groupSpinner.setSelection(0);
+                            // Build 139 - Second Group
+                            group2Spinner.setSelection(0);
                             keyworkerSpinner.setSelection(0);
                             coworker1Spinner.setSelection(0);
                             coworker2Spinner.setSelection(0);
@@ -318,6 +333,15 @@ public class EditCase extends Fragment {
         groupAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         groupSpinner.setAdapter(groupAdapter);
         groupSpinner.setSelection(groupPickList.getDefaultPosition());
+
+        // Build 139 - Second Group
+        // Initialise the Group 2 Spinner
+        group2PickList = new GroupPickList(localDB);
+        ArrayAdapter<String> group2Adapter = new
+                ArrayAdapter<>(getActivity(), android.R.layout.simple_spinner_item, group2PickList.getOptions());
+        groupAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        group2Spinner.setAdapter(group2Adapter);
+        group2Spinner.setSelection(group2PickList.getDefaultPosition());
 
         // Initialise the Keyworker/Co-worker Spinners
         ArrayList<User> users = localDB.getAllUsers();
@@ -382,24 +406,61 @@ public class EditCase extends Fragment {
                     // Deal with future invites if this is a new Case document and the group
                     // has changed (or is being set for the first time, Case Start)
                     if (isNewMode) {
-                        if (oldGroupID == null ||
-                                !editDocument.getGroupID().equals(oldGroupID)) {
-                            // Build 110 - The following code deals with invalidated invites to
-                            // existing future sessions. First, get the list of future sessions
-                            ArrayList<Session> futureSessionList = localDB.getFutureSessions();
-                            // Find sessions for the old  and new groups
-                            final ArrayList<Session> oldGroupSessions = new ArrayList<>();
-                            final ArrayList<Session> newGroupSessions = new ArrayList<>();
-                            for (Session session : futureSessionList) {
-                                if (session.getGroupID().equals(editDocument.getGroupID())) {
-                                    newGroupSessions.add(session);
-                                } else if (oldGroupID != null && session.getGroupID().equals(oldGroupID)) {
-                                    oldGroupSessions.add(session);
+
+                        // Build 125 - 18/07/2019 The following build 110 change is not relevant
+                        // for a new 'reject' case document and will crash since oldGroupID will
+                        //be null and editDocument.getGroupID() will also be null. However, there
+                        // is a weird case where a user is changing an active case to rejected.
+                        // Though this is incorrect use to CRIS, it should cancel any future
+                        // sessions, so rather than checking the newCaseType, it is better to
+                        // check for a null editDocument.getGroupID()
+
+                        // Build 110 - The following code deals with invalidated invites to
+                        // existing future sessions. First, get the list of future sessions
+                        ArrayList<Session> futureSessionList = localDB.getFutureSessions();
+                        // Find sessions for the old  and new groups
+                        final ArrayList<Session> oldGroupSessions = new ArrayList<>();
+                        final ArrayList<Session> newGroupSessions = new ArrayList<>();
+                        // Build 139 - Modify code to handle 2 groups
+                        boolean manageInvalidatedSessions = false;
+
+                        if (editDocument.getGroupID() != null) {
+                            UUID newGroupID = editDocument.getGroupID();
+                            if (oldGroupID == null ||
+                                    !newGroupID.equals(oldGroupID)) {
+                                manageInvalidatedSessions = true;
+                                // Identify the sessions potentially invalidated
+                                for (Session session : futureSessionList) {
+                                    if (session.getGroupID().equals(newGroupID)) {
+                                        newGroupSessions.add(session);
+                                    } else if (oldGroupID != null && session.getGroupID().equals(oldGroupID)) {
+                                        oldGroupSessions.add(session);
+                                    }
                                 }
                             }
-                            // First deal with future sessions of the old group
+                        }
+                        // Build 139 - Handle second group by adding to the session arrays
+
+                        if (editDocument.getGroup2ID() != null) {
+                             UUID newGroup2ID = editDocument.getGroup2ID();
+                            if (oldGroup2ID == null ||
+                                    !newGroup2ID.equals(oldGroup2ID)) {
+                                manageInvalidatedSessions = true;
+                                // Identify the sessions potentially invalidated
+                                for (Session session : futureSessionList) {
+                                    if (session.getGroupID().equals(newGroup2ID)) {
+                                        newGroupSessions.add(session);
+                                    } else if (oldGroup2ID != null && session.getGroupID().equals(oldGroup2ID)) {
+                                        oldGroupSessions.add(session);
+                                    }
+                                }
+                            }
+                        }
+                        // Check whether there are invalidated sessions and process
+                        if (manageInvalidatedSessions) {
+                            // First deal with future sessions of the old group(s)
                             if (oldGroupSessions.size() > 0) {
-                                // Get all client sessions for all future sessions of the old group
+                                // Get all client sessions for all future sessions of the old group(s)
                                 ArrayList<ClientSession> oldClientSessions =
                                         localDB.getAllClientSessions(oldGroupSessions,
                                                 new Date(Long.MIN_VALUE),
@@ -453,18 +514,28 @@ public class EditCase extends Fragment {
                                 }
 
                                 // If there are still new sessions, see if the user wants to add invites
-                                if (!editDocument.isDoNotInviteFlag() && newGroupSessions.size() > 0) {
+                                // Display the dialog unless both groups are 'do not invite
+                                // Note: This may display a spurious dialog if all of the new group
+                                // sessions are for the 'do not invite' group, but not really a problem
+                                boolean displayDialog = false;
+                                if (!editDocument.isDoNotInviteFlag()){
+                                    displayDialog = true;
+                                }
+                                if (!editDocument.isDoNotInvite2Flag()){
+                                    displayDialog = true;
+                                }
+                                if (displayDialog && newGroupSessions.size() > 0) {
                                     final User currentUser = ((ListActivity) getActivity()).getCurrentUser();
 
                                     String messageText = "";
                                     if (oldGroupID == null) {
                                         messageText = "Do you want invitations to be created for any " +
-                                                "existing, future sessions for the client's new group?";
+                                                "existing, future sessions for the client's new group(s)?";
                                     } else {
-                                        messageText = "The client is moving to a new group so invitations " +
-                                                "to future sessions for the old group have been automatically cancelled. " +
+                                        messageText = "The client is moving to one or more new groups so invitations " +
+                                                "to future sessions for the old group(s) have been automatically cancelled. " +
                                                 "Do you want invitations to be created for any " +
-                                                "existing, future sessions for the client's new group?";
+                                                "existing, future sessions for the client's new group(s)?";
                                     }
                                     new AlertDialog.Builder(getActivity())
                                             .setTitle("Invite to Existing Sessions")
@@ -474,16 +545,32 @@ public class EditCase extends Fragment {
                                                 public void onClick(DialogInterface dialog, int which) {
                                                     // Create the new sessions
                                                     for (Session session : newGroupSessions) {
-                                                        ClientSession clientSession = new ClientSession(
-                                                                currentUser,
-                                                                client.getClientID());
-                                                        clientSession.setSessionID(session.getDocumentID());
-                                                        clientSession.setReferenceDate(session.getReferenceDate());
-                                                        clientSession.setSession(session);
-                                                        clientSession.setAttended(false);
-                                                        clientSession.setReserved(false);
-                                                        clientSession.setCancelledFlag(false);
-                                                        clientSession.save(true);
+                                                        // Only create if 'do not invite' is false
+                                                        boolean createSession = false;
+                                                        UUID newGroupID = editDocument.getGroupID();
+                                                        if (newGroupID != null &&
+                                                                session.getGroupID().equals(newGroupID) &&
+                                                                !editDocument.isDoNotInviteFlag()){
+                                                            createSession = true;
+                                                        }
+                                                        UUID newGroup2ID = editDocument.getGroup2ID();
+                                                        if (newGroup2ID != null &&
+                                                                session.getGroupID().equals(newGroup2ID) &&
+                                                                !editDocument.isDoNotInvite2Flag()){
+                                                            createSession = true;
+                                                        }
+                                                        if (createSession) {
+                                                            ClientSession clientSession = new ClientSession(
+                                                                    currentUser,
+                                                                    client.getClientID());
+                                                            clientSession.setSessionID(session.getDocumentID());
+                                                            clientSession.setReferenceDate(session.getReferenceDate());
+                                                            clientSession.setSession(session);
+                                                            clientSession.setAttended(false);
+                                                            clientSession.setReserved(false);
+                                                            clientSession.setCancelledFlag(false);
+                                                            clientSession.save(true);
+                                                        }
 
                                                     }
                                                     editDocument.save(isNewMode);
@@ -515,6 +602,7 @@ public class EditCase extends Fragment {
                             FragmentManager fragmentManager = getFragmentManager();
                             fragmentManager.popBackStack();
                         }
+
                     } else {
                         editDocument.save(isNewMode);
                         FragmentManager fragmentManager = getFragmentManager();
@@ -534,6 +622,7 @@ public class EditCase extends Fragment {
             transportRequiredSpinner.setSelection(caseTypeAdapter.getPosition("No"));
             photographyConsentCheckbox.setChecked(false);
             doNotInviteCheckbox.setChecked(false);
+            doNotInvite2Checkbox.setChecked(false);
         } else {
             if (isNewMode) {
                 referenceDateView.setText(sDate.format(today));
@@ -552,6 +641,12 @@ public class EditCase extends Fragment {
                         groupSpinner.setSelection(groupPickList.getPosition(currentCase.getGroup()));
                         // Build 110 - Save current group for managing group changes
                         oldGroupID = currentCase.getGroupID();
+                        // Build 139 - Second Group
+                        if (currentCase.getGroup2ID() != null){
+                            group2Spinner.setSelection(groupPickList.getPosition(currentCase.getGroup2()));
+                            oldGroup2ID = currentCase.getGroup2ID();
+                            doNotInvite2Checkbox.setChecked(currentCase.isDoNotInvite2Flag());
+                        }
                         keyworkerSpinner.setSelection(keyworkerPickList.getPosition(currentCase.getKeyWorker()));
                         coworker1Spinner.setSelection(coworker1PickList.getPosition(currentCase.getCoWorker1()));
                         coworker2Spinner.setSelection(coworker2PickList.getPosition(currentCase.getCoWorker2()));
@@ -591,6 +686,13 @@ public class EditCase extends Fragment {
                 // Build 110 - Save current group for managing group changes
                 oldGroupID = editDocument.getGroupID();
                 doNotInviteCheckbox.setChecked(editDocument.isDoNotInviteFlag());
+                // Build 139 - Second Group
+                if (editDocument.getGroup2ID() != null){
+                    group2Spinner.setSelection(groupPickList.getPosition(editDocument.getGroup2()));
+                    oldGroup2ID = editDocument.getGroup2ID();
+                    doNotInvite2Checkbox.setChecked(editDocument.isDoNotInvite2Flag());
+                }
+
                 keyworkerSpinner.setSelection(keyworkerPickList.getPosition(editDocument.getKeyWorker()));
                 coworker1Spinner.setSelection(coworker1PickList.getPosition(editDocument.getCoWorker1()));
                 coworker2Spinner.setSelection(coworker2PickList.getPosition(editDocument.getCoWorker2()));
@@ -614,10 +716,6 @@ public class EditCase extends Fragment {
             }
         }
     }
-
-    // MENU BLOCK
-    private static final int MENU_CANCEL_DOCUMENT = Menu.FIRST + 1;
-    private static final int MENU_UNCANCEL_DOCUMENT = Menu.FIRST + 2;
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
@@ -849,6 +947,27 @@ public class EditCase extends Fragment {
 
         // DoNotInvite
         editDocument.setDoNotInviteFlag(doNotInviteCheckbox.isChecked());
+
+        // Build 139 - Second Group
+        //Group 2 (Not mandatory)
+        ListItem newGroup2 = group2PickList.getListItems().get(group2Spinner.getSelectedItemPosition());
+        if (newGroup2.getItemOrder() != -1) {
+            // Check for duplicate Group1/Group2
+            if (newGroup.getListItemID().equals(newGroup2.getListItemID())) {
+                TextView errorText = (TextView) group2Spinner.getSelectedView();
+                //errorText.setError("anything here, just to add the icon");
+                errorText.setTextColor(ResourcesCompat.getColor(getResources(), R.color.red, null));//just to highlight that this is an error
+                focusView = group2Spinner;
+                success = false;
+            } else {
+                editDocument.setGroup2ID(newGroup2.getListItemID());
+                // PickList contained
+                editDocument.setGroup2(localDB.getListItem(editDocument.getGroup2ID()));
+            }
+        }
+
+        // DoNotInvite2
+        editDocument.setDoNotInvite2Flag(doNotInvite2Checkbox.isChecked());
 
         //Keyworker
         User newKeyworker = keyworkerPickList.getUsers().get(keyworkerSpinner.getSelectedItemPosition());

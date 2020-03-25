@@ -15,13 +15,12 @@ package solutions.cris.edit;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.app.DatePickerDialog;
-import android.content.Intent;
 import android.database.sqlite.SQLiteConstraintException;
 import android.os.Bundle;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.text.TextUtils;
 import android.util.Patterns;
 import android.view.Menu;
@@ -42,7 +41,6 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 import solutions.cris.CRISActivity;
-import solutions.cris.Login;
 import solutions.cris.crypto.AESEncryption;
 import solutions.cris.list.ListUsers;
 import solutions.cris.Main;
@@ -100,7 +98,10 @@ public class EditUser extends CRISActivity {
             // Re-load the local current user from the database in case activity is called twice
             // with the same current user and current user is being edited
             // (would cause a constraint exception)
-            currentUser = localDB.getUser(currentUser.getUserID());
+            // Build 139 - Cannot re-load in first-use case
+            if (!firstUse) {
+                currentUser = localDB.getUser(currentUser.getUserID());
+            }
             setContentView(R.layout.activity_user);
 
             // Preset sDate for use throughout the activity
@@ -446,8 +447,11 @@ public class EditUser extends CRISActivity {
                     editUser.setNewPassword(passwordView.getText().toString().trim());
                     // Password changed so set password expired to force change at next login
                     // unless the current user is modifying it
-                    if (!editUser.getUserID().equals(currentUser.getUserID())) {
-                        editUser.setPasswordExpiryDate(new Date(Long.MIN_VALUE));
+                    // Build 139 - Except in First Use case where user does not yet exist
+                    if (!firstUse) {
+                        if (!editUser.getUserID().equals(currentUser.getUserID())) {
+                            editUser.setPasswordExpiryDate(new Date(Long.MIN_VALUE));
+                        }
                     }
                 }
             }

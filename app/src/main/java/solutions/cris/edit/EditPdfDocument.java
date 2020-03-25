@@ -20,10 +20,10 @@ import android.app.FragmentManager;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -51,18 +51,14 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
-import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
-import solutions.cris.list.ListSessionClients;
 import solutions.cris.object.Document;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
 import solutions.cris.object.PdfDocument;
-import solutions.cris.object.Session;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.PickList;
@@ -333,7 +329,10 @@ public class EditPdfDocument extends Fragment {
             cancelOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         }
         MenuItem shareOption = menu.findItem(R.id.menu_item_share);
-        shareOption.setVisible(false);
+        // Share option only exists if called from ListClientHeader
+        if (shareOption != null) {
+            shareOption.setVisible(false);
+        }
     }
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {

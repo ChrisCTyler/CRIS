@@ -3,11 +3,11 @@ package solutions.cris.read;
 import android.app.Fragment;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.widget.ShareActionProvider;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.widget.ShareActionProvider;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -29,7 +29,6 @@ import java.util.Locale;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.User;
@@ -58,6 +57,7 @@ public class ReadCase extends Fragment {
     private Case editDocument;
     private View parent;
     private Client client;
+    private LocalDB localDB;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -88,7 +88,7 @@ public class ReadCase extends Fragment {
         //footer.setText(R.string.action_swipe_left_for_unread);
         toolbar.setTitle(getString(R.string.app_name) + " - Case");
 
-        LocalDB localDB = LocalDB.getInstance();
+        localDB = LocalDB.getInstance();
 
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
@@ -116,6 +116,9 @@ public class ReadCase extends Fragment {
         TextView tierTextView = (TextView) parent.findViewById(R.id.tier_read_text);
         Spinner groupSpinner = (Spinner) parent.findViewById(R.id.group_spinner);
         TextView groupTextView = (TextView) parent.findViewById(R.id.group_read_text);
+        // Build 139 - Second Group
+        Spinner group2Spinner = (Spinner) parent.findViewById(R.id.group2_spinner);
+        TextView group2TextView = (TextView) parent.findViewById(R.id.group2_read_text);
         Spinner keyworkerSpinner = (Spinner) parent.findViewById(R.id.keyworker_spinner);
         TextView keyworkerTextView = (TextView) parent.findViewById(R.id.keyworker_read_text);
         Spinner coworker1Spinner = (Spinner) parent.findViewById(R.id.coworker1_spinner);
@@ -136,6 +139,9 @@ public class ReadCase extends Fragment {
         TextView photographyConsentReadText = (TextView) parent.findViewById(R.id.photography_consent_read_text);
         CheckBox doNotInviteCheckbox = (CheckBox) parent.findViewById(R.id.do_not_invite_flag);
         TextView doNotInviteReadText = (TextView) parent.findViewById(R.id.do_not_invite_read_text);
+        // Build 139 - Second Group
+        CheckBox doNotInvite2Checkbox = (CheckBox) parent.findViewById(R.id.do_not_invite2_flag);
+        TextView doNotInvite2ReadText = (TextView) parent.findViewById(R.id.do_not_invite2_read_text);
 
         caseTypeSpinner.setVisibility(View.GONE);
         caseTypeTextView.setVisibility(View.VISIBLE);
@@ -156,6 +162,12 @@ public class ReadCase extends Fragment {
         groupTextView.setFocusable(false);
         doNotInviteCheckbox.setVisibility(View.GONE);
         doNotInviteReadText.setVisibility(View.VISIBLE);
+        // Build 139 - Second Group
+        group2Spinner.setVisibility(View.GONE);
+        group2TextView.setVisibility(View.VISIBLE);
+        group2TextView.setFocusable(false);
+        doNotInvite2Checkbox.setVisibility(View.GONE);
+        doNotInvite2ReadText.setVisibility(View.VISIBLE);
         keyworkerSpinner.setVisibility(View.GONE);
         keyworkerTextView.setVisibility(View.VISIBLE);
         keyworkerTextView.setFocusable(false);
@@ -184,6 +196,9 @@ public class ReadCase extends Fragment {
         tierLabel.setText(localSettings.Tier);
         TextView groupLabel = (TextView) parent.findViewById(R.id.group_label_text);
         groupLabel.setText(localSettings.Group);
+        // Build 139 - Second Group
+        TextView group2Label = (TextView) parent.findViewById(R.id.group2_label_text);
+        group2Label.setText(localSettings.Group + "2");
         TextView keyworkerLabel = (TextView) parent.findViewById(R.id.keyworker_label_text);
         keyworkerLabel.setText(localSettings.Keyworker);
         TextView coworker1Label = (TextView) parent.findViewById(R.id.coworker1_label_text);
@@ -215,6 +230,13 @@ public class ReadCase extends Fragment {
         }
         if (editDocument.isDoNotInviteFlag()){
             doNotInviteReadText.setText(" (Do not invite to Sessions)");
+        }
+        // Build 139 - Second Group
+        if (editDocument.getGroup2() != null) {
+            group2TextView.setText(editDocument.getGroup2().getItemValue());
+        }
+        if (editDocument.isDoNotInvite2Flag()){
+            doNotInvite2ReadText.setText(" (Do not invite to Sessions)");
         }
         if (editDocument.getKeyWorker() != null) {
             keyworkerTextView.setText(editDocument.getKeyWorker().getFullName());

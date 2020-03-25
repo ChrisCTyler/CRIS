@@ -1,10 +1,15 @@
 package solutions.cris.object;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -166,5 +171,44 @@ public class Group extends ListItem implements Serializable {
 
         setKeyWorker(keyWorker);
         setSessionCoordinator(sessionCoordinator);
+    }
+
+    public String textSummary() {
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        // Use local settings for 'local' labels
+        LocalSettings localSettings = LocalSettings.getInstance();
+        String summary = super.textSummary();
+        if (getKeyWorker() != null) {
+            summary += String.format("%s: %s\n",
+                    localSettings.Keyworker,
+                    getKeyWorker().getFullName());
+        }
+        if (getSessionCoordinator() != null) {
+            summary += String.format("%s: %s\n",
+                    localSettings.SessionCoordinator,
+                    getSessionCoordinator().getFullName());
+        }
+        summary += String.format("Frequency: every %s %s\n",getFrequency(),getFrequencyType());
+        summary += String.format("Address:\n%s\n%s\n", getGroupAddress(), getGroupPostcode());
+        return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
+        // Use local settings for 'local' labels
+        LocalSettings localSettings = LocalSettings.getInstance();
+        Group previousItem = (Group) localDB.getListItemByRecordID(previousRecordID);
+        Group thisItem = (Group) localDB.getListItemByRecordID(thisRecordID);
+        String changes = ListItem.getChanges(previousItem, thisItem);
+        changes += CRISUtil.getChanges(previousItem.getKeyWorker(), thisItem.getKeyWorker(), localSettings.Keyworker);
+        changes += CRISUtil.getChanges(previousItem.getSessionCoordinator(), thisItem.getSessionCoordinator(), localSettings.SessionCoordinator);
+        changes += CRISUtil.getChanges(previousItem.getGroupAddress(), thisItem.getGroupAddress(), "Address");
+        changes += CRISUtil.getChanges(previousItem.getFrequency(), thisItem.getFrequency(), "Frequency");
+        changes += CRISUtil.getChanges(previousItem.getFrequencyType(), thisItem.getFrequencyType(), "Frequency Type");
+        changes += CRISUtil.getChanges(previousItem.getGroupPostcode(), thisItem.getGroupPostcode(), "Postcode");
+        if (changes.length() == 0) {
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 }

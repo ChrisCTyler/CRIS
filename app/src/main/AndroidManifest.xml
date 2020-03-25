@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <application
         android:allowBackup="true"
@@ -16,6 +18,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+
         <service
             android:name=".sync.AuthenticatorService"
             android:enabled="true">
@@ -47,7 +50,7 @@
             android:label="@string/app_name"
             android:syncable="true" />
         <provider
-            android:name="android.support.v4.content.FileProvider"
+            android:name="androidx.core.content.FileProvider"
             android:authorities="solutions.cris.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
@@ -63,6 +66,13 @@
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
         <activity
@@ -105,6 +115,14 @@
             android:name=".list.ListSysAdmin"
             android:label="@string/title_activity_list_menu"
             android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListKPI"
+            android:label="@string/title_activity_list_kpi"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".list.ListOneKPI"
+            android:label="@string/title_activity_list_kpi"
+            android:theme="@style/AppTheme"></activity>
         <activity
             android:name=".list.ListComplexListItems"
             android:label="@string/title_activity_list_complex_list_items"
@@ -173,18 +191,19 @@
         <activity
             android:name=".utils.SheetTest"
             android:label="SheetTest"
-            android:theme="@style/AppTheme"/>
+            android:theme="@style/AppTheme" />
 
-        <receiver android:name=".utils.CRISDeviceAdmin"
+        <receiver
+            android:name=".utils.CRISDeviceAdmin"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
-            <meta-data android:name="android.app.device_admin"
+            <meta-data
+                android:name="android.app.device_admin"
                 android:resource="@xml/policies" />
+
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
     </application>
-
-
 
 </manifest>

@@ -16,21 +16,16 @@ package solutions.cris.list;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
-import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
-import solutions.cris.Login;
-import solutions.cris.Main;
 import solutions.cris.R;
-import solutions.cris.object.Document;
-import solutions.cris.object.Session;
 import solutions.cris.object.User;
 import solutions.cris.utils.ExceptionHandler;
 
@@ -69,7 +64,9 @@ public class ListSessions extends ListActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.menu_search, menu);
+        // Build 126 - Add share option so that Read fragments can offer a share
+        //inflater.inflate(R.menu.menu_search, menu);
+        inflater.inflate(R.menu.menu_search_share, menu);
         super.onCreateOptionsMenu(menu);
         return true;
     }
@@ -78,5 +75,6 @@ public class ListSessions extends ListActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         return super.onOptionsItemSelected(item);
     }
+
 
 }

@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -40,6 +41,7 @@ import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
 import solutions.cris.object.NoteType;
 import solutions.cris.object.PdfDocument;
+import solutions.cris.object.RawDocument;
 import solutions.cris.object.Role;
 import solutions.cris.object.School;
 import solutions.cris.object.Session;
@@ -50,6 +52,7 @@ import solutions.cris.object.Transport;
 import solutions.cris.object.TransportOrganisation;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -510,16 +513,43 @@ public class LocalDB {
     //    database.execSQL(sql);
     //}
 
+    // Build 128 - Need to limit sets of unsynced records to prevent JSON/HTTP problems
+    // Build 128 - Updating the table after the cursor is found leads to an invalid cursor so update
+    // then get cursor on the new syncID
+    // Update SQL cannot use LIMIT clause because some tablets/smartphones don't enable it
+    // so need to use more sophisticated SQL
+    /*
     public Cursor getUnsyncedRecords(String tableName, UUID newSyncID) {
         String[] tableColumns = new String[]{"*"};
         String whereClause = "SyncID is null";
-        //String[] whereArgs = new String[]{newSyncID.toString()};
         Cursor systemErrors = database.query(tableName, tableColumns, whereClause, null, null, null, null);
         if (systemErrors.getCount() > 0) {
             String sql = "UPDATE " + tableName + " SET SyncID = \"" + newSyncID.toString() + "\" WHERE SyncID is null";
             database.execSQL(sql);
         }
         return systemErrors;
+    }
+    */
+    public Cursor getUnsyncedRecordsWithRecordID(String tableName, UUID newSyncID) {
+        // Update the first 200 rows where SyncID is Null
+        String sql = "UPDATE " + tableName + " SET SyncID = \"" + newSyncID.toString() + "\" WHERE RecordID IN " +
+                "(SELECT RecordID FROM " + tableName + " WHERE SyncID is null LIMIT 200)";
+        database.execSQL(sql);
+        // Get these rows in a cursor
+        String[] tableColumns = new String[]{"*"};
+        String whereClause = String.format("SyncID = '%s'",newSyncID.toString());
+        Cursor unsyncedRecords = database.query(tableName, tableColumns, whereClause, null, null, null, null);
+        return unsyncedRecords;
+    }
+    public Cursor getUnsyncedRecords(String tableName, UUID newSyncID) {
+        // This is only used for Follows and ReadAudits which will be relatively small batches
+        String sql = "UPDATE " + tableName + " SET SyncID = \"" + newSyncID.toString() + "\" WHERE SyncID is null";
+        database.execSQL(sql);
+        // Get these rows in a cursor
+        String[] tableColumns = new String[]{"*"};
+        String whereClause = String.format("SyncID = '%s'",newSyncID.toString());
+        Cursor unsyncedRecords = database.query(tableName, tableColumns, whereClause, null, null, null, null);
+        return unsyncedRecords;
     }
 
     public void nullSyncID(String tableName, UUID syncID) {
@@ -698,12 +728,10 @@ public class LocalDB {
             // Save the sync
             save(sync);
             database.execSQL("COMMIT");
-        }
-        catch (JSONException ex) {
-           database.execSQL("ROLLBACK");
+        } catch (JSONException ex) {
+            database.execSQL("ROLLBACK");
             throw new CRISException("Error parsing JSON data: " + ex.getMessage());
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             database.execSQL("ROLLBACK");
             throw ex;
         }
@@ -880,10 +908,19 @@ public class LocalDB {
                         Document document = deSerializeDocument(cursor.getBlob(1), documentType);
                         // Build 086 - Special case for Notes. If READ_NOTES (demographic documents)
                         // only sticky notes are allowed
-                        if (!currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS) &&
-                                documentType == Document.Note) {
+                        if (documentType == Document.Note) {
                             Note note = (Note) document;
-                            if (!note.isStickyFlag()) {
+                            if (!currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+                                if (!note.isStickyFlag()) {
+                                    document = null;
+                                }
+                            }
+                            // Build 127 - Remove Text Message, Phone Message and Email Notes
+                            if (note.getNoteType().getItemValue().toLowerCase().equals("text message")) {
+                                document = null;
+                            } else if (note.getNoteType().getItemValue().toLowerCase().equals("phone message")) {
+                                document = null;
+                            } else if (note.getNoteType().getItemValue().toLowerCase().equals("email")) {
                                 document = null;
                             }
                         }
@@ -961,6 +998,7 @@ public class LocalDB {
         cursor.close();
         return sessions;
     }
+
     public ArrayList<ClientSession> getAllClientSessions(Session session) {
         ArrayList<Session> sessions = new ArrayList<>();
         sessions.add(session);
@@ -1058,6 +1096,127 @@ public class LocalDB {
         return documents;
     }
 
+    // Build 139 - Added KPI Views (needs Order By ClientID, ReferenceDate
+    public ArrayList<Document> getAllDocumentsOfType(int documentType) {
+        ArrayList<Document> documents = new ArrayList<>();
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        String orderBy = "ClientID,ReferenceDate";
+        whereClause = "DocumentType = ? AND HistoryDate = ?";
+        whereArgs = new String[]{Integer.toString(documentType), Long.toString(Long.MIN_VALUE)};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, orderBy);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Document document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+                // New document types (post this version) will return as null documents, ignore.
+                if (document != null) {
+                    documents.add(document);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return documents;
+    }
+
+    public ArrayList<RawDocument> getAllRawDocumentsOfType(int documentType) {
+        return getAllRawDocumentsOfType(documentType, new Date(Long.MIN_VALUE), new Date(Long.MAX_VALUE));
+    }
+    public ArrayList<RawDocument> getAllRawDocumentsOfType(int documentType, Date minDate, Date maxDate) {
+        ArrayList<RawDocument> documents = new ArrayList<>();
+        String[] tableColumns = new String[]{"RecordID, CreationDate, CreatedByID, DocumentID, Cancelled, ClientID, ReferenceDate"};
+        String whereClause;
+        String[] whereArgs;
+        String orderBy = "ClientID, ReferenceDate";
+        whereClause = "DocumentType = ? AND HistoryDate = ? AND ReferenceDate > ? AND ReferenceDate < ?";
+        whereArgs = new String[]{Integer.toString(documentType),
+                Long.toString(Long.MIN_VALUE), Long.toString(minDate.getTime()), Long.toString(maxDate.getTime())};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, orderBy);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                UUID recordID = UUID.fromString(cursor.getString(0));
+                Date creationDate = new Date();
+                creationDate.setTime(cursor.getLong(1));
+                UUID createdByID = UUID.fromString(cursor.getString(2));
+                UUID documentID = UUID.fromString(cursor.getString(3));
+                int cancelledInt = cursor.getInt(4);
+                boolean cancelledFlag = false;
+                if (cancelledInt == 1){
+                    cancelledFlag = true;
+                }
+                UUID clientID = UUID.fromString(cursor.getString(5));
+                Date referenceDate = new Date();
+                referenceDate.setTime(cursor.getLong(6));
+                RawDocument document = new RawDocument(recordID,creationDate,createdByID,documentID,cancelledFlag,clientID,referenceDate,documentType);
+                documents.add(document);
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return documents;
+    }
+
+    //Build 139 - KPI Views - Get Documents in a date range - one per client
+    public ArrayList<Document> getRangeOfDocumentsOfType(UUID clientID, int documentType, Date startDate, Date endDate) {
+        ArrayList<Document> documents = new ArrayList<>();
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        String orderBy = "ClientID,ReferenceDate";
+        whereClause = "ClientID = ? AND HistoryDate = ? AND DocumentType = ? AND " +
+                "ReferenceDate > ? AND ReferenceDate < ? ";
+        whereArgs = new String[]{clientID.toString(),
+                Long.toString(Long.MIN_VALUE),
+                Integer.toString(documentType),
+                String.format("%d",startDate.getTime()),
+                String.format("%d",endDate.getTime()),
+                };
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Document document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+                // New document types (post this version) will return as null documents, ignore.
+                if (document != null) {
+                    documents.add(document);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return documents;
+    }
+    public ArrayList<Document> getRangeOfDocumentsOfType(int documentType, Date startDate, Date endDate) {
+        ArrayList<Document> documents = new ArrayList<>();
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        String orderBy = "ClientID,ReferenceDate";
+        whereClause = "DocumentType = ? AND HistoryDate = ? AND " +
+                "ReferenceDate > ? AND ReferenceDate < ? ";
+        whereArgs = new String[]{Integer.toString(documentType),
+                Long.toString(Long.MIN_VALUE),
+                String.format("%d",startDate.getTime()),
+                String.format("%d",endDate.getTime()),
+        };
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Document document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+                // New document types (post this version) will return as null documents, ignore.
+                if (document != null) {
+                    documents.add(document);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return documents;
+    }
     public ArrayList<Document> getAllDocumentsOfType(UUID clientID, int documentType) {
         ArrayList<Document> documents = new ArrayList<>();
         String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
@@ -1079,6 +1238,29 @@ public class LocalDB {
         }
         cursor.close();
         return documents;
+    }
+
+    // Build 128 Duplicate Note Fix
+    public ArrayList<Note> getAllBroadcastNotes() {
+        ArrayList<Note> notes = new ArrayList<>();
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause = "HistoryDate = ? AND DocumentType = ? ";
+        String[] whereArgs;
+        whereArgs = new String[]{Long.toString(Long.MIN_VALUE), Integer.toString(Document.Note)};
+        String orderBy = "ClientID, CreationDate";
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, orderBy);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Note note = (Note) deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+                if (note != null) {
+                    notes.add(note);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return notes;
     }
 
     public ArrayList<Document> getAllDocumentsOfType(ArrayList<ClientSession> clientSessions, int documentType) {
@@ -1137,6 +1319,9 @@ public class LocalDB {
         return documents;
     }
 
+
+
+
     public Document getDocument(UUID documentID) {
         Document newDocument = null;
         String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
@@ -1151,6 +1336,97 @@ public class LocalDB {
         }
         cursor.close();
         return newDocument;
+    }
+
+    public Document getDocumentByRecordID(UUID recordID) {
+        Document newDocument = null;
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "RecordID = ?";
+        whereArgs = new String[]{recordID.toString()};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            newDocument = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+        }
+        cursor.close();
+        return newDocument;
+    }
+
+    public String getDocumentMetaData(UUID recordID, boolean isEarliest, SwipeDetector.Action action) {
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        String content = "";
+        String[] tableColumns = new String[]{"CreatedByID", "CreationDate", "SyncID", "DocumentID", "HistoryDate"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "RecordID = ? ";
+        whereArgs = new String[]{recordID.toString()};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            String userName = "Unknown User";
+            UUID userID = UUID.fromString(cursor.getString(0));
+            User user = getUser(userID);
+            if (user != null) {
+                userName = user.getFullName();
+            }
+            if (action.equals(SwipeDetector.Action.RL)) {
+                content += String.format("Document ID: %s\n", cursor.getString(3));
+                content += String.format("Record ID: %s\n", recordID.toString());
+                String syncID = cursor.getString(2);
+                if (syncID == null) {
+                    content += "Not yet synced:\n";
+                } else if (syncID.length() < 36) {
+                    content += String.format("\nSyncID is not a UUID and Sync record not found (%s):\n", syncID);
+                } else {
+                    Sync sync = getSync(UUID.fromString(syncID));
+                    if (sync == null) {
+                        content += String.format("\nSync record not found (%s):\n", syncID);
+                    } else {
+                        content += String.format("Synced on %s:\n", sDateTime.format(sync.getSyncDate()));
+                    }
+                }
+                Long historyDate = cursor.getLong(4);
+                if (historyDate != Long.MIN_VALUE) {
+                    content += String.format("Superceded On: %s\n", sDateTime.format(historyDate));
+                }
+            }
+            if (isEarliest) {
+                content += String.format("Document created By: %s on %s.\n",
+                        userName,
+                        sDateTime.format(cursor.getLong(1)));
+            } else {
+
+                content += String.format("The following changes were made by %s on %s:\n",
+                        userName,
+                        sDateTime.format(cursor.getLong(1)));
+            }
+        } else {
+            content += String.format("Document not found, RecordID = %s\n", recordID.toString());
+        }
+        cursor.close();
+        return content;
+    }
+
+    public ArrayList<UUID> getRecordIDs(Document document) {
+        UUID documentID = document.getDocumentID();
+        ArrayList<UUID> recordIDs = new ArrayList<>();
+        String[] tableColumns = new String[]{"RecordID"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "DocumentID = ?";
+        whereArgs = new String[]{documentID.toString()};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, "CreationDate DESC");
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                recordIDs.add(UUID.fromString(cursor.getString(0)));
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return recordIDs;
     }
 
     public Date getLatestDocument(Client client) {
@@ -1173,6 +1449,29 @@ public class LocalDB {
         cursor.close();
         return latest;
 
+    }
+
+    // Build 128 Duplicate Notes - Add a 'remove' function which just sets a document's
+    // history date without creating a new one (essentially a delete function
+    public void remove(Document document) {
+        ContentValues values = new ContentValues();
+        try {
+            database.execSQL("BEGIN TRANSACTION");
+            // Write history date into existing record and clear the SyncID
+            // The history date will also be the Creation date for the new record
+            Date historyDate = new Date();
+            String whereClause = "RecordID = ?";
+            String[] whereArgs = new String[]{document.getRecordID().toString()};
+            values.put("HistoryDate", historyDate.getTime());
+            values.putNull("SyncID");
+            database.update("Document", values, whereClause, whereArgs);
+            // All done so commit the changes
+            database.execSQL("COMMIT");
+        } catch (Exception ex) {
+            database.execSQL("ROLLBACK");
+            throw new CRISException(String.format(Locale.UK, "%s", ex.getMessage()));
+            //throw ex;
+        }
     }
 
     // Document
@@ -1229,7 +1528,7 @@ public class LocalDB {
         }
     }
 
-    public int downloadDocuments(JSONObject jsonOutput, Sync sync)  {
+    public int downloadDocuments(JSONObject jsonOutput, Sync sync) {
         JSONArray names;
         try {
             database.execSQL("BEGIN TRANSACTION");
@@ -1346,7 +1645,24 @@ public class LocalDB {
                     newListItem = (School) o.readObject();
                     break;
                 case "NOTE_TYPE":
-                    newListItem = (NoteType) o.readObject();
+                    try {
+                        //Build 121 - Build 119 added some rogue NoteTypes as ListItems which cannot be
+                        // cast to NoteType which is a complex type. They need to be consigned to history
+                        newListItem = (ListItem) o.readObject();
+                        NoteType newNoteType = (NoteType) newListItem;
+                        newListItem = newNoteType;
+                    } catch (ClassCastException ex) {
+                        if (newListItem != null) {
+                            ContentValues values = new ContentValues();
+                            Date historyDate = new Date();
+                            String whereClause = "RecordID = ?";
+                            String[] whereArgs = new String[]{newListItem.getRecordID().toString()};
+                            values.put("HistoryDate", historyDate.getTime());
+                            values.putNull("SyncID");
+                            database.update("ListItem", values, whereClause, whereArgs);
+                        }
+                        newListItem = null;
+                    }
                     break;
                 case "TRANSPORT_ORGANISATION":
                     newListItem = (TransportOrganisation) o.readObject();
@@ -1414,6 +1730,121 @@ public class LocalDB {
         }
         return listItem;
     }
+
+    public ListItem getListItem(String itemValue, ListType listType) {
+        ListItem listItem = null;
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause = "ItemValue = ? AND HistoryDate = ? AND ListType = ?";
+        String[] whereArgs = new String[]{itemValue, Long.toString(Long.MIN_VALUE), listType.toString()};
+        Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            listItem = deSerializeListItem(cursor.getBlob(0), listType.toString());
+        }
+        cursor.close();
+        if (listItem == null) {
+            // This may be because a new version has introduced a new list item but the
+            // new item should not be called in an older version of the code. One exception
+            // to this rule may be a list item which is promoted from simple to complex (such
+            // as the Group)
+            //throw new CRISException("Error deserializing object. ListType = " + listType);
+        }
+        return listItem;
+    }
+
+    public ListItem getListItemByRecordID(UUID recordID) {
+        ListItem listItem = null;
+        String[] tableColumns = new String[]{"ListType", "SerialisedObject"};
+        String whereClause = "RecordID = ?";
+        String[] whereArgs = new String[]{recordID.toString()};
+        String listType = "Unknown";
+        Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            listType = cursor.getString(0);
+            listItem = deSerializeListItem(cursor.getBlob(1), listType);
+        }
+        cursor.close();
+        return listItem;
+    }
+
+
+    public ArrayList<UUID> getRecordIDs(ListItem listItem) {
+        UUID listItemID = listItem.getListItemID();
+        ArrayList<UUID> recordIDs = new ArrayList<>();
+        String[] tableColumns = new String[]{"RecordID"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "ListItemID = ?";
+        whereArgs = new String[]{listItemID.toString()};
+        Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, "CreationDate DESC");
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                recordIDs.add(UUID.fromString(cursor.getString(0)));
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return recordIDs;
+    }
+
+    public String getListItemMetaData(UUID recordID, boolean isEarliest, SwipeDetector.Action action) {
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        String content = "";
+        String[] tableColumns = new String[]{"CreatedByID", "CreationDate", "SyncID", "ListItemID", "HistoryDate"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "RecordID = ? ";
+        whereArgs = new String[]{recordID.toString()};
+        Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            String userName = "Unknown User";
+            UUID userID = UUID.fromString(cursor.getString(0));
+            User user = getUser(userID);
+            if (user != null) {
+                userName = user.getFullName();
+            }
+            if (action.equals(SwipeDetector.Action.RL)) {
+                content += String.format("ListItem ID: %s\n", cursor.getString(3));
+                content += String.format("Record ID: %s\n", recordID.toString());
+                String syncID = cursor.getString(2);
+                if (syncID == null) {
+                    content += "Not yet synced:";
+                } else if (syncID.length() < 36) {
+                    content += String.format("\nSyncID is not a UUID and Sync record not found (%s):\n", syncID);
+                } else {
+                    Sync sync = getSync(UUID.fromString(syncID));
+                    if (sync == null) {
+                        content += String.format("\nSync record not found (%s):\n", syncID);
+                    } else {
+                        content += String.format("Synced on %s:\n", sDateTime.format(sync.getSyncDate()));
+                    }
+                }
+                Long historyDate = cursor.getLong(4);
+                if (historyDate != Long.MIN_VALUE) {
+                    content += String.format("Superceded On: %s\n", sDateTime.format(historyDate));
+                }
+            }
+            if (isEarliest) {
+                content += String.format("List Item created By: %s on %s.\n",
+                        userName,
+                        sDateTime.format(cursor.getLong(1)));
+            } else {
+
+                content += String.format("The following changes were made by %s on %s:\n",
+                        userName,
+                        sDateTime.format(cursor.getLong(1)));
+            }
+
+        } else {
+            content += String.format("List Item not found, RecordID = %s\n", recordID.toString());
+        }
+        cursor.close();
+        return content;
+    }
+
 
     private boolean listItemExists(ListType listType, String itemValue) {
         String[] tableColumns = new String[]{"ListItemID"};

@@ -1,9 +1,15 @@
 package solutions.cris.object;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 import java.util.UUID;
 
+import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -87,5 +93,76 @@ public class Role extends ListItem implements Serializable {
         } else {
             privileges = privileges & ~privilege;
         }
+    }
+    public String textSummary() {
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        // Use local settings for 'local' labels
+        LocalSettings localSettings = LocalSettings.getInstance();
+        String summary = super.textSummary();
+        summary += String.format("PRIVILEGE_ACCESS_ALL_CLIENTS: %b", hasPrivilege(PRIVILEGE_ACCESS_ALL_CLIENTS));
+        summary += String.format("PRIVILEGE_ACCESS_MY_CLIENTS: %b", hasPrivilege(PRIVILEGE_ACCESS_MY_CLIENTS));
+        summary += String.format("PRIVILEGE_READ_ALL_CLIENTS: %b", hasPrivilege(PRIVILEGE_READ_ALL_CLIENTS));
+        summary += String.format("PRIVILEGE_READ_MY_CLIENTS: %b", hasPrivilege(PRIVILEGE_READ_MY_CLIENTS));
+        summary += String.format("PRIVILEGE_WRITE_ALL_CLIENTS: %b", hasPrivilege(PRIVILEGE_WRITE_ALL_CLIENTS));
+        summary += String.format("PRIVILEGE_WRITE_MY_CLIENTS: %b", hasPrivilege(PRIVILEGE_WRITE_MY_CLIENTS));
+        summary += String.format("PRIVILEGE_ACCESS_ALL_DOCUMENTS: %b", hasPrivilege(PRIVILEGE_ACCESS_ALL_DOCUMENTS));
+        summary += String.format("PRIVILEGE_READ_ALL_DOCUMENTS: %b", hasPrivilege(PRIVILEGE_READ_ALL_DOCUMENTS));
+        summary += String.format("PRIVILEGE_WRITE_ALL_DOCUMENTS: %b", hasPrivilege(PRIVILEGE_WRITE_ALL_DOCUMENTS));
+        summary += String.format("PRIVILEGE_ACCESS_NOTES: %b", hasPrivilege(PRIVILEGE_ACCESS_NOTES));
+        summary += String.format("PRIVILEGE_READ_NOTES: %b", hasPrivilege(PRIVILEGE_READ_NOTES));
+        summary += String.format("PRIVILEGE_WRITE_NOTES: %b", hasPrivilege(PRIVILEGE_WRITE_NOTES));
+        //summary += String.format("PRIVILEGE_ACCESS_SESSIONS: %b", hasPrivilege(PRIVILEGE_ACCESS_SESSIONS));
+        //summary += String.format("PRIVILEGE_READ_SESSIONS: %b", hasPrivilege(PRIVILEGE_READ_SESSIONS));
+        //summary += String.format("PRIVILEGE_WRITE_SESSIONS: %b", hasPrivilege(PRIVILEGE_WRITE_SESSIONS));
+        summary += String.format("PRIVILEGE_SYSTEM_ADMINISTRATOR: %b", hasPrivilege(PRIVILEGE_SYSTEM_ADMINISTRATOR));
+        summary += String.format("PRIVILEGE_CREATE_NOTES: %b", hasPrivilege(PRIVILEGE_CREATE_NOTES));
+        summary += String.format("PRIVILEGE_CREATE_SESSIONS: %b", hasPrivilege(PRIVILEGE_CREATE_SESSIONS));
+        summary += String.format("PRIVILEGE_VIEW_USER_RECORD: %b", hasPrivilege(PRIVILEGE_VIEW_USER_RECORD));
+        summary += String.format("PRIVILEGE_WRITE_LIBRARY_DOCUMENTS: %b", hasPrivilege(PRIVILEGE_WRITE_LIBRARY_DOCUMENTS));
+        summary += String.format("PRIVILEGE_CREATE_NEW_CLIENTS: %b", hasPrivilege(PRIVILEGE_CREATE_NEW_CLIENTS));
+        summary += String.format("PRIVILEGE_USER_IS_KEYWORKER: %b", hasPrivilege(PRIVILEGE_USER_IS_KEYWORKER));
+        summary += String.format("PRIVILEGE_SUPERVISOR_SET_TO_FOLLOW: %b", hasPrivilege(PRIVILEGE_SUPERVISOR_SET_TO_FOLLOW));
+        summary += String.format("PRIVILEGE_EDIT_ALL_SESSIONS: %b", hasPrivilege(PRIVILEGE_EDIT_ALL_SESSIONS));
+        summary += String.format("PRIVILEGE_ALLOW_EXPORT: %b", hasPrivilege(PRIVILEGE_ALLOW_EXPORT));
+
+        return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
+        // Use local settings for 'local' labels
+        LocalSettings localSettings = LocalSettings.getInstance();
+        Role previousItem = (Role) localDB.getListItemByRecordID(previousRecordID);
+        Role thisItem = (Role) localDB.getListItemByRecordID(thisRecordID);
+        String changes = ListItem.getChanges(previousItem, thisItem);
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_ACCESS_ALL_CLIENTS), thisItem.hasPrivilege(PRIVILEGE_ACCESS_ALL_CLIENTS), "PRIVILEGE_ACCESS_ALL_CLIENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_ACCESS_MY_CLIENTS), thisItem.hasPrivilege(PRIVILEGE_ACCESS_MY_CLIENTS), "PRIVILEGE_ACCESS_MY_CLIENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_READ_ALL_CLIENTS), thisItem.hasPrivilege(PRIVILEGE_READ_ALL_CLIENTS), "PRIVILEGE_READ_ALL_CLIENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_READ_MY_CLIENTS), thisItem.hasPrivilege(PRIVILEGE_READ_MY_CLIENTS), "PRIVILEGE_READ_MY_CLIENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_WRITE_ALL_CLIENTS), thisItem.hasPrivilege(PRIVILEGE_WRITE_ALL_CLIENTS), "PRIVILEGE_WRITE_ALL_CLIENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_WRITE_MY_CLIENTS), thisItem.hasPrivilege(PRIVILEGE_WRITE_MY_CLIENTS), "PRIVILEGE_WRITE_MY_CLIENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_ACCESS_ALL_DOCUMENTS), thisItem.hasPrivilege(PRIVILEGE_ACCESS_ALL_DOCUMENTS), "PRIVILEGE_ACCESS_ALL_DOCUMENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_READ_ALL_DOCUMENTS), thisItem.hasPrivilege(PRIVILEGE_READ_ALL_DOCUMENTS), "PRIVILEGE_READ_ALL_DOCUMENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_WRITE_ALL_DOCUMENTS), thisItem.hasPrivilege(PRIVILEGE_WRITE_ALL_DOCUMENTS), "PRIVILEGE_WRITE_ALL_DOCUMENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_ACCESS_NOTES), thisItem.hasPrivilege(PRIVILEGE_ACCESS_NOTES), "PRIVILEGE_ACCESS_NOTES");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_READ_NOTES), thisItem.hasPrivilege(PRIVILEGE_READ_NOTES), "PRIVILEGE_READ_NOTES");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_WRITE_NOTES), thisItem.hasPrivilege(PRIVILEGE_WRITE_NOTES), "PRIVILEGE_WRITE_NOTES");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_ACCESS_SESSIONS), thisItem.hasPrivilege(PRIVILEGE_ACCESS_SESSIONS), "PRIVILEGE_ACCESS_SESSIONS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_READ_SESSIONS), thisItem.hasPrivilege(PRIVILEGE_READ_SESSIONS), "PRIVILEGE_READ_SESSIONS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_WRITE_SESSIONS), thisItem.hasPrivilege(PRIVILEGE_WRITE_SESSIONS), "PRIVILEGE_WRITE_SESSIONS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_SYSTEM_ADMINISTRATOR), thisItem.hasPrivilege(PRIVILEGE_SYSTEM_ADMINISTRATOR), "PRIVILEGE_SYSTEM_ADMINISTRATOR");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_CREATE_NOTES), thisItem.hasPrivilege(PRIVILEGE_CREATE_NOTES), "PRIVILEGE_CREATE_NOTES");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_CREATE_SESSIONS), thisItem.hasPrivilege(PRIVILEGE_CREATE_SESSIONS), "PRIVILEGE_CREATE_SESSIONS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_VIEW_USER_RECORD), thisItem.hasPrivilege(PRIVILEGE_VIEW_USER_RECORD), "PRIVILEGE_VIEW_USER_RECORD");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_WRITE_LIBRARY_DOCUMENTS), thisItem.hasPrivilege(PRIVILEGE_WRITE_LIBRARY_DOCUMENTS), "PRIVILEGE_WRITE_LIBRARY_DOCUMENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_CREATE_NEW_CLIENTS), thisItem.hasPrivilege(PRIVILEGE_CREATE_NEW_CLIENTS), "PRIVILEGE_CREATE_NEW_CLIENTS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_USER_IS_KEYWORKER), thisItem.hasPrivilege(PRIVILEGE_USER_IS_KEYWORKER), "PRIVILEGE_USER_IS_KEYWORKER");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_SUPERVISOR_SET_TO_FOLLOW), thisItem.hasPrivilege(PRIVILEGE_SUPERVISOR_SET_TO_FOLLOW), "PRIVILEGE_SUPERVISOR_SET_TO_FOLLOW");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_EDIT_ALL_SESSIONS), thisItem.hasPrivilege(PRIVILEGE_EDIT_ALL_SESSIONS), "PRIVILEGE_EDIT_ALL_SESSIONS");
+        changes += CRISUtil.getChanges(previousItem.hasPrivilege(PRIVILEGE_ALLOW_EXPORT), thisItem.hasPrivilege(PRIVILEGE_ALLOW_EXPORT), "PRIVILEGE_ALLOW_EXPORT");
+        if (changes.length() == 0) {
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 }

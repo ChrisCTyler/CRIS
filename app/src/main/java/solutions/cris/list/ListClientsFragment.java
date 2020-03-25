@@ -23,14 +23,14 @@ import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.SearchView;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -43,12 +43,8 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
-import com.google.api.services.sheets.v4.model.Color;
-import com.google.api.services.sheets.v4.model.Sheet;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -59,17 +55,18 @@ import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.edit.EditClient;
+import solutions.cris.edit.EditNote;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.Contact;
 import solutions.cris.object.Document;
 import solutions.cris.object.ListType;
+import solutions.cris.object.Note;
 import solutions.cris.object.Role;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.LocalSettings;
 import solutions.cris.utils.PickList;
-import solutions.cris.utils.SheetTest;
 
 /**
  * Copyright CRIS.Solutions 13/12/2016.
@@ -131,11 +128,19 @@ public class ListClientsFragment extends Fragment {
         currentUser = User.getCurrentUser();
 
         // Initialise the list view
+        // Build 116 22 May 2019 Add handler for incoming text via share
+        final String shareText = ((ListClients) getActivity()).getShareText();
         this.listView = (ListView) parent.findViewById(R.id.list_view);
         this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                doReadClient(position);
+                // Build 116 22 May 2019 Add handler for incoming text via share
+                String shareText = ((ListActivity) getActivity()).getShareText();
+                if (shareText != null && shareText.length() > 0){
+                    doCreateShareNote(position);
+                } else {
+                    doReadClient(position);
+                }
             }
         });
         listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
@@ -360,7 +365,10 @@ public class ListClientsFragment extends Fragment {
                     break;
                 case GROUP:
                     // New clients (pre-case) have no group
+                    // Build 139 - Second Group
+                    /*
                     UUID clientID = null;
+
                     if (client.getCurrentCase() != null) {
                         Case currentCase = client.getCurrentCase();
                         if (currentCase.getGroupID() != null &&
@@ -371,10 +379,31 @@ public class ListClientsFragment extends Fragment {
                     if (clientID == null || !clientID.equals(selectedID)) {
                         selected = false;
                     }
+                    */
+                    boolean match = false;
+                    UUID groupID = null;
+                    if (client.getCurrentCase() != null) {
+                        Case currentCase = client.getCurrentCase();
+                        if (!currentCase.getCaseType().equals("Close")) {
+                            if (currentCase.getGroupID() != null) {
+                                groupID = currentCase.getGroupID();
+                                if (groupID.equals(selectedID)) {
+                                    match = true;
+                                }
+                            }
+                            if (currentCase.getGroup2ID() != null) {
+                                groupID = currentCase.getGroup2ID();
+                                if (groupID.equals(selectedID)) {
+                                    match = true;
+                                }
+                            }
+                        }
+                    }
+                    selected = match;
                     break;
                 case KEYWORKER:
                     // New clients (pre-case) have no group
-                    clientID = null;
+                    UUID clientID = null;
                     if (client.getCurrentCase() != null) {
                         Case currentCase = client.getCurrentCase();
                         if (currentCase.getKeyWorkerID() != null&&
@@ -426,6 +455,13 @@ public class ListClientsFragment extends Fragment {
                             selected = false;
                         }
                         else {
+                            // Build 136 - Only show school with end date later than today
+                            Date now = new Date();
+                            if (contactDocument.getEndDate() != null &&
+                                    contactDocument.getEndDate().getTime() != Long.MIN_VALUE &&
+                                    contactDocument.getEndDate().before(now)){
+                                selected = false;
+                            }
                             if (!contactDocument.getSchoolID().equals(selectedID)){
                                 selected = false;
                             }
@@ -442,6 +478,13 @@ public class ListClientsFragment extends Fragment {
                             selected = false;
                         }
                         else {
+                            // Build 136 - Only show agency with end date later than today
+                            Date now = new Date();
+                            if (contactDocument.getEndDate() != null &&
+                                    contactDocument.getEndDate().getTime() != Long.MIN_VALUE &&
+                                    contactDocument.getEndDate().before(now)){
+                                selected = false;
+                            }
                             if (!contactDocument.getAgencyID().equals(selectedID)){
                                 selected = false;
                             }
@@ -475,7 +518,7 @@ public class ListClientsFragment extends Fragment {
     private static final int MENU_SORT_GROUP = Menu.FIRST + 15;
     private static final int MENU_SORT_KEYWORKER = Menu.FIRST + 16;
     private static final int MENU_SORT_STATUS = Menu.FIRST + 17;
-
+    private static final int MENU_BROADCAST = Menu.FIRST + 20;
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
@@ -538,6 +581,8 @@ public class ListClientsFragment extends Fragment {
 
             MenuItem sortStatusOption = menu.add(0, MENU_SORT_STATUS, 26, "Sort by Status");
             sortStatusOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+            MenuItem broadcastOption = menu.add(0, MENU_BROADCAST, 30, "Broadcast Message");
+            broadcastOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         }
         final MenuItem searchItem = menu.findItem(R.id.action_search);
         ActionBar supportActionBar = ((ListClients) getActivity()).getSupportActionBar();
@@ -739,6 +784,34 @@ public class ListClientsFragment extends Fragment {
                 adapter.notifyDataSetChanged();
                 return true;
 
+            // Build 119 30 May 2019 Broadcast handler
+            case MENU_BROADCAST:
+                /*
+                // Load Broadcast Client List from the selected clients
+                ArrayList<Client> broadcastClientList = new ArrayList<>();
+                for (Client client: ((ListActivity) getActivity()).getClientAdapterList()){
+                    broadcastClientList.add(client);
+                }
+                ((ListActivity)getActivity()).setBroadcastClientList(broadcastClientList);
+                // Start the Broadcast fragment
+                fragmentManager = getFragmentManager();
+                fragmentTransaction = fragmentManager.beginTransaction();
+                fragment = new BroadcastMessageFragment();
+                fragmentTransaction.replace(R.id.content, fragment);
+                fragmentTransaction.addToBackStack(null);
+                fragmentTransaction.commit();
+                */
+                new AlertDialog.Builder(getActivity())
+                        .setTitle("Not Implemented Yet")
+                        .setMessage("Unfortunately, this option is not yet available.")
+                        .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                            }
+                        })
+                        .show();
+
+                return true;
             default:
                 return false;
         }
@@ -902,6 +975,48 @@ public class ListClientsFragment extends Fragment {
         dialog.show();
     }
 
+    // Build 116 22 May 2019 Add handler for incoming text via share
+    private void doCreateShareNote(int position){
+        ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
+        String shareText = ((ListClients) getActivity()).getShareText();
+        boolean hasPrivelege = false;
+        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_CREATE_NOTES)){
+            hasPrivelege = true;
+        }
+        if (((ListClients) getActivity()).isMyClients()) {
+            if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_MY_CLIENTS)) {
+                hasPrivelege = true;
+            }
+        } else {
+            if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_ALL_CLIENTS)) {
+                hasPrivelege = true;
+            }
+        }
+        if (hasPrivelege){
+            // 3/3/2017 Odd crash (Graeme Edwards) seems to have returned null so test
+            if (adapter.getItem(position) != null) {
+                // V2.0 Set the 'document' in case the client is modified in the document view
+                // Note: get/setDocument is used rather than get/setClient for consistency
+                // since EditClient is possible from both list of clients and list of documents
+                // and it used getDocument to establish the client document to be edited.
+                Client client = adapter.getItem(position);
+                listViewState = listView.onSaveInstanceState();
+                FragmentManager fragmentManager = getFragmentManager();
+                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                Fragment fragment = new EditNote();
+                ((ListActivity) getActivity()).setDocument(new Note(currentUser, client.getClientID()));
+                fragmentTransaction.replace(R.id.content, fragment);
+                fragmentTransaction.addToBackStack(null);
+                fragmentTransaction.commit();
+            }
+            else {
+                doNoClient();
+            }
+        } else {
+            doNoPrivilege();
+        }
+    }
+
     private void doReadClient(int position) {
         boolean myClients = ((ListClients) getActivity()).isMyClients();
         if ((myClients && currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_MY_CLIENTS)) ||
@@ -1057,6 +1172,10 @@ public class ListClientsFragment extends Fragment {
                 }
                 if (currentCase.getGroup() != null) {
                     group = currentCase.getGroup().getItemValue();
+                }
+                // Build 139 - Second Group
+                if (currentCase.getGroup2() != null) {
+                    group += " plus 1";
                 }
                 if (currentCase.getKeyWorker() != null) {
                     keyworkerName = currentCase.getKeyWorker().getFullName();

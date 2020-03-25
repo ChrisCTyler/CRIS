@@ -14,12 +14,11 @@ package solutions.cris.edit;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import android.content.Intent;
 import android.database.sqlite.SQLiteConstraintException;
 import android.os.Bundle;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -33,7 +32,6 @@ import android.widget.ImageView;
 import java.util.ArrayList;
 
 import solutions.cris.CRISActivity;
-import solutions.cris.Login;
 import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;

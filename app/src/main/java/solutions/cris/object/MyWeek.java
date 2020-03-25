@@ -16,6 +16,8 @@ import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -125,7 +127,7 @@ public class MyWeek extends Status implements Serializable {
     public String textSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("EEE dd MMM yyyy", Locale.UK);
         // Build the string
-        String summary = "";
+        String summary = super.textSummary();
         summary += String.format("Date: %s\n",sDate.format(getReferenceDate()));
         summary += String.format(Locale.UK, "School/College Score: %d\n",schoolScore);
         summary += String.format(Locale.UK, "Friendship/Me Score: %d\n",friendshipScore);
@@ -136,12 +138,30 @@ public class MyWeek extends Status implements Serializable {
         return summary;
     }
 
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        MyWeek previousDocument = (MyWeek) localDB.getDocumentByRecordID(previousRecordID);
+        MyWeek thisDocument = (MyWeek) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.getSchoolScore(), thisDocument.getSchoolScore(), "School Score");
+        changes += CRISUtil.getChanges(previousDocument.getHomeScore(), thisDocument.getHomeScore(), "Home Score");
+        changes += CRISUtil.getChanges(previousDocument.getFriendshipScore(), thisDocument.getFriendshipScore(), "Friendship Score");
+        changes += CRISUtil.getChanges(previousDocument.getNote(), thisDocument.getNote(), "Note");
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
+    }
+
     private static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Date");
         fNames.add("Score");
@@ -226,8 +246,9 @@ public class MyWeek extends Status implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(5)
-                                .setEndColumnIndex(6)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(6)
+                                .setEndColumnIndex(7)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -240,6 +261,8 @@ public class MyWeek extends Status implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getReferenceDate()));

@@ -18,10 +18,10 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -48,7 +48,6 @@ import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
 import solutions.cris.object.Client;
 import solutions.cris.object.CriteriaAssessmentTool;
 import solutions.cris.object.Document;
@@ -66,6 +65,8 @@ public class EditCAT extends Fragment {
     private Spinner childStatusSpinner;
     private Spinner typeOfSupportSpinner;
     private EditText personCaredForParentView;
+    // Build 139 - Added Grandparents to People Cared For
+    private EditText personCaredForGrandparentView;
     private EditText personCaredForSiblingView;
     private EditText personCaredForOtherView;
     private CheckBox tocDomestic1;
@@ -174,6 +175,8 @@ public class EditCAT extends Fragment {
         childStatusSpinner = (Spinner) parent.findViewById(R.id.child_status_spinner);
         typeOfSupportSpinner = (Spinner) parent.findViewById(R.id.type_of_support_spinner);
         personCaredForParentView = (EditText) parent.findViewById(R.id.person_cared_for_parents);
+        // Build 139 - Added Grandparents to People Cared For
+        personCaredForGrandparentView = (EditText) parent.findViewById(R.id.person_cared_for_grandparents);
         personCaredForSiblingView = (EditText) parent.findViewById(R.id.person_cared_for_siblings);
         personCaredForOtherView = (EditText) parent.findViewById(R.id.person_cared_for_others);
         tocDomestic1 = (CheckBox) parent.findViewById(R.id.toc_domestic1);
@@ -275,6 +278,24 @@ public class EditCAT extends Fragment {
                         personCaredForParentView.setError(getString(R.string.error_invalid_integer));
                     } else if (editDocument.getPersonCaredForParent() != newValue) {
                         editDocument.setPersonCaredForParent(newValue);
+                        checkScore();
+                    }
+                }
+            }
+        });
+
+        // Build 139 - Added Grandparents to People Cared For
+        personCaredForGrandparentView.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View view, boolean hasFocus) {
+                if (!hasFocus) {
+                    int newValue = getInt(personCaredForGrandparentView.getText().toString());
+                    if (newValue == -1) {
+                        personCaredForGrandparentView.setError(getString(R.string.error_number_0_to_5));
+                    } else if (newValue == -2) {
+                        personCaredForGrandparentView.setError(getString(R.string.error_invalid_integer));
+                    } else if (editDocument.getPersonCaredForGrandparent() != newValue) {
+                        editDocument.setPersonCaredForGrandparent(newValue);
                         checkScore();
                     }
                 }
@@ -577,6 +598,8 @@ public class EditCAT extends Fragment {
             referenceDateView.setText(sDate.format(editDocument.getCreationDate()));
             scoreView.setText(String.format(Locale.UK, "%d", editDocument.getScore()));
             personCaredForParentView.setText("0");
+            // Build 139 - Added Grandparents to People Cared For
+            personCaredForGrandparentView.setText("0");
             personCaredForSiblingView.setText("0");
             personCaredForOtherView.setText("0");
             typeofConditionMentalHealthView.setText("0");
@@ -595,6 +618,8 @@ public class EditCAT extends Fragment {
             childStatusSpinner.setSelection(childStatusAdapter.getPosition(editDocument.getChildStatus()));
             typeOfSupportSpinner.setSelection(typeOfSupportAdapter.getPosition(editDocument.getTypeOfSupport()));
             personCaredForParentView.setText(String.format(Locale.UK, "%d", editDocument.getPersonCaredForParent()));
+            // Build 139 - Added Grandparents to People Cared For
+            personCaredForGrandparentView.setText(String.format(Locale.UK, "%d", editDocument.getPersonCaredForGrandparent()));
             personCaredForSiblingView.setText(String.format(Locale.UK, "%d", editDocument.getPersonCaredForSibling()));
             personCaredForOtherView.setText(String.format(Locale.UK, "%d", editDocument.getPersonCaredForOther()));
             tocDomestic1.setChecked(editDocument.getTypeOfCareDomestic1());
@@ -794,6 +819,31 @@ public class EditCAT extends Fragment {
             } catch (Exception ex) {
                 personCaredForParentView.setError(getString(R.string.error_invalid_integer));
                 focusView = personCaredForParentView;
+                success = false;
+            }
+        }
+
+        // Build 139 - Added Grandparents to People Cared For
+        // PersonCareForGrandparent
+        String sPersonCareForGrandparent = personCaredForGrandparentView.getText().toString().trim();
+        if (TextUtils.isEmpty(sPersonCareForGrandparent)) {
+            personCaredForGrandparentView.setError(getString(R.string.error_field_required));
+            focusView = personCaredForGrandparentView;
+            success = false;
+        } else {
+            int personCaredForGrandparent;
+            try {
+                personCaredForGrandparent = Integer.parseInt(sPersonCareForGrandparent);
+                if (personCaredForGrandparent < 0 || personCaredForGrandparent > 5) {
+                    personCaredForGrandparentView.setError(getString(R.string.error_number_0_to_5));
+                    focusView = personCaredForGrandparentView;
+                    success = false;
+                } else {
+                    editDocument.setPersonCaredForGrandparent(personCaredForGrandparent);
+                }
+            } catch (Exception ex) {
+                personCaredForGrandparentView.setError(getString(R.string.error_invalid_integer));
+                focusView = personCaredForGrandparentView;
                 success = false;
             }
         }

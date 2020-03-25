@@ -1,10 +1,14 @@
 package solutions.cris.object;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -27,6 +31,9 @@ public class ListItem extends CrisObject implements Serializable {
     // Note: version should only be incremented if the class is changed in such
     // a way that older versions cannot be deserialised.
     private static final long serialVersionUID = SVUID_LIST_ITEM;
+    // Build 139 KPIs - Special Commissioner 'Total'
+    public static final UUID commissionerTotalID = UUID.fromString("a5d087dc-92d2-11e6-ae22-56b6b6499612");
+    public static final UUID commissionerUnknownID = UUID.fromString("a5d287de-92d2-11e6-ae22-58b6b6499616");
 
     // Special for creating the System Administrator Role
     public ListItem(UUID listItemID, User currentUser, ListType listType, String itemValue, int itemOrder){
@@ -108,14 +115,24 @@ public class ListItem extends CrisObject implements Serializable {
         }
     };
 
-    /*
     public String textSummary(){
-        String summary = "List Type:\n" + listType.toString() + "\n\n";
-        summary += "Item Value:\n" + itemValue + "\n\n";
-        summary += "Item Order:\n" + Integer.toString(itemOrder) + "\n\n";
-        summary += "Is Default:\n" + Boolean.toString(isDefault) + "\n\n";
-        summary += "Is Displayed:\n" + Boolean.toString(isDisplayed) + "\n\n";
+        String summary = "List Type: " + listType.toString() + "\n";
+        summary += "Item Value: " + itemValue + "\n";
+        summary += "Item Order: " + Integer.toString(itemOrder) + "\n";
+        summary += "Is Default: " + Boolean.toString(isDefault) + "\n";
+        summary += "Is Displayed: " + Boolean.toString(isDisplayed) + "\n";
         return summary;
     }
-    */
+
+    public static String getChanges(ListItem previousDocument, ListItem thisDocument){
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        LocalSettings localSettings = LocalSettings.getInstance();
+        String changes = "";
+        changes += CRISUtil.getChanges(previousDocument.getItemValue(), thisDocument.getItemValue(), "Value");
+        changes += CRISUtil.getChanges(previousDocument.getItemOrder(), thisDocument.getItemOrder(), "Order");
+        changes += CRISUtil.getChanges(previousDocument.isDefault(), thisDocument.isDefault(), "Default Flag");
+        changes += CRISUtil.getChanges(previousDocument.isDisplayed(), thisDocument.isDisplayed(), "Displayed Flag");
+        return changes;
+    }
 }

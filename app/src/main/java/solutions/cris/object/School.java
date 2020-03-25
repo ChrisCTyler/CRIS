@@ -1,6 +1,14 @@
 package solutions.cris.object;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.UUID;
+
+import solutions.cris.db.LocalDB;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -84,8 +92,8 @@ public class School extends ListItem implements Serializable {
     }
 
     public String textSummary(){
-        String summary = String.format("%s\n",getSchoolAddress());
-        summary += String.format("%s\n", getSchoolPostcode());
+        String summary = super.textSummary();
+        summary += String.format("Address:\n%s\n%s\n",getSchoolAddress(),getSchoolPostcode());
         summary += String.format("Contact Number: %s\n", getSchoolContactNumber());
         summary += String.format("Email: %s\n",getSchoolEmailAddress());
         summary += String.format("Head Teacher: %s\n",getSchoolHeadTeacher());
@@ -93,6 +101,26 @@ public class School extends ListItem implements Serializable {
             summary += String.format("Additional Information:\n%s", getSchoolAdditionalInformation());
         }
         return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        LocalSettings localSettings = LocalSettings.getInstance();
+        School previousItem = (School) localDB.getListItemByRecordID(previousRecordID);
+        School thisItem = (School) localDB.getListItemByRecordID(thisRecordID);
+        String changes = ListItem.getChanges(previousItem, thisItem);
+        changes += CRISUtil.getChanges(previousItem.getSchoolAddress(), thisItem.getSchoolAddress(), "Address");
+        changes += CRISUtil.getChanges(previousItem.getSchoolPostcode(), thisItem.getSchoolPostcode(), "Postcode");
+        changes += CRISUtil.getChanges(previousItem.getSchoolContactNumber(), thisItem.getSchoolContactNumber(), "Contact Number");
+        changes += CRISUtil.getChanges(previousItem.getSchoolEmailAddress(), thisItem.getSchoolEmailAddress(), "Email Address");
+        changes += CRISUtil.getChanges(previousItem.getSchoolHeadTeacher(), thisItem.getSchoolHeadTeacher(), "Head Teacher");
+        changes += CRISUtil.getChanges(previousItem.getSchoolAdditionalInformation(), thisItem.getSchoolAdditionalInformation(), "Additional Information");
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 
 }

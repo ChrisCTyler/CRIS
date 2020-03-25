@@ -3,11 +3,17 @@ package solutions.cris.object;
 import android.database.sqlite.SQLiteConstraintException;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Locale;
+import java.util.UUID;
 
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListComplexListItems;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -82,14 +88,30 @@ public class Agency extends ListItem implements Serializable {
     }
 
     public String textSummary(){
-        String summary = String.format("%s\n",getAgencyAddress());
-        summary += String.format("%s\n", getAgencyPostcode());
+        String summary = super.textSummary();
+        summary += String.format("Address:\n%s\n%s\n",getAgencyAddress(), getAgencyPostcode());
         summary += String.format("Contact Number: %s\n", getAgencyContactNumber());
         summary += String.format("Email: %s\n",getAgencyEmailAddress());
         if (!getAgencyAdditionalInformation().isEmpty()){
             summary += String.format("Additional Information:\n%s", getAgencyAdditionalInformation());
         }
         return summary;
+    }
+
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        Agency previousItem = (Agency) localDB.getListItemByRecordID(previousRecordID);
+        Agency thisItem = (Agency) localDB.getListItemByRecordID(thisRecordID);
+        String changes = ListItem.getChanges(previousItem, thisItem);
+        changes += CRISUtil.getChanges(previousItem.getAgencyAddress(), thisItem.getAgencyAddress(), "Address");
+        changes += CRISUtil.getChanges(previousItem.getAgencyPostcode(), thisItem.getAgencyPostcode(), "Postcode");
+        changes += CRISUtil.getChanges(previousItem.getAgencyContactNumber(), thisItem.getAgencyContactNumber(), "Contact Number");
+        changes += CRISUtil.getChanges(previousItem.getAgencyEmailAddress(), thisItem.getAgencyEmailAddress(), "Email Address");
+        changes += CRISUtil.getChanges(previousItem.getAgencyAdditionalInformation(), thisItem.getAgencyAdditionalInformation(), "Additional Information");
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
     }
 
 }

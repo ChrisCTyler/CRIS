@@ -8,14 +8,14 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.SearchView;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -47,8 +47,10 @@ import solutions.cris.object.ListItem;
 import solutions.cris.object.Role;
 import solutions.cris.object.Session;
 import solutions.cris.object.User;
+import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -126,10 +128,16 @@ public class ListSessionsFragment extends Fragment {
 
         // Initialise the list view
         this.listView = (ListView) parent.findViewById(R.id.list_view);
+        final SwipeDetector swipeDetector = new SwipeDetector();
+        this.listView.setOnTouchListener(swipeDetector);
         this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                doReadSession(position);
+                if (swipeDetector.swipeDetected()){
+                    displayDocumentHistory(position, swipeDetector.getAction());
+                } else {
+                    doReadSession(position);
+                }
             }
         });
         listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
@@ -138,6 +146,12 @@ public class ListSessionsFragment extends Fragment {
                 return doEditSession(position);
             }
         });
+
+
+        // Swipe Left and Right
+        //LinearLayout mainLayout = (LinearLayout) getActivity().findViewById(R.id.main_layout);
+
+
 
         User currentUser = User.getCurrentUser();
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
@@ -317,11 +331,17 @@ public class ListSessionsFragment extends Fragment {
     private static final int MENU_SORT_DATE = Menu.FIRST + 10;
     private static final int MENU_SORT_NAME = Menu.FIRST + 11;
 
-
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         // Use local settings for 'local' labels
         LocalSettings localSettings = LocalSettings.getInstance(getActivity());
+
+        //SHARE
+        // Build 126 - share is only relevant in Read fragments
+        MenuItem shareOption = menu.findItem(R.id.menu_item_share);
+        shareOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        shareOption.setVisible(false);
+        shareOption.setEnabled(false);
 
         if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_ALLOW_EXPORT)) {
             MenuItem selectExport = menu.add(0, MENU_EXPORT, 1, "Export to Google Sheets");
@@ -617,6 +637,28 @@ public class ListSessionsFragment extends Fragment {
         return true;
     }
 
+    private void displayDocumentHistory(int position, SwipeDetector.Action action){
+        Session session = adapter.getItem(position);
+        listViewState = listView.onSaveInstanceState();
+        //Loop through all instances of the document gathering data
+        String history = "";
+        ArrayList<UUID> recordIDs = localDB.getRecordIDs(session);
+        for (int i=0; i < recordIDs.size(); i++){
+            boolean isEarliest = (i == recordIDs.size()-1);
+            history += localDB.getDocumentMetaData(recordIDs.get(i), isEarliest, action);
+            if (!isEarliest){
+                history += Session.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+            }
+
+        }
+        history += String.format("\nThe current document contents are:\n\n%s\n", session.textSummary());
+        Intent intent = new Intent(getActivity(), AlertAndContinue.class);
+        intent.putExtra("title", String.format("Change History - %s", session.getDocumentTypeString()));
+        intent.putExtra("message", history);
+        startActivity(intent);
+    }
+
+
 
     private class SessionAdapter extends ArrayAdapter<Session> {
 
@@ -659,6 +701,8 @@ public class ListSessionsFragment extends Fragment {
             viewItemAdditionalText.setText(String.format("%s (%s)",
                     session.getSessionCoordinator().getFullName(),
                     session.getSessionCoordinator().getContactNumber()));
+
+
             return convertView;
         }
     }

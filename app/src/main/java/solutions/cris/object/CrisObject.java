@@ -53,8 +53,12 @@ public abstract class CrisObject implements Serializable{
     static final long SVUID_STATUS = 1234502201L;
     static final long SVUID_TRANSPORT_ORGANISATION = 1234502301L;
     static final long SVUID_TRANSPORT = 1234502401L;
+    // Build 139 -Added KPIs (public because CRISKPIItem declared in Utils not Object
+    public static final long SVUID_CRIS_KPI_ITEM = 1234502501L;
+    static final long SVUID_RAW_DOCUMENT = 1234502601L;
 
     private static final long serialVersionUID = SVUID_CRIS_OBJECT;
+
 
     // Constructor
     public CrisObject(User currentUser) {
@@ -73,6 +77,13 @@ public abstract class CrisObject implements Serializable{
             creationDate = new Date();
             createdByID = userID;
         }
+    }
+
+    // Build 139 - KPI Special Constructor for RawDocument
+    public CrisObject(UUID recordID, Date creationDate, UUID createdByID) {
+        this.recordID = recordID;
+        this. creationDate = creationDate;
+        this.createdByID = createdByID;
     }
 
     //RecordID

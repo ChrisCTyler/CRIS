@@ -62,7 +62,8 @@ public class SyncActivity extends CrisObject {
 
     public String getTextSummary() {
         return "Sync Result\n\n" +
-                "Date: " + sDate.format(getCreationDate()) + "\n\n" +
+                "Start: " + sDate.format(getCreationDate()) + "\n\n" +
+                "Finish: " + sDate.format(completionDate) + "\n\n" +
                 "Result: " + result + "\n\n" +
                 "Summary: " + summary + "\n\n" +
                 log;

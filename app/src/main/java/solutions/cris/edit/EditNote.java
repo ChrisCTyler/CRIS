@@ -20,12 +20,12 @@ import android.app.FragmentManager;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.res.ResourcesCompat;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.ShareActionProvider;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.ShareActionProvider;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -106,6 +106,9 @@ public class EditNote extends Fragment {
     private boolean contentHintTextDisplayed = true;
     private PickList noteTypePickList;
 
+    // Build 116 22 May 2019 Add handler for incoming text via share
+    String shareText = "";
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -120,10 +123,23 @@ public class EditNote extends Fragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
+        localDB = LocalDB.getInstance();
+        // Build 116 22 May 2019 Add handler for incoming text via share
+        shareText = ((ListActivity) getActivity()).getShareText();
         toolbar = ((ListActivity) getActivity()).getToolbar();
         TextView footer = (TextView) getActivity().findViewById(R.id.footer);
         currentUser = ((ListActivity) getActivity()).getCurrentUser();
         editDocument = (Note) ((ListActivity) getActivity()).getDocument();
+        // Build 119 2 May 2019 Introduced an error where note could be created with a
+        // null note type id. In this case it can be set to Text Message
+        // Note, this only affects a few note documents created before the bug was fixed
+        if (editDocument != null && editDocument.getNoteTypeID() == null){
+            NoteType noteType = (NoteType) localDB.getListItem("Text Message",ListType.NOTE_TYPE);
+            editDocument.setNoteTypeID(noteType.getListItemID());
+        }
+        // Now clear the document in the parent activity so that it is not checked
+        // against the old Client document
+        ((ListActivity) getActivity()).setDocument(null);
         fab = ((ListActivity) getActivity()).getFab();
         mode = ((ListActivity) getActivity()).getMode();
         client = ((ListActivity) getActivity()).getClient();
@@ -154,10 +170,6 @@ public class EditNote extends Fragment {
                 contentHintTextDisplayed = toggleHint(contentHintTextView, contentHintTextDisplayed);
             }
         });
-
-
-        // Get the document to be edited from the activity
-        localDB = LocalDB.getInstance();
 
         noteTypeSpinner = (Spinner) parent.findViewById(R.id.note_type_spinner);
         noteTypeTextView = (TextView) parent.findViewById(R.id.note_type_read_text);
@@ -254,8 +266,12 @@ public class EditNote extends Fragment {
                 cancelButton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        FragmentManager fragmentManager = getFragmentManager();
-                        fragmentManager.popBackStack();
+                        if (shareText.length() > 0) {
+                            ((ListActivity) getActivity()).finish();
+                        } else {
+                            FragmentManager fragmentManager = getFragmentManager();
+                            fragmentManager.popBackStack();
+                        }
                     }
                 });
                 // Save Button
@@ -265,13 +281,23 @@ public class EditNote extends Fragment {
                     public void onClick(View view) {
                         if (validate()) {
                             editDocument.save(true, author);
+                            if (shareText.length() > 0) {
+                                ((ListActivity) getActivity()).finish();
+                            } else {
                                 FragmentManager fragmentManager = getFragmentManager();
                                 fragmentManager.popBackStack();
+                            }
                         }
                     }
                 });
                 if (cancelOption != null) {
                     cancelOption.setVisible(false);
+                }
+                // Build 116 22 May 2019 Add handler for incoming text via share
+                if (shareText.length() > 0) {
+                    contentView.setText(shareText);
+                    // Clear the text for the ListClientsFragment Resume
+                    ((ListActivity) getActivity()).setShareText("");
                 }
                 break;
             case EDIT:
@@ -444,17 +470,26 @@ public class EditNote extends Fragment {
                         cancelOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
                     }
                 }
-                shareOption.setVisible(false);
+                // Share option only exists if called from ListClientHeader
+                if (shareOption != null) {
+                    shareOption.setVisible(false);
+                }
                 break;
             case NEW:
             case RESPONSE:
                 MenuItem hashtagOption = menu.add(0, MENU_HASHTAG, 3, "Insert Hashtag");
                 hashtagOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-                shareOption.setVisible(false);
+                // Share option only exists if called from ListClientHeader
+                if (shareOption != null) {
+                    shareOption.setVisible(false);
+                }
                 break;
             case READ:
-                shareOption.setVisible(true);
-                createShareActionProvider(shareOption);
+                // Share option only exists if called from ListClientHeader
+                if (shareOption != null) {
+                    shareOption.setVisible(true);
+                    createShareActionProvider(shareOption);
+                }
         }
 
     }
@@ -485,8 +520,23 @@ public class EditNote extends Fragment {
         ShareActionProvider shareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(menuItem);
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
-        String summary = String.format("%s\n\n%s", client.textSummary(), editDocument.textSummary());
-        shareIntent.putExtra(Intent.EXTRA_TEXT, summary);
+        String body = String.format("%s\n\n%s", client.textSummary(), editDocument.textSummary());
+        // Build 114 22 May 2019 - Get client's email address and add to share info
+        ArrayList<String> emailList = new ArrayList<>();
+        emailList.add(client.getEmailAddress());
+        String[] emails = emailList.toArray(new String[0]);
+        shareIntent.putExtra(Intent.EXTRA_EMAIL, emails);
+        // Build 114 22 May 2019 - Use contact number if text
+        shareIntent.putExtra("address",  client.getContactNumber());
+        // Build 114 22 May 2019 - Use different body for Email/Text Message
+        if (editDocument.getNoteType().getItemValue().toLowerCase().indexOf("email") != -1 ||
+                editDocument.getNoteType().getItemValue().toLowerCase().indexOf("text message") != -1){
+            body = editDocument.getContent();
+            if (editDocument.getResponseContent() != null){
+                body += "\n" + editDocument.getResponseContent();
+            }
+        }
+        shareIntent.putExtra(Intent.EXTRA_TEXT, body);
         shareActionProvider.setShareIntent(shareIntent);
     }
 

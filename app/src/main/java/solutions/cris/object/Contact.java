@@ -21,6 +21,8 @@ import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListClientHeader;
+import solutions.cris.utils.CRISUtil;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -312,7 +314,7 @@ public class Contact extends Document implements Serializable {
     public String textSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("EEE dd MMM yyyy", Locale.UK);
         // Build the string
-        String summary = "";
+        String summary = super.textSummary();
         switch (getContactType().getItemValue()) {
             case "School Contact":
                 summary += "School: " + getSchool().getItemValue() + "\n";
@@ -331,7 +333,7 @@ public class Contact extends Document implements Serializable {
             default:
                 summary += String.format("%s: %s\n", getContactType().getItemValue(), getContactName());
                 summary += "Relationship: " + getRelationshipType().getItemValue() + "\n";
-                summary += getContactAddress() + "\n";
+                summary += "Address:\n" + getContactAddress() + "\n";
                 summary += getContactPostcode() + "\n";
         }
         summary += "Contact Number: " + getContactContactNumber() + "\n";
@@ -350,12 +352,51 @@ public class Contact extends Document implements Serializable {
         return summary;
     }
 
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        Contact previousDocument = (Contact) localDB.getDocumentByRecordID(previousRecordID);
+        Contact thisDocument = (Contact) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        if (!previousDocument.getContactType().equals(thisDocument.getContactType())) {
+            changes += CRISUtil.getChanges(previousDocument.getContactType(), thisDocument.getContactType(), "ContactType");
+        } else {
+            switch (previousDocument.getContactType().getItemValue()) {
+                case "School Contact":
+                    changes += CRISUtil.getChanges(previousDocument.getSchool(), thisDocument.getSchool(), "School");
+                    changes += CRISUtil.getChanges(previousDocument.getContactName(), thisDocument.getContactName(), "Contact Name");
+                    changes += CRISUtil.getChanges(previousDocument.getRelationshipType(), thisDocument.getRelationshipType(), "Relationship Type");
+                    break;
+                case "Agency Contact":
+                    changes += CRISUtil.getChanges(previousDocument.getAgency(), thisDocument.getAgency(), "Agency");
+                    changes += CRISUtil.getChanges(previousDocument.getContactName(), thisDocument.getContactName(), "Contact Name");
+                    changes += CRISUtil.getChanges(previousDocument.getRelationshipType(), thisDocument.getRelationshipType(), "Relationship Type");
+                    break;
+                default:
+                    changes += CRISUtil.getChanges(previousDocument.getContactName(), thisDocument.getContactName(), "Contact Name");
+                    changes += CRISUtil.getChanges(previousDocument.getRelationshipType(), thisDocument.getRelationshipType(), "Relationship Type");
+                    changes += CRISUtil.getChanges(previousDocument.getContactAddress(), thisDocument.getContactAddress(), "Address");
+                    changes += CRISUtil.getChanges(previousDocument.getContactPostcode(), thisDocument.getContactPostcode(), "Postcode");
+            }
+            changes += CRISUtil.getChangesDate(previousDocument.getStartDate(), thisDocument.getStartDate(), "Start Date");
+            changes += CRISUtil.getChangesDate(previousDocument.getEndDate(), thisDocument.getEndDate(), "End Date");
+            changes += CRISUtil.getChanges(previousDocument.getContactContactNumber(), thisDocument.getContactContactNumber(), "Contact Number");
+            changes += CRISUtil.getChanges(previousDocument.getContactEmailAddress(), thisDocument.getContactEmailAddress(), "Email Address");
+            changes += CRISUtil.getChanges(previousDocument.getContactAdditionalInformation(), thisDocument.getContactAdditionalInformation(), "Additional Information");
+        }
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
+    }
+
     private static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Postcode");
         fNames.add("Start Date");
         fNames.add("End Date");
@@ -454,8 +495,9 @@ public class Contact extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(5)
-                                .setEndColumnIndex(7)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(6)
+                                .setEndColumnIndex(8)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -467,6 +509,8 @@ public class Contact extends Document implements Serializable {
         row.add(client.getLastName());
         row.add(sDate.format(client.getDateOfBirth()));
         row.add(client.getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(client.getYearGroup());
         row.add(client.getPostcode());
         if (getStartDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getStartDate()));

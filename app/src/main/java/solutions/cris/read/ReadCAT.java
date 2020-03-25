@@ -3,10 +3,10 @@ package solutions.cris.read;
 import android.app.Fragment;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.widget.ShareActionProvider;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.widget.ShareActionProvider;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -28,7 +28,6 @@ import java.util.Locale;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
-import solutions.cris.list.ListClientHeader;
 import solutions.cris.object.Client;
 import solutions.cris.object.CriteriaAssessmentTool;
 import solutions.cris.object.User;
@@ -114,6 +113,9 @@ public class ReadCAT extends Fragment {
         TextView personCaredForTextView = (TextView) parent.findViewById(R.id.person_cared_for_text);
         EditText personCaredForParentView = (EditText) parent.findViewById(R.id.person_cared_for_parents);
         TextView personCaredForParentLabel = (TextView) parent.findViewById(R.id.person_cared_for_parents_label);
+        // Build 139 - Added Grandparents to People Cared For
+        EditText personCaredForGrandparentView = (EditText) parent.findViewById(R.id.person_cared_for_grandparents);
+        TextView personCaredForGrandparentLabel = (TextView) parent.findViewById(R.id.person_cared_for_grandparents_label);
         EditText personCaredForSiblingView = (EditText) parent.findViewById(R.id.person_cared_for_siblings);
         TextView personCaredForSiblingLabel = (TextView) parent.findViewById(R.id.person_cared_for_siblings_label);
         EditText personCaredForOtherView = (EditText) parent.findViewById(R.id.person_cared_for_others);
@@ -162,9 +164,13 @@ public class ReadCAT extends Fragment {
         personCaredForTextView.setVisibility(View.VISIBLE);
         personCaredForTextView.setFocusable(false);
         personCaredForParentView.setVisibility(View.GONE);
+        // Build 139 - Added Grandparents to People Cared For
+        personCaredForGrandparentView.setVisibility(View.GONE);
         personCaredForSiblingView.setVisibility(View.GONE);
         personCaredForOtherView.setVisibility(View.GONE);
         personCaredForParentLabel.setVisibility(View.GONE);
+        // Build 139 - Added Grandparents to People Cared For
+        personCaredForGrandparentLabel.setVisibility(View.GONE);
         personCaredForSiblingLabel.setVisibility(View.GONE);
         personCaredForOtherLabel.setVisibility(View.GONE);
         typeOfCareView.setVisibility(View.VISIBLE);
@@ -215,6 +221,12 @@ public class ReadCAT extends Fragment {
             personCaredFor += String.format(Locale.UK, "%d parents cared for.\n", editDocument.getPersonCaredForParent());
         } else if (editDocument.getPersonCaredForParent() > 0) {
             personCaredFor += String.format(Locale.UK, "%d parent cared for.\n", editDocument.getPersonCaredForParent());
+        }
+        // Build 139 - Added Grandparents to People Cared For
+        if (editDocument.getPersonCaredForGrandparent() > 1) {
+            personCaredFor += String.format(Locale.UK, "%d grandparents cared for.\n", editDocument.getPersonCaredForGrandparent());
+        } else if (editDocument.getPersonCaredForGrandparent() > 0) {
+            personCaredFor += String.format(Locale.UK, "%d grandparent cared for.\n", editDocument.getPersonCaredForGrandparent());
         }
         if (editDocument.getPersonCaredForSibling() > 1) {
             personCaredFor += String.format(Locale.UK, "%d siblings cared for.\n", editDocument.getPersonCaredForSibling());

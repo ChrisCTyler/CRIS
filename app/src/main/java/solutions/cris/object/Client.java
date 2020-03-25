@@ -27,6 +27,7 @@ import java.util.UUID;
 import solutions.cris.db.LocalDB;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 import static solutions.cris.object.Case.AMBER;
 import static solutions.cris.object.Case.GREEN;
@@ -105,6 +106,37 @@ public class Client extends Document implements Serializable {
             }
         }
         return age;
+    }
+
+    // Build 139 - Add Year Group to Export
+    public int getYearGroup(){
+        // Changes for DoB 1st September
+        // Year Group 1 = 5 years old on or before 1st Sept
+        // Range  is 1 to 14, if child under 5 then 0 if over 19 then 99
+        int ageSept;
+        // Calculate client's age on 1st September
+        Calendar dob = Calendar.getInstance();
+        dob.setTime(CRISUtil.midnightEarlier(dateOfBirth));
+        // Get year of last september
+        Calendar today = Calendar.getInstance();
+        today.setTime(CRISUtil.midnightEarlier(new Date()));
+        int yearStart = today.get(Calendar.YEAR);
+        if (today.get(Calendar.MONTH) < 8){{
+            yearStart--;
+        }}
+        int yearGroup = yearStart - dob.get(Calendar.YEAR);
+        if (dob.get(Calendar.MONTH )>= 8){
+            yearGroup--;
+        }
+        if (yearGroup < 5){
+            yearGroup = 0;
+        } else {
+            yearGroup = yearGroup -4;
+        }
+        if (yearGroup > 14) {
+            yearGroup = 99;
+        }
+        return yearGroup;
     }
 
     private boolean isBirthday;
@@ -710,6 +742,8 @@ public class Client extends Document implements Serializable {
         fNames.add("Lastname");
         fNames.add("Date of Birth");
         fNames.add("Age");
+        // Build 139 - Add Year Group to Export
+        fNames.add("Year Group");
         fNames.add("Address");
         fNames.add("Postcode");
         fNames.add("Contact Number");
@@ -721,6 +755,8 @@ public class Client extends Document implements Serializable {
         fNames.add("CAT");
         fNames.add("Status");
         fNames.add(localSettings.Group);
+        // Build 139 - Second Group
+        fNames.add(localSettings.Group + "2");
         fNames.add(localSettings.Keyworker);
         fNames.add(localSettings.Commisioner);
         fNames.add(localSettings.Tier);
@@ -842,8 +878,9 @@ public class Client extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(20)
-                                .setEndColumnIndex(21)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(21)
+                                .setEndColumnIndex(22)
                                 .setStartRowIndex(1))));
         // 23rd column is a date (CaseClosedate)
         requests.add(new Request()
@@ -858,8 +895,9 @@ public class Client extends Document implements Serializable {
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
-                                .setStartColumnIndex(23)
-                                .setEndColumnIndex(24)
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                .setStartColumnIndex(24)
+                                .setEndColumnIndex(25)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -872,6 +910,8 @@ public class Client extends Document implements Serializable {
         row.add(getLastName());
         row.add(sDate.format(getDateOfBirth()));
         row.add(getAge());
+        // Build 139 - Add Year Group to Export
+        row.add(getYearGroup());
         row.add(getAddress());
         row.add(getPostcode());
         row.add(String.format("'%s", getContactNumber()));
@@ -909,6 +949,12 @@ public class Client extends Document implements Serializable {
             }
             if (getCurrentCase().getGroup() != null) {
                 row.add(getCurrentCase().getGroup().getItemValue());
+            } else {
+                row.add("");    // Group
+            }
+            // Build 139 - Second Group
+            if (getCurrentCase().getGroup2() != null) {
+                row.add(getCurrentCase().getGroup2().getItemValue());
             } else {
                 row.add("");    // Group
             }
@@ -1019,7 +1065,8 @@ public class Client extends Document implements Serializable {
     public String textSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
 
-        String summary = "Name: " + getFirstNames() + " " + getLastName() + "\n";
+        String summary = super.textSummary();
+        summary += "Name: " + getFirstNames() + " " + getLastName() + "\n";
         summary += "Date of Birth: ";
         if (getDateOfBirth().getTime() != Long.MIN_VALUE) {
             summary += sDate.format(getDateOfBirth());
@@ -1038,4 +1085,26 @@ public class Client extends Document implements Serializable {
     }
 
 
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+        Client previousDocument = (Client) localDB.getDocumentByRecordID(previousRecordID);
+        Client thisDocument = (Client) localDB.getDocumentByRecordID(thisRecordID);
+        String changes = Document.getChanges(previousDocument, thisDocument);
+        changes += CRISUtil.getChanges(previousDocument.getFullName(), thisDocument.getFullName(), "Name");
+        changes += CRISUtil.getChangesDate(previousDocument.getDateOfBirth(), thisDocument.getDateOfBirth(), "DOB");
+        changes += CRISUtil.getChanges(previousDocument.getAddress(), thisDocument.getAddress(), "Address");
+        changes += CRISUtil.getChanges(previousDocument.getPostcode(), thisDocument.getPostcode(), "Postcode");
+        changes += CRISUtil.getChanges(previousDocument.getContactNumber(), thisDocument.getContactNumber(), "Contact Number");
+        changes += CRISUtil.getChanges(previousDocument.getContactNumber2(), thisDocument.getContactNumber2(), "Alt. Contact Number");
+        changes += CRISUtil.getChanges(previousDocument.getEmailAddress(), thisDocument.getEmailAddress(), "Email Address");
+        changes += CRISUtil.getChanges(previousDocument.getGender(), thisDocument.getGender(), "Gender");
+        changes += CRISUtil.getChanges(previousDocument.getEthnicity(), thisDocument.getEthnicity(), "Ethnicity");
+        changes += CRISUtil.getChanges(previousDocument.getCurrentAgency(), thisDocument.getCurrentAgency(), "Current Agency");
+        changes += CRISUtil.getChanges(previousDocument.getCurrentSchool(), thisDocument.getCurrentSchool(), "Current School");
+        changes += CRISUtil.getChanges(previousDocument.getCurrentCase(), thisDocument.getCurrentCase());
+        if (changes.length() == 0){
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
+    }
 }

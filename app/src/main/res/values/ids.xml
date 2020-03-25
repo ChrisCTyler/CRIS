@@ -16,4 +16,16 @@
     <item type="id" name="tag_pdf_document_icon"/>
     <item type="id" name="tag_client_entry"/>
     <item type="id" name="tag_additional_text"/>
+    <item type="id" name="tag_view_item_title"/>
+    <item type="id" name="tag_view_item_area_1"/>
+    <item type="id" name="tag_view_item_area_2"/>
+    <item type="id" name="tag_view_item_area_3"/>
+    <item type="id" name="tag_view_item_area_4"/>
+    <item type="id" name="tag_view_item_area_5"/>
+    <item type="id" name="tag_view_item_area_6"/>
+    <item type="id" name="tag_view_item_area_7"/>
+    <item type="id" name="tag_view_item_area_8"/>
+    <item type="id" name="tag_view_item_area_9"/>
+
+
 </resources>

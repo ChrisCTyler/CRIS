@@ -7,14 +7,14 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.SearchView;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuItemCompat;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -23,8 +23,8 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
@@ -32,7 +32,6 @@ import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -46,7 +45,6 @@ import solutions.cris.db.LocalDB;
 import solutions.cris.edit.EditMyWeek;
 import solutions.cris.edit.EditNote;
 import solutions.cris.edit.EditTransport;
-import solutions.cris.exceptions.CRISException;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.ClientSession;
@@ -62,9 +60,11 @@ import solutions.cris.object.Transport;
 import solutions.cris.object.User;
 import solutions.cris.read.ReadMyWeek;
 import solutions.cris.read.ReadTransport;
+import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -116,6 +116,8 @@ public class ListSessionClientsFragment extends Fragment {
     private String searchText = "";
     private boolean isSearchIconified = true;
 
+    private RegisterEntryAdapter registerAdapter;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -141,6 +143,20 @@ public class ListSessionClientsFragment extends Fragment {
 
         // Initialise the list view
         listView = (ListView) parent.findViewById(R.id.list_view);
+        final SwipeDetector swipeDetector = new SwipeDetector();
+        this.listView.setOnTouchListener(swipeDetector);
+        this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                if (swipeDetector.swipeDetected()) {
+                    if (displayAllClients) {
+                        //displayDocumentHistory(position, swipeDetector.getAction());
+                    } else {
+                        displayClientSessionHistory(position, swipeDetector.getAction());
+                    }
+                }
+            }
+        });
 
         final FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
         if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_CREATE_SESSIONS) ||
@@ -186,7 +202,7 @@ public class ListSessionClientsFragment extends Fragment {
         }
         int attendees = 0;
         // Build 110 - Add Reserved option
-        int reserves =0;
+        int reserves = 0;
         // Create the adapter
         registerAdapterList = new ArrayList<>();
         ArrayList<ClientSession> clientSessions = localDB.getAllClientSessions(session);
@@ -195,7 +211,7 @@ public class ListSessionClientsFragment extends Fragment {
                 case ALL:
                     registerAdapterList.add(new RegisterEntry(clientSession));
                     if (clientSession.isAttended()) attendees++;
-                    if (clientSession.isReserved()){
+                    if (clientSession.isReserved()) {
                         reserves++;
                     }
                     break;
@@ -203,7 +219,7 @@ public class ListSessionClientsFragment extends Fragment {
                     if (!clientSession.getCancelledFlag()) {
                         registerAdapterList.add(new RegisterEntry(clientSession));
                         if (clientSession.isAttended()) attendees++;
-                        if (clientSession.isReserved()){
+                        if (clientSession.isReserved()) {
                             reserves++;
                         }
                     }
@@ -225,14 +241,15 @@ public class ListSessionClientsFragment extends Fragment {
                 Collections.sort(registerAdapterList, comparatorREAge);
                 break;
         }
-        RegisterEntryAdapter adapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
-        this.listView.setAdapter(adapter);
+        //RegisterEntryAdapter adapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
+        registerAdapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
+        this.listView.setAdapter(registerAdapter);
         // Report the number of hidden documents in the footer.
         TextView footer = (TextView) getActivity().findViewById(R.id.footer);
         if (session.getReferenceDate().before(new Date())) {
             footer.setText(String.format(Locale.UK, "Attended: %d, DNA: %d, Reserves: %d", attendees, registerAdapterList.size() - attendees - reserves, reserves));
         } else {
-            footer.setText(String.format(Locale.UK, "%d clients invited, %d reserves.", registerAdapterList.size()-reserves, reserves));
+            footer.setText(String.format(Locale.UK, "%d clients invited, %d reserves.", registerAdapterList.size() - reserves, reserves));
         }
     }
 
@@ -297,7 +314,7 @@ public class ListSessionClientsFragment extends Fragment {
                         clientEntry.setInvited(false);
                         clientEntry.setReserved(false);
                     } else {
-                        if (registerEntry.getClientSession().isReserved()){
+                        if (registerEntry.getClientSession().isReserved()) {
                             clientEntry.setInvited(false);
                             clientEntry.setReserved(true);
                         } else {
@@ -319,11 +336,19 @@ public class ListSessionClientsFragment extends Fragment {
     private static final int MENU_SORT_LAST_FIRST = Menu.FIRST + 11;
     private static final int MENU_SORT_ATTENDED = Menu.FIRST + 12;
     private static final int MENU_SORT_AGE = Menu.FIRST + 13;
+    private static final int MENU_BROADCAST = Menu.FIRST + 20;
 
     private MenuItem searchItem;
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+
+        //SHARE
+        // Build 126 - share is only relevant in Read fragments
+        MenuItem shareOption = menu.findItem(R.id.menu_item_share);
+        shareOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        shareOption.setVisible(false);
+        shareOption.setEnabled(false);
 
         if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_ALLOW_EXPORT)) {
             MenuItem selectExport = menu.add(0, MENU_EXPORT, 1, "Export to Google Sheets");
@@ -345,6 +370,8 @@ public class ListSessionClientsFragment extends Fragment {
         }
         MenuItem sortAgeOption = menu.add(0, MENU_SORT_AGE, 13, "Sort by Age");
         sortAgeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        MenuItem broadcastOption = menu.add(0, MENU_BROADCAST, 20, "Broadcast Message");
+        broadcastOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
         // Build 105 Add Search at client level
         searchItem = menu.findItem(R.id.action_search);
@@ -440,6 +467,34 @@ public class ListSessionClientsFragment extends Fragment {
                 sortMode = SortMode.AGE;
                 onResume();
                 return true;
+            // Build 119 30 May 2019 Broadcast handler
+            case MENU_BROADCAST:
+
+                // Load Broadcast Client List from the selected clients
+                ArrayList<Client> broadcastClientList = new ArrayList<>();
+                for (RegisterEntry entry : registerAdapterList){
+                    broadcastClientList.add(entry.getClientSession().getClient());
+                }
+                ((ListActivity)getActivity()).setBroadcastClientList(broadcastClientList);
+                // Start the Broadcast fragment
+                fragmentManager = getFragmentManager();
+                fragmentTransaction = fragmentManager.beginTransaction();
+                fragment = new BroadcastMessageFragment();
+                fragmentTransaction.replace(R.id.content, fragment);
+                fragmentTransaction.addToBackStack(null);
+                fragmentTransaction.commit();
+                /*
+                new AlertDialog.Builder(getActivity())
+                        .setTitle("Not Implemented Yet")
+                        .setMessage("Unfortunately, this option is not yet available.")
+                        .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                            }
+                        })
+                        .show();
+                 */
+                return true;
             default:
                 // Build 105 - Added search so allow search option to return false
                 //throw new CRISException("Unexpected menu option:" + item.getItemId());
@@ -461,13 +516,49 @@ public class ListSessionClientsFragment extends Fragment {
                 .show();
     }
 
+    private void displayClientSessionHistory(int position, SwipeDetector.Action action) {
+        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+        RegisterEntry registerEntry = registerAdapter.getItem(position);
+        ClientSession clientSession = registerEntry.getClientSession();
+        Client client = clientSession.getClient();
+        //Loop through all instances of the document gathering data
+        String history = "";
+        ArrayList<UUID> recordIDs = localDB.getRecordIDs(clientSession);
+        for (int i = 0; i < recordIDs.size(); i++) {
+            boolean isEarliest = (i == recordIDs.size() - 1);
+            history += localDB.getDocumentMetaData(recordIDs.get(i), isEarliest, action);
+            if (!isEarliest) {
+                history += ClientSession.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
+            }
+
+        }
+        // Add some detail about the session
+        if (action.equals(SwipeDetector.Action.RL)) {
+
+            if (clientSession.getSession() != null) {
+                history += String.format("\nAssociated Session:\n\nName: %s\nDate: %s\nID: %s\n",
+                        clientSession.getSession().getSessionName(),
+                        sDateTime.format(clientSession.getSession().getReferenceDate()),
+                        clientSession.getSession().getDocumentID());
+            }
+
+        }
+        history += String.format("\nThe current document contents are:\n\n%s\n%s\n",
+                client.textSummary(),
+                clientSession.textSummary());
+        Intent intent = new Intent(getActivity(), AlertAndContinue.class);
+        intent.putExtra("title", String.format("Change History - %s", "Client Session"));
+        intent.putExtra("message", history);
+        startActivity(intent);
+    }
+
     private Comparator<RegisterEntry> comparatorRELastFirst = new Comparator<RegisterEntry>() {
         @Override
         public int compare(RegisterEntry r1, RegisterEntry r2) {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
             // Build 110 - Added reserved option
-            if (o1.isReserved() != o2.isReserved()){
+            if (o1.isReserved() != o2.isReserved()) {
                 if (o1.isReserved()) return 1;
                 else return -1;
             } else if (o1.getClient().getLastName().equals(o2.getClient().getLastName())) {
@@ -484,7 +575,7 @@ public class ListSessionClientsFragment extends Fragment {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
             // Build 110 - Added reserved option
-            if (o1.isReserved() != o2.isReserved()){
+            if (o1.isReserved() != o2.isReserved()) {
                 if (o1.isReserved()) return 1;
                 else return -1;
             } else if (o1.isAttended() == o2.isAttended()) {
@@ -510,7 +601,7 @@ public class ListSessionClientsFragment extends Fragment {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
             // Build 110 - Added reserved option
-            if (o1.isReserved() != o2.isReserved()){
+            if (o1.isReserved() != o2.isReserved()) {
                 if (o1.isReserved()) return 1;
                 else return -1;
             } else if (o1.getClient().getFirstNames().equals(o2.getClient().getFirstNames())) {
@@ -527,7 +618,7 @@ public class ListSessionClientsFragment extends Fragment {
             ClientSession o1 = r1.getClientSession();
             ClientSession o2 = r2.getClientSession();
             // Build 110 - Added reserved option
-            if (o1.isReserved() != o2.isReserved()){
+            if (o1.isReserved() != o2.isReserved()) {
                 if (o1.isReserved()) return 1;
                 else return -1;
             } else if (o1.getClient().getDateOfBirth().equals(o2.getClient().getDateOfBirth())) {
@@ -1290,7 +1381,7 @@ public class ListSessionClientsFragment extends Fragment {
 
             ImageView cameraIcon = (ImageView) convertView.findViewById(R.id.camera_icon);
             // Build 111 - Fix bug where current case is null
-            if (currentCase == null){
+            if (currentCase == null) {
                 cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_grey));
             } else {
                 if (currentCase.isPhotographyConsentFlag()) {
@@ -1318,11 +1409,10 @@ public class ListSessionClientsFragment extends Fragment {
                 else return 1;
             }
             // Build 110 - Added reserved option
-            else if (o1.isReserved() != o2.isReserved()){
+            else if (o1.isReserved() != o2.isReserved()) {
                 if (o1.isReserved()) return -1;
                 else return 1;
-            }
-            else {
+            } else {
                 if (o1.getClient().getLastName().equals(o2.getClient().getLastName())) {
                     return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
                 } else {
@@ -1340,11 +1430,10 @@ public class ListSessionClientsFragment extends Fragment {
                 else return 1;
             }
             // Build 110 - Added reserved option
-            else if (o1.isReserved() != o2.isReserved()){
+            else if (o1.isReserved() != o2.isReserved()) {
                 if (o1.isReserved()) return -1;
                 else return 1;
-            }
-            else {
+            } else {
                 if (o1.getClient().getFirstNames().equals(o2.getClient().getFirstNames())) {
                     return o1.getClient().getLastName().compareTo(o2.getClient().getLastName());
                 } else {
@@ -1362,11 +1451,10 @@ public class ListSessionClientsFragment extends Fragment {
                 else return 1;
             }
             // Build 110 - Added reserved option
-            else if (o1.isReserved() != o2.isReserved()){
+            else if (o1.isReserved() != o2.isReserved()) {
                 if (o1.isReserved()) return -1;
                 else return 1;
-            }
-            else {
+            } else {
                 if (o1.getClient().getDateOfBirth().equals(o2.getClient().getDateOfBirth())) {
                     // Probably twins so compare on first name
                     return o1.getClient().getFirstNames().compareTo(o2.getClient().getFirstNames());
@@ -1511,7 +1599,7 @@ public class ListSessionClientsFragment extends Fragment {
             } else {
                 // Not cancelled so currently either invited or reserved
                 if ((clientSession.isReserved() && mode.equals(AttendanceMode.INVITED) ||
-                        (!clientSession.isReserved() && mode.equals(AttendanceMode.RESERVED)))){
+                        (!clientSession.isReserved() && mode.equals(AttendanceMode.RESERVED)))) {
                     // Switch to invited/reserved
                     if (mode.equals(AttendanceMode.RESERVED)) {
                         clientSession.setReserved(true);
@@ -1827,6 +1915,10 @@ public class ListSessionClientsFragment extends Fragment {
                 }
                 if (currentCase.getGroup() != null) {
                     group = currentCase.getGroup().getItemValue();
+                }
+                // Build 139 - Second Group
+                if (currentCase.getGroup2() != null) {
+                    group += " +1";
                 }
                 if (currentCase.getKeyWorker() != null) {
                     keyworkerName = currentCase.getKeyWorker().getFullName();
