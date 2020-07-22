@@ -14,15 +14,18 @@ package solutions.cris.read;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -32,6 +35,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
@@ -123,15 +127,27 @@ public class ReadClientHeader extends ListActivity {
     @Override
     public void onResume() {
         super.onResume();
+        // Build 146 - Re-written the swipe handler to reload the set/getDocument since a change
+        // to the EditNote fragment had set the Document to null. This code now re-instates the
+        // document, even if it hasn't changed.
         // Handle the swipe value
         if (swipeValue != 0) {
             currentPosition += swipeValue;
-            if (currentPosition >= 0 && currentPosition < menuItem.getDocumentList().size()) {
-                setDocument(menuItem.getDocumentList().get(currentPosition));
-                if (getDocument().getDocumentType() != Document.PdfDocument) {
-                    swipeValue = 0;
-                }
-
+            if (currentPosition < 0 || currentPosition >= menuItem.getDocumentList().size()) {
+                // Leave currentPosition unchanged
+                currentPosition -= swipeValue;
+                swipeValue = 0;
+            }
+        }
+        ArrayList<Document> docList = menuItem.getDocumentList();
+        Document nextDocument = docList.get(currentPosition);
+        if (nextDocument == null) {
+            finish();
+        } else {
+            //setDocument(menuItem.getDocumentList().get(currentPosition));
+            setDocument(nextDocument);
+            if (getDocument().getDocumentType() != Document.PdfDocument) {
+                swipeValue = 0;
             } else {
                 finish();
             }
@@ -181,7 +197,8 @@ public class ReadClientHeader extends ListActivity {
     }
 
     private void doReadDocument() {
-        localDB.read(getDocument(), getCurrentUser());
+        Document thisDocument = getDocument();
+        localDB.read(thisDocument, getCurrentUser());
         FragmentManager fragmentManager = getFragmentManager();
         FragmentTransaction fragmentTransaction;
         Fragment fragment;

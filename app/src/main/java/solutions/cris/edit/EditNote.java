@@ -14,18 +14,22 @@ package solutions.cris.edit;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.app.DatePickerDialog;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.view.MenuItemCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.ShareActionProvider;
 import androidx.appcompat.widget.Toolbar;
+
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -133,8 +137,8 @@ public class EditNote extends Fragment {
         // Build 119 2 May 2019 Introduced an error where note could be created with a
         // null note type id. In this case it can be set to Text Message
         // Note, this only affects a few note documents created before the bug was fixed
-        if (editDocument != null && editDocument.getNoteTypeID() == null){
-            NoteType noteType = (NoteType) localDB.getListItem("Text Message",ListType.NOTE_TYPE);
+        if (editDocument != null && editDocument.getNoteTypeID() == null) {
+            NoteType noteType = (NoteType) localDB.getListItem("Text Message", ListType.NOTE_TYPE);
             editDocument.setNoteTypeID(noteType.getListItemID());
         }
         // Now clear the document in the parent activity so that it is not checked
@@ -161,15 +165,18 @@ public class EditNote extends Fragment {
         });
 
         // ContentHintText
-        contentHintTextView = (TextView) parent.findViewById(R.id.content_hint_text);
-        contentHintTextView.setText(getContentHintText());
-        contentHintTextDisplayed = toggleHint(contentHintTextView, contentHintTextDisplayed);
-        contentHintTextView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                contentHintTextDisplayed = toggleHint(contentHintTextView, contentHintTextDisplayed);
-            }
-        });
+        // Build 153 - Disable the Hashtag facility
+        LinearLayout contentHintBox = (LinearLayout) parent.findViewById(R.id.content_hint_box);
+        contentHintBox.setVisibility(View.GONE);
+        //contentHintTextView = (TextView) parent.findViewById(R.id.content_hint_text);
+        //contentHintTextView.setText(getContentHintText());
+        //contentHintTextDisplayed = toggleHint(contentHintTextView, contentHintTextDisplayed);
+        //contentHintTextView.setOnClickListener(new View.OnClickListener() {
+        //    @Override
+        //    public void onClick(View v) {
+        //        contentHintTextDisplayed = toggleHint(contentHintTextView, contentHintTextDisplayed);
+        //   }
+        //});
 
         noteTypeSpinner = (Spinner) parent.findViewById(R.id.note_type_spinner);
         noteTypeTextView = (TextView) parent.findViewById(R.id.note_type_read_text);
@@ -212,7 +219,6 @@ public class EditNote extends Fragment {
                 toolbar.setTitle(getString(R.string.app_name) + " - New Note");
                 doShowFab();
                 hintBox.setVisibility(View.VISIBLE);
-                // Initialise the NodeType Spinner
                 noteTypePickList = new PickList(localDB, ListType.NOTE_TYPE);
                 ArrayAdapter<String> noteTypeAdapter = new
                         ArrayAdapter<>(getActivity(), android.R.layout.simple_spinner_item, noteTypePickList.getOptions());
@@ -254,13 +260,14 @@ public class EditNote extends Fragment {
                 authorView.setText(author.getFullName());
                 creationDateView.setText(sDateTime.format(editDocument.getCreationDate()));
                 responseView.setVisibility(View.GONE);
-                contentView.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        insertHashtag();
-                        return false;
-                    }
-                });
+                // Build 153 - Disable the Hashtag facility
+                //contentView.setOnLongClickListener(new View.OnLongClickListener() {
+                //    @Override
+                //    public boolean onLongClick(View v) {
+                //        insertHashtag();
+                //        return false;
+                //    }
+                //});
                 // Cancel Button
                 cancelButton.setVisibility(View.VISIBLE);
                 cancelButton.setOnClickListener(new View.OnClickListener() {
@@ -342,8 +349,8 @@ public class EditNote extends Fragment {
                     public void onClick(View view) {
                         if (validateEdit()) {
                             editDocument.save(false, author);
-                                FragmentManager fragmentManager = getFragmentManager();
-                                fragmentManager.popBackStack();
+                            FragmentManager fragmentManager = getFragmentManager();
+                            fragmentManager.popBackStack();
                         }
                     }
                 });
@@ -409,13 +416,14 @@ public class EditNote extends Fragment {
                 }
                 stickyDateView.setText(stickyText);
                 responseView.setVisibility(View.VISIBLE);
-                responseView.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        insertHashtag();
-                        return false;
-                    }
-                });
+                // Build 153 - Disable the Hashtag facility
+                //responseView.setOnLongClickListener(new View.OnLongClickListener() {
+                //    @Override
+                //    public boolean onLongClick(View v) {
+                //        insertHashtag();
+                //        return false;
+                //    }
+                //});
                 // Cancel Button
                 cancelButton.setVisibility(View.VISIBLE);
                 cancelButton.setOnClickListener(new View.OnClickListener() {
@@ -452,7 +460,7 @@ public class EditNote extends Fragment {
     // MENU BLOCK
     private static final int MENU_CANCEL_DOCUMENT = Menu.FIRST + 1;
     private static final int MENU_UNCANCEL_DOCUMENT = Menu.FIRST + 2;
-    private static final int MENU_HASHTAG = Menu.FIRST +3;
+    private static final int MENU_HASHTAG = Menu.FIRST + 3;
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
@@ -527,12 +535,12 @@ public class EditNote extends Fragment {
         String[] emails = emailList.toArray(new String[0]);
         shareIntent.putExtra(Intent.EXTRA_EMAIL, emails);
         // Build 114 22 May 2019 - Use contact number if text
-        shareIntent.putExtra("address",  client.getContactNumber());
+        shareIntent.putExtra("address", client.getContactNumber());
         // Build 114 22 May 2019 - Use different body for Email/Text Message
         if (editDocument.getNoteType().getItemValue().toLowerCase().indexOf("email") != -1 ||
-                editDocument.getNoteType().getItemValue().toLowerCase().indexOf("text message") != -1){
+                editDocument.getNoteType().getItemValue().toLowerCase().indexOf("text message") != -1) {
             body = editDocument.getContent();
-            if (editDocument.getResponseContent() != null){
+            if (editDocument.getResponseContent() != null) {
                 body += "\n" + editDocument.getResponseContent();
             }
         }
@@ -553,7 +561,7 @@ public class EditNote extends Fragment {
             public void onClick(DialogInterface dialog, int which) {
                 // Field to insert hashtag depends on  mode
                 EditText editView;
-                if (mode == Document.Mode.RESPONSE){
+                if (mode == Document.Mode.RESPONSE) {
                     editView = responseView;
                 } else {
                     editView = contentView;
@@ -563,7 +571,7 @@ public class EditNote extends Fragment {
                 int cursorPos = editView.getSelectionStart();
                 String content = editView.getText().toString();
                 String newContent = String.format("%s %s %s",
-                        content.substring(0,cursorPos),
+                        content.substring(0, cursorPos),
                         hashTag,
                         content.substring(cursorPos));
                 editView.setText(newContent);
@@ -604,7 +612,7 @@ public class EditNote extends Fragment {
                     fab.setVisibility(View.GONE);
                 } else {
                     // Check access
-                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_ALL_DOCUMENTS)  ||
+                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_ALL_DOCUMENTS) ||
                             currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_NOTES) ||
                             currentUser.getRole().hasPrivilege(Role.PRIVILEGE_CREATE_NOTES)) {
                         fab.setVisibility(View.VISIBLE);
@@ -634,7 +642,7 @@ public class EditNote extends Fragment {
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
             TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
-            cancelReason.setText(String.format("Reason: %s",editDocument.getCancellationReason()));
+            cancelReason.setText(String.format("Reason: %s", editDocument.getCancellationReason()));
         }
     }
 
@@ -659,8 +667,8 @@ public class EditNote extends Fragment {
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     editDocument.save(mode == Document.Mode.NEW, author);
-                                        FragmentManager fragmentManager = getFragmentManager();
-                                        fragmentManager.popBackStack();
+                                    FragmentManager fragmentManager = getFragmentManager();
+                                    fragmentManager.popBackStack();
                                 }
                             }
                         }
@@ -678,8 +686,8 @@ public class EditNote extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 editDocument.save(mode == Document.Mode.NEW, author);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                FragmentManager fragmentManager = getFragmentManager();
+                fragmentManager.popBackStack();
             }
         }
     }
@@ -705,10 +713,12 @@ public class EditNote extends Fragment {
         // should check the fields in the displayed order
         View focusView = null;
 
-            // Clear any existing errors
-            stickyDateView.setError(null);
+        // Clear any existing errors
+        stickyDateView.setError(null);
 
-            //NoteType
+        //NoteType
+        // In edit mode, note type cannot be changed
+        if (mode == Document.Mode.NEW) {
             ListItem newNoteType = noteTypePickList.getListItems().get(noteTypeSpinner.getSelectedItemPosition());
             // Test for Please select
             if (newNoteType.getItemOrder() == -1) {
@@ -722,27 +732,28 @@ public class EditNote extends Fragment {
                 // PickList contained
                 editDocument.setNoteType(localDB.getListItem(editDocument.getNoteTypeID()));
             }
+        }
 
-            // StickyFlag
-            editDocument.setStickyFlag(stickyFlagView.isChecked());
+        // StickyFlag
+        editDocument.setStickyFlag(stickyFlagView.isChecked());
 
-            // StickyDate
-            String sStickyDate = stickyDateView.getText().toString().trim();
-            if (TextUtils.isEmpty(sStickyDate)) {
-                editDocument.setStickyDate(new Date(Long.MIN_VALUE));
+        // StickyDate
+        String sStickyDate = stickyDateView.getText().toString().trim();
+        if (TextUtils.isEmpty(sStickyDate)) {
+            editDocument.setStickyDate(new Date(Long.MIN_VALUE));
+        } else {
+            Date dStickyDate = CRISUtil.parseDate(sStickyDate);
+            if (dStickyDate == null) {
+                stickyDateView.setError(getString(R.string.error_invalid_date));
+                focusView = stickyDateView;
+                success = false;
             } else {
-                Date dStickyDate = CRISUtil.parseDate(sStickyDate);
-                if (dStickyDate == null) {
-                    stickyDateView.setError(getString(R.string.error_invalid_date));
-                    focusView = stickyDateView;
-                    success = false;
-                } else {
-                    editDocument.setStickyDate(dStickyDate);
-                }
+                editDocument.setStickyDate(dStickyDate);
             }
+        }
 
-            // Content
-            editDocument.setContent(contentView.getText().toString().trim());
+        // Content
+        editDocument.setContent(contentView.getText().toString().trim());
 
         if (!success) {
             focusView.requestFocus();
@@ -757,24 +768,24 @@ public class EditNote extends Fragment {
         // Holds most recent view to fail validation. The validation
         // should check the fields in the displayed order
         View focusView = null;
-            // Clear any existing errors
-            stickyDateView.setError(null);
-            // StickyFlag
-            editDocument.setStickyFlag(stickyFlagView.isChecked());
-            // StickyDate
-            String sStickyDate = stickyDateView.getText().toString().trim();
-            if (TextUtils.isEmpty(sStickyDate)) {
-                editDocument.setStickyDate(new Date(Long.MIN_VALUE));
+        // Clear any existing errors
+        stickyDateView.setError(null);
+        // StickyFlag
+        editDocument.setStickyFlag(stickyFlagView.isChecked());
+        // StickyDate
+        String sStickyDate = stickyDateView.getText().toString().trim();
+        if (TextUtils.isEmpty(sStickyDate)) {
+            editDocument.setStickyDate(new Date(Long.MIN_VALUE));
+        } else {
+            Date dStickyDate = CRISUtil.parseDate(sStickyDate);
+            if (dStickyDate == null) {
+                stickyDateView.setError(getString(R.string.error_invalid_date));
+                focusView = stickyDateView;
+                success = false;
             } else {
-                Date dStickyDate = CRISUtil.parseDate(sStickyDate);
-                if (dStickyDate == null) {
-                    stickyDateView.setError(getString(R.string.error_invalid_date));
-                    focusView = stickyDateView;
-                    success = false;
-                } else {
-                    editDocument.setStickyDate(dStickyDate);
-                }
+                editDocument.setStickyDate(dStickyDate);
             }
+        }
 
         if (!success) {
             focusView.requestFocus();

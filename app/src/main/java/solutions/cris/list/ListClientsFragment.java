@@ -552,7 +552,16 @@ public class ListClientsFragment extends Fragment {
         MenuItem sortAgeOption = menu.add(0, MENU_SORT_AGE, 23, "Sort by Date of Birth");
         sortAgeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-        boolean myClients = ((ListClients) getActivity()).isMyClients();
+        // Build 151 - Spurious crash seen when getActivity returned null
+        //boolean myClients = ((ListClients) getActivity()).isMyClients();
+        boolean myClients = false;
+        try{
+            myClients = ((ListClients) getActivity()).isMyClients();
+        } catch (Exception ex){
+            // Try to recover by exiting
+            FragmentManager fragmentManager = getFragmentManager();
+            fragmentManager.popBackStack();
+        }
         if (myClients || currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_CLIENTS)) {
             MenuItem selectOverdueOption = menu.add(0, MENU_SELECT_OVERDUE, 7, "Show Clients Overdue for Update");
             selectOverdueOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -786,7 +795,6 @@ public class ListClientsFragment extends Fragment {
 
             // Build 119 30 May 2019 Broadcast handler
             case MENU_BROADCAST:
-                /*
                 // Load Broadcast Client List from the selected clients
                 ArrayList<Client> broadcastClientList = new ArrayList<>();
                 for (Client client: ((ListActivity) getActivity()).getClientAdapterList()){
@@ -800,7 +808,7 @@ public class ListClientsFragment extends Fragment {
                 fragmentTransaction.replace(R.id.content, fragment);
                 fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
-                */
+                /*
                 new AlertDialog.Builder(getActivity())
                         .setTitle("Not Implemented Yet")
                         .setMessage("Unfortunately, this option is not yet available.")
@@ -810,7 +818,7 @@ public class ListClientsFragment extends Fragment {
                             }
                         })
                         .show();
-
+                */
                 return true;
             default:
                 return false;
@@ -1056,6 +1064,11 @@ public class ListClientsFragment extends Fragment {
                 // since EditClient is possible from both list of clients and list of documents
                 // and it used getDocument to establish the client document to be edited.
                 Client client = adapter.getItem(position);
+                // Build 151 - Just in case the client has already been edited in this
+                // list fragment, reload it before editing it again
+                //client = (Client) localDB.getDocument(client.getDocumentID());
+                // Re-load unnecessary because a check is made in onResume and the
+                // client has been reloaded in this adapter
                 ((ListActivity) getActivity()).setDocument(client);
                 listViewState = listView.onSaveInstanceState();
                 // Save this recordID to enable check for change to client

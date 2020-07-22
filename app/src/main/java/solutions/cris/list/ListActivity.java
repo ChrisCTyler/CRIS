@@ -37,6 +37,7 @@ import solutions.cris.edit.EditPdfDocument;
 import solutions.cris.exceptions.CRISException;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
+import solutions.cris.object.ClientSession;
 import solutions.cris.object.Document;
 import solutions.cris.object.Session;
 import solutions.cris.object.User;

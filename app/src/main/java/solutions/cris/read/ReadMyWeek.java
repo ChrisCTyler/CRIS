@@ -90,8 +90,13 @@ public class ReadMyWeek extends Fragment {
             cancelBoxView.setVisibility(View.VISIBLE);
             TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
             String byText = "by ";
-            User cancelUser = localDB.getUser(editDocument.getCancelledByID());
-            byText += cancelUser.getFullName() + " on ";
+            // Build 150 - Allow for earlier bug which didn't set the cancelled by used
+            if (editDocument.getCancelledByID() == null){
+                byText += "Unknown User" + " on ";
+            } else {
+                User cancelUser = localDB.getUser(editDocument.getCancelledByID());
+                byText += cancelUser.getFullName() + " on ";
+            }
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
             TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);

@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -537,17 +538,18 @@ public class LocalDB {
         database.execSQL(sql);
         // Get these rows in a cursor
         String[] tableColumns = new String[]{"*"};
-        String whereClause = String.format("SyncID = '%s'",newSyncID.toString());
+        String whereClause = String.format("SyncID = '%s'", newSyncID.toString());
         Cursor unsyncedRecords = database.query(tableName, tableColumns, whereClause, null, null, null, null);
         return unsyncedRecords;
     }
+
     public Cursor getUnsyncedRecords(String tableName, UUID newSyncID) {
         // This is only used for Follows and ReadAudits which will be relatively small batches
         String sql = "UPDATE " + tableName + " SET SyncID = \"" + newSyncID.toString() + "\" WHERE SyncID is null";
         database.execSQL(sql);
         // Get these rows in a cursor
         String[] tableColumns = new String[]{"*"};
-        String whereClause = String.format("SyncID = '%s'",newSyncID.toString());
+        String whereClause = String.format("SyncID = '%s'", newSyncID.toString());
         Cursor unsyncedRecords = database.query(tableName, tableColumns, whereClause, null, null, null, null);
         return unsyncedRecords;
     }
@@ -636,7 +638,8 @@ public class LocalDB {
     public ArrayList<User> getAllUsers() {
         ArrayList<User> users = new ArrayList<>();
         String[] tableColumns = new String[]{"SerialisedObject"};
-        String whereClause = "HistoryDate = ?";
+        // Ignore The Client User
+        String whereClause = "HistoryDate = ? AND UserID != 'b800cf1b-4bfc-4915-8545-14e99e5e7669'";
         String[] whereArgs = new String[]{Long.toString(Long.MIN_VALUE)};
         Cursor cursor = database.query("User", tableColumns, whereClause, whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
@@ -846,93 +849,112 @@ public class LocalDB {
                 currentUser.getUserID().toString(),
                 currentUser.getUserID().toString(),
                 Client.nonClientDocumentID.toString()};
-        Cursor cursor = database.rawQuery(query, selectionArgs);
-        if (cursor.getCount() > 0) {
-            cursor.moveToFirst();
-            while (!cursor.isAfterLast()) {
-                // Test the document's visibility. Library documents are always visible
-                // Other documents depend on the user's privileges
-                // 19 Oct 2017 Build 089 Restrict Unread docs to Notes and MyWeek
-                int documentType = cursor.getInt(0);
-                //if (documentType != Document.Session &&
-                //        documentType != Document.ClientSession) {
-                if (documentType == Document.Note ||
-                        documentType == Document.MyWeek) {
-                    String clientID = cursor.getString(2);
-                    boolean addDocument = false;
-                    if (clientID.equals(Document.nonClientDocumentID.toString())) {
-                        addDocument = true;
-                    } else {
-                        Client client = (Client) getDocument(UUID.fromString(clientID));
-                        // Build 098 - test here (instead of Main so that count is correct in Sync)
-                        // Due to an earlier bug, there can be spurious documents which are not
-                        // linked to a client. These should be ignored
-                        if (client != null) {
-                            if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+        // Build 151 - Belt and braces
+        try {
+            Cursor cursor = database.rawQuery(query, selectionArgs);
+            if (cursor.getCount() > 0) {
+                // Build 151 - Spurious error where cursor exists but index crashes
+                // Added try/catch to restart after crash but limit to 10 to
+                // prevent an infinite loop if cursor.MoveToNext() does anything odd.
+                int exceptionCount = 0;
+                cursor.moveToFirst();
+                while (!cursor.isAfterLast()) {
+                    // Build 151 - Trap indexing crash
+                    try {
+                        // Test the document's visibility. Library documents are always visible
+                        // Other documents depend on the user's privileges
+                        // 19 Oct 2017 Build 089 Restrict Unread docs to Notes and MyWeek
+                        int documentType = cursor.getInt(0);
+                        //if (documentType != Document.Session &&
+                        //        documentType != Document.ClientSession) {
+                        if (documentType == Document.Note ||
+                                documentType == Document.MyWeek) {
+                            String clientID = cursor.getString(2);
+                            boolean addDocument = false;
+                            if (clientID.equals(Document.nonClientDocumentID.toString())) {
                                 addDocument = true;
-                            } else if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
-                                // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
-                                // NB: Test for Sticky Notes is later
+                            } else {
+                                Client client = (Client) getDocument(UUID.fromString(clientID));
+                                // Build 098 - test here (instead of Main so that count is correct in Sync)
+                                // Due to an earlier bug, there can be spurious documents which are not
+                                // linked to a client. These should be ignored
+                                if (client != null) {
+                                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+                                        addDocument = true;
+                                    } else if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
+                                        // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
+                                        // NB: Test for Sticky Notes is later
+                                        if (documentType == Document.Note) {
+                                            addDocument = true;
+                                        }
+                                    }
+                                }
+                                //else{
+                                //    // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
+                                //    switch (documentType) {
+                                //        case Document.Client:
+                                //        case Document.Case:
+                                //        case Document.Contact:
+                                //        case Document.Note:
+                                //            if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)){
+                                //                addDocument = true;
+                                //            }
+                                //           break;
+                                //        default:
+                                //            addDocument = false;
+                                //    }
+                                //}
+                                if (addDocument) {
+                                    // Final check that the document's creation date is after the follow date
+                                    Date docDate = new Date(cursor.getLong(3));
+                                    Date followDate = followStartDate(currentUser.getUserID(), UUID.fromString(clientID));
+                                    // Build 101 - Display docs with same date as follow date
+                                    //if (!followDate.before(docDate)) {
+                                    if (docDate.before(followDate)) {
+                                        addDocument = false;
+                                    }
+                                }
+                            }
+                            if (addDocument) {
+                                Document document = deSerializeDocument(cursor.getBlob(1), documentType);
+                                // Build 086 - Special case for Notes. If READ_NOTES (demographic documents)
+                                // only sticky notes are allowed
                                 if (documentType == Document.Note) {
-                                    addDocument = true;
+                                    Note note = (Note) document;
+                                    if (!currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+                                        if (!note.isStickyFlag()) {
+                                            document = null;
+                                        }
+                                    }
+                                    // Build 127 - Remove Text Message, Phone Message and Email Notes
+                                    if (note.getNoteType().getItemValue().toLowerCase().equals("text message")) {
+                                        document = null;
+                                    } else if (note.getNoteType().getItemValue().toLowerCase().equals("phone message")) {
+                                        document = null;
+                                    } else if (note.getNoteType().getItemValue().toLowerCase().equals("email")) {
+                                        document = null;
+                                    }
+                                }
+                                if (document != null) {
+                                    documents.add(document);
                                 }
                             }
                         }
-                        //else{
-                        //    // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
-                        //    switch (documentType) {
-                        //        case Document.Client:
-                        //        case Document.Case:
-                        //        case Document.Contact:
-                        //        case Document.Note:
-                        //            if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)){
-                        //                addDocument = true;
-                        //            }
-                        //           break;
-                        //        default:
-                        //            addDocument = false;
-                        //    }
-                        //}
-                        if (addDocument) {
-                            // Final check that the document's creation date is after the follow date
-                            Date docDate = new Date(cursor.getLong(3));
-                            Date followDate = followStartDate(currentUser.getUserID(), UUID.fromString(clientID));
-                            // Build 101 - Display docs with same date as follow date
-                            //if (!followDate.before(docDate)) {
-                            if (docDate.before(followDate)) {
-                                addDocument = false;
-                            }
+                    } catch (Exception ex) {
+                        // Build 151 - Allow 10 crashes then exit from loop
+                        if (exceptionCount < 10) {
+                            exceptionCount++;
+                        } else {
+                            break;
                         }
                     }
-                    if (addDocument) {
-                        Document document = deSerializeDocument(cursor.getBlob(1), documentType);
-                        // Build 086 - Special case for Notes. If READ_NOTES (demographic documents)
-                        // only sticky notes are allowed
-                        if (documentType == Document.Note) {
-                            Note note = (Note) document;
-                            if (!currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
-                                if (!note.isStickyFlag()) {
-                                    document = null;
-                                }
-                            }
-                            // Build 127 - Remove Text Message, Phone Message and Email Notes
-                            if (note.getNoteType().getItemValue().toLowerCase().equals("text message")) {
-                                document = null;
-                            } else if (note.getNoteType().getItemValue().toLowerCase().equals("phone message")) {
-                                document = null;
-                            } else if (note.getNoteType().getItemValue().toLowerCase().equals("email")) {
-                                document = null;
-                            }
-                        }
-                        if (document != null) {
-                            documents.add(document);
-                        }
-                    }
+                    cursor.moveToNext();
                 }
-                cursor.moveToNext();
             }
+            cursor.close();
+        } catch (Exception ex){
+            // ignore
         }
-        cursor.close();
         return documents;
     }
 
@@ -1124,6 +1146,7 @@ public class LocalDB {
     public ArrayList<RawDocument> getAllRawDocumentsOfType(int documentType) {
         return getAllRawDocumentsOfType(documentType, new Date(Long.MIN_VALUE), new Date(Long.MAX_VALUE));
     }
+
     public ArrayList<RawDocument> getAllRawDocumentsOfType(int documentType, Date minDate, Date maxDate) {
         ArrayList<RawDocument> documents = new ArrayList<>();
         String[] tableColumns = new String[]{"RecordID, CreationDate, CreatedByID, DocumentID, Cancelled, ClientID, ReferenceDate"};
@@ -1144,13 +1167,13 @@ public class LocalDB {
                 UUID documentID = UUID.fromString(cursor.getString(3));
                 int cancelledInt = cursor.getInt(4);
                 boolean cancelledFlag = false;
-                if (cancelledInt == 1){
+                if (cancelledInt == 1) {
                     cancelledFlag = true;
                 }
                 UUID clientID = UUID.fromString(cursor.getString(5));
                 Date referenceDate = new Date();
                 referenceDate.setTime(cursor.getLong(6));
-                RawDocument document = new RawDocument(recordID,creationDate,createdByID,documentID,cancelledFlag,clientID,referenceDate,documentType);
+                RawDocument document = new RawDocument(recordID, creationDate, createdByID, documentID, cancelledFlag, clientID, referenceDate, documentType);
                 documents.add(document);
                 cursor.moveToNext();
             }
@@ -1171,36 +1194,8 @@ public class LocalDB {
         whereArgs = new String[]{clientID.toString(),
                 Long.toString(Long.MIN_VALUE),
                 Integer.toString(documentType),
-                String.format("%d",startDate.getTime()),
-                String.format("%d",endDate.getTime()),
-                };
-        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
-        if (cursor.getCount() > 0) {
-            cursor.moveToFirst();
-            while (!cursor.isAfterLast()) {
-                Document document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
-                // New document types (post this version) will return as null documents, ignore.
-                if (document != null) {
-                    documents.add(document);
-                }
-                cursor.moveToNext();
-            }
-        }
-        cursor.close();
-        return documents;
-    }
-    public ArrayList<Document> getRangeOfDocumentsOfType(int documentType, Date startDate, Date endDate) {
-        ArrayList<Document> documents = new ArrayList<>();
-        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
-        String whereClause;
-        String[] whereArgs;
-        String orderBy = "ClientID,ReferenceDate";
-        whereClause = "DocumentType = ? AND HistoryDate = ? AND " +
-                "ReferenceDate > ? AND ReferenceDate < ? ";
-        whereArgs = new String[]{Integer.toString(documentType),
-                Long.toString(Long.MIN_VALUE),
-                String.format("%d",startDate.getTime()),
-                String.format("%d",endDate.getTime()),
+                String.format("%d", startDate.getTime()),
+                String.format("%d", endDate.getTime()),
         };
         Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
@@ -1217,6 +1212,36 @@ public class LocalDB {
         cursor.close();
         return documents;
     }
+
+    public ArrayList<Document> getRangeOfDocumentsOfType(int documentType, Date startDate, Date endDate) {
+        ArrayList<Document> documents = new ArrayList<>();
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        String orderBy = "ClientID,ReferenceDate";
+        whereClause = "DocumentType = ? AND HistoryDate = ? AND " +
+                "ReferenceDate > ? AND ReferenceDate < ? ";
+        whereArgs = new String[]{Integer.toString(documentType),
+                Long.toString(Long.MIN_VALUE),
+                String.format("%d", startDate.getTime()),
+                String.format("%d", endDate.getTime()),
+        };
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Document document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+                // New document types (post this version) will return as null documents, ignore.
+                if (document != null) {
+                    documents.add(document);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return documents;
+    }
+
     public ArrayList<Document> getAllDocumentsOfType(UUID clientID, int documentType) {
         ArrayList<Document> documents = new ArrayList<>();
         String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
@@ -1318,8 +1343,6 @@ public class LocalDB {
         cursor.close();
         return documents;
     }
-
-
 
 
     public Document getDocument(UUID documentID) {
@@ -1480,6 +1503,12 @@ public class LocalDB {
         try {
             database.execSQL("BEGIN TRANSACTION");
             if (!newMode) {
+                // Build 144 - There are some circumstances where the document passed in
+                // the parameter may have been superceded by another call to the save
+                // so check we have the most recent document
+                // Build 145 - Wrong solution. This will stop changes being made. Need to
+                // fix at source in ListClientDocumentsFragment
+                //document = getDocument(document.getDocumentID());
                 // Edit so write history date into existing record and clear the SyncID
                 // The history date will also be the Creation date for the new record
                 Date historyDate = new Date();
@@ -1587,6 +1616,235 @@ public class LocalDB {
             throw ex;
         }
         return names.length() - 1;
+    }
+
+    // Build 143 - Download Website MyWeek Questionnaires
+
+    public int downloadWebsiteMyWeeks(JSONObject jsonOutput) {
+        // This is similar to a standard download, but builds a MyWeek document
+        // from the record in the myweek table of teh MyWeek website
+        // It uses a special user The Client rather than the current user so that
+        // 'follow' mechanism is not compromised.
+        User theClient = getUser(User.theClientUser);
+        if (theClient == null) {
+            // One time creation of The Client user.
+            theClient = new User(User.theClientUser);
+            theClient.setEmailAddress("the.client@giggle.com");
+            theClient.setContactNumber("09090909");
+            theClient.setFirstName("The");
+            theClient.setLastName("Client");
+            theClient.setStartDate(new Date());
+            theClient.setRoleID(Role.systemAdministratorID);
+            theClient.setNewPassword("Roger.That");
+            theClient.setPasswordExpiryDate(new Date(Long.MAX_VALUE));
+            theClient.save(true);
+        }
+
+        JSONArray names;
+        try {
+
+            names = jsonOutput.names();
+            for (int i = 0; i < names.length(); i++) {
+                String name = names.getString(i);
+
+                if (!name.equals("result")) {
+                    JSONObject row = jsonOutput.getJSONObject(names.getString(i));
+                    String clientID = row.getString("ClientID");
+                    String sessionID = row.getString("SessionID");
+                    // PHP Dates are seconds.milliseconds from epoch start
+                    Long creationDate = row.getLong("CreationDate") * 1000;
+                    Integer schoolScore = row.getInt("SchoolScore");
+                    Integer friendshipScore = row.getInt("FriendshipScore");
+                    Integer familyScore = row.getInt("FamilyScore");
+                    // Build 148 - Need to encode/decode the Notes to sort out spurious characters
+                    //byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
+                    //String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
+                    // Now create the new MyWeek document
+                    // Build 152 - Bad UUID string seen once. Will follow up if it happens again
+                    UUID clientUUID;
+                    MyWeek myWeek = null;
+                    try {
+                        clientUUID = UUID.fromString(clientID);
+                        myWeek = new MyWeek(theClient, UUID.fromString(clientID));
+                    }
+                    catch (Exception ex){
+                        // Ignore, this will be caught in System Admin MyWeek checker
+                    }
+                    if (myWeek != null) {
+                        Date referenceDate = new Date(creationDate);
+                        myWeek.setReferenceDate(referenceDate);
+                        myWeek.setSchoolScore(schoolScore);
+                        myWeek.setFriendshipScore(friendshipScore);
+                        myWeek.setHomeScore(familyScore);
+                        myWeek.setSessionID(UUID.fromString(sessionID));
+                        // Build 152 - Check for bad decode here and fail gracefully to avoid
+                        // the exception which would lose all subsequent MyWeeks in this batch
+                        try {
+                            byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
+                            String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
+                            myWeek.setNote(notes);
+                        } catch (Exception ex) {
+                            myWeek.setNote("Error decoding the notes, please inform the System Administrator");
+                        }
+                        // Check whether MyWeek link was created from a session register
+                        //Document session = getDocument(UUID.fromString(sessionID));
+                        //if (session != null){
+                        //    myWeek.setSessionID(UUID.fromString(sessionID));
+                        //}
+                        // Always set sessionID even though it tis a randomID for MyWeeks
+                        // created directly from the client record (not the session register)
+                        // This is necessary because it may be a different tablet/smartphone
+                        // that creates the MyWeeks to the one that created the session and
+                        // the session may not have been synced yet.
+
+                        // and save it
+                        myWeek.save(true);
+                    }
+                }
+
+            }
+
+        } catch (JSONException ex) {
+            throw new CRISException("Error parsing JSON data: " + ex.getMessage());
+        } catch (Exception ex) {
+            throw ex;
+        }
+        return names.length() - 1;
+    }
+
+    // Build 148 - Check for missing MyWeek records
+    // Note: Cannot use the SessionID when checking for the existence of MyWeeke documents
+    // since it is only saved (outside of the object) for ClientSession documents, so use
+    // the reference date which is accurate to milli-second so will be unique
+    public RawDocument getRawDocument(int documentType, String ClientID, Long CreationDate) {
+        RawDocument document = null;
+        String[] tableColumns = new String[]{"RecordID, CreationDate, CreatedByID, DocumentID, Cancelled, ClientID, ReferenceDate"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "DocumentType = ? AND HistoryDate = ? AND ClientID = ? AND ReferenceDate = ?";
+        whereArgs = new String[]{Integer.toString(documentType),
+                Long.toString(Long.MIN_VALUE), ClientID, Long.toString(CreationDate)};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            UUID recordID = UUID.fromString(cursor.getString(0));
+            Date creationDate = new Date();
+            creationDate.setTime(cursor.getLong(1));
+            UUID createdByID = UUID.fromString(cursor.getString(2));
+            UUID documentID = UUID.fromString(cursor.getString(3));
+            int cancelledInt = cursor.getInt(4);
+            boolean cancelledFlag = false;
+            if (cancelledInt == 1) {
+                cancelledFlag = true;
+            }
+            UUID clientID = UUID.fromString(cursor.getString(5));
+            Date referenceDate = new Date();
+            referenceDate.setTime(cursor.getLong(6));
+            document = new RawDocument(recordID, creationDate, createdByID, documentID, cancelledFlag, clientID, referenceDate, documentType);
+        }
+        cursor.close();
+        return document;
+    }
+
+    public String checkWebsiteMyWeeks(JSONObject jsonOutput) {
+        String output = "";
+        int missing = 0;
+        // This is similar to a standard download, but builds a MyWeek document
+        // from the record in the myweek table of teh MyWeek website
+        // It uses a special user The Client rather than the current user so that
+        // 'follow' mechanism is not compromised.
+        User theClient = getUser(User.theClientUser);
+        if (theClient == null) {
+            // One time creation of The Client user.
+            theClient = new User(User.theClientUser);
+            theClient.setEmailAddress("the.client@giggle.com");
+            theClient.setContactNumber("09090909");
+            theClient.setFirstName("The");
+            theClient.setLastName("Client");
+            theClient.setStartDate(new Date());
+            theClient.setRoleID(Role.systemAdministratorID);
+            theClient.setNewPassword("Roger.That");
+            theClient.setPasswordExpiryDate(new Date(Long.MAX_VALUE));
+            theClient.save(true);
+        }
+
+        JSONArray names;
+        JSONObject row;
+        try {
+
+            names = jsonOutput.names();
+            for (int i = 0; i < names.length(); i++) {
+                String name = names.getString(i);
+
+                if (!name.equals("result")) {
+                    row = jsonOutput.getJSONObject(names.getString(i));
+                    String clientID = row.getString("ClientID");
+                    String sessionID = row.getString("SessionID");
+                    // PHP Dates are seconds.milliseconds from epoch start
+                    Long creationDate = row.getLong("CreationDate") * 1000;
+                    Integer schoolScore = row.getInt("SchoolScore");
+                    Integer friendshipScore = row.getInt("FriendshipScore");
+                    Integer familyScore = row.getInt("FamilyScore");
+                    // Build 148 - Need to encode/decode the Notes to sort out spurious characters
+                    //byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
+                    //String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
+
+                    // Get the client document
+                    UUID clientUUID;
+                    ArrayList<Document> clients = null;
+                    try {
+                        clientUUID = UUID.fromString(clientID);
+                        clients = getAllDocumentsOfType(clientUUID, Document.Client);
+                    }
+                    catch (Exception ex){
+                        output += String.format("%d. Client had bad UUID string: %s\n", i, clientID);
+                    }
+                    if (clients == null || clients.size() == 0) {
+                        output += String.format("%d. Client not found: %s\n", i, clientID);
+                    } else {
+                        Client client = (Client) clients.get(0);
+                        // Check whether the record already exists
+                        RawDocument document = getRawDocument(Document.MyWeek, clientID, creationDate);
+                        if (document == null) {
+                            output += String.format("%d. Missing MyWeek for %s ", i, client.getFullName());
+                            missing++;
+                            // Now add the missing MyWeek document
+                            MyWeek myWeek = new MyWeek(theClient,UUID.fromString(clientID));
+                            Date referenceDate = new Date(creationDate);
+                            myWeek.setReferenceDate(referenceDate);
+                            myWeek.setSchoolScore(schoolScore);
+                            myWeek.setFriendshipScore(friendshipScore);
+                            myWeek.setHomeScore(familyScore);
+                            myWeek.setSessionID(UUID.fromString(sessionID));
+                            try {
+                                // Build 152 - Catch spurious characters causing decode errors
+                                byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
+                                String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
+                                myWeek.setNote(notes);
+                                // and save it
+                                myWeek.save(true);
+                                output += " ... Added\n";
+                            }
+                            catch (Exception ex){
+                                output += String.format("%d. Exception decoding note for %s\n", i, client.getFullName());
+                            }
+                        } else {
+                            output += String.format("%d. Found MyWeek for %s\n", i, client.getFullName());
+                        }
+                    }
+                } else {
+                    output += String.format("%s. Found row with name: ", name);
+                }
+            }
+            output += String.format("Missing/Added MyWeek documents =  %d\n", missing);
+        } catch (
+                JSONException ex) {
+            output += "checkWebsiteMyWeeks() JSON Error: " + ex.getMessage();
+        } catch (
+                Exception ex) {
+            output += "checkWebsiteMyWeeks() Error: " + ex.getMessage();
+        }
+        return output;
     }
 
 

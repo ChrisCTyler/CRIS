@@ -175,6 +175,9 @@ public class EditClient extends Fragment {
             public void onClick(View view) {
                 if (validate()) {
                     editClient.save(isNewMode);
+                    // Build 144 - Need to update client in calling activity so that
+                    // any subsequent changes are saved against theis new client
+                    ((ListActivity) getActivity()).setClient(editClient);
                     FragmentManager fragmentManager = getFragmentManager();
                     fragmentManager.popBackStack();
                 }

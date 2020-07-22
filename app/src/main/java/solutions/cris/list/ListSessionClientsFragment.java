@@ -7,14 +7,18 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+
 import androidx.annotation.NonNull;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuItemCompat;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
+
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -337,6 +341,7 @@ public class ListSessionClientsFragment extends Fragment {
     private static final int MENU_SORT_ATTENDED = Menu.FIRST + 12;
     private static final int MENU_SORT_AGE = Menu.FIRST + 13;
     private static final int MENU_BROADCAST = Menu.FIRST + 20;
+    private static final int MENU_SEND_MYWEEK_LINK = Menu.FIRST + 30;
 
     private MenuItem searchItem;
 
@@ -372,6 +377,8 @@ public class ListSessionClientsFragment extends Fragment {
         sortAgeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem broadcastOption = menu.add(0, MENU_BROADCAST, 20, "Broadcast Message");
         broadcastOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        MenuItem sendMyWeekLinkOption = menu.add(0, MENU_SEND_MYWEEK_LINK, 20, "Send MyWeek Links");
+        sendMyWeekLinkOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
         // Build 105 Add Search at client level
         searchItem = menu.findItem(R.id.action_search);
@@ -469,13 +476,12 @@ public class ListSessionClientsFragment extends Fragment {
                 return true;
             // Build 119 30 May 2019 Broadcast handler
             case MENU_BROADCAST:
-
                 // Load Broadcast Client List from the selected clients
                 ArrayList<Client> broadcastClientList = new ArrayList<>();
-                for (RegisterEntry entry : registerAdapterList){
+                for (RegisterEntry entry : registerAdapterList) {
                     broadcastClientList.add(entry.getClientSession().getClient());
                 }
-                ((ListActivity)getActivity()).setBroadcastClientList(broadcastClientList);
+                ((ListActivity) getActivity()).setBroadcastClientList(broadcastClientList);
                 // Start the Broadcast fragment
                 fragmentManager = getFragmentManager();
                 fragmentTransaction = fragmentManager.beginTransaction();
@@ -483,23 +489,27 @@ public class ListSessionClientsFragment extends Fragment {
                 fragmentTransaction.replace(R.id.content, fragment);
                 fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
-                /*
-                new AlertDialog.Builder(getActivity())
-                        .setTitle("Not Implemented Yet")
-                        .setMessage("Unfortunately, this option is not yet available.")
-                        .setPositiveButton("Return", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                            }
-                        })
-                        .show();
-                 */
+                return true;
+            // Build 143 Send MyWeekLink handler
+            case MENU_SEND_MYWEEK_LINK:
+                // Load Client List from the selected clients
+                ArrayList<Client> sendMyWeekClientList = new ArrayList<>();
+                for (RegisterEntry entry : registerAdapterList) {
+                    sendMyWeekClientList.add(entry.getClientSession().getClient());
+                }
+                ((ListActivity) getActivity()).setBroadcastClientList(sendMyWeekClientList);
+                // Start the SendMyWeek fragment
+                fragmentManager = getFragmentManager();
+                fragmentTransaction = fragmentManager.beginTransaction();
+                fragment = new SendMyWeekLinkFragment();
+                fragmentTransaction.replace(R.id.content, fragment);
+                fragmentTransaction.addToBackStack(null);
+                fragmentTransaction.commit();
                 return true;
             default:
                 // Build 105 - Added search so allow search option to return false
                 //throw new CRISException("Unexpected menu option:" + item.getItemId());
                 return false;
-
         }
     }
 
@@ -1282,14 +1292,22 @@ public class ListSessionClientsFragment extends Fragment {
                         case NoteType.ICON_COLOUR_RESPONSE_BLUE:
                             noteIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_note_response_blue));
                             break;
-                        case NoteType.ICON_COLOUR_UNKNOWN:
-                            // Pre-V1.1
+                        // Build 151 - Added default for cases where the Note colour has not been set
+                        // Not sure how this occurs but an instance was found whilst testing something else
+                        //case NoteType.ICON_COLOUR_UNKNOWN:
+                        //    // Pre-V1.1
+                        //    if (noteDocument.getNoteTypeID().equals(NoteType.responseNoteTypeID)) {
+                        //        noteIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_note_response_blue));
+                        //    } else {
+                        //        noteIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_note_blue));
+                        //    }
+                        //    break;
+                        default:
                             if (noteDocument.getNoteTypeID().equals(NoteType.responseNoteTypeID)) {
                                 noteIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_note_response_blue));
                             } else {
                                 noteIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_note_blue));
                             }
-                            break;
                     }
                 }
             }

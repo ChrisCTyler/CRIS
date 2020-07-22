@@ -14,6 +14,7 @@ package solutions.cris.edit;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.app.DatePickerDialog;
 import android.app.Fragment;
 import android.app.FragmentManager;
@@ -22,10 +23,13 @@ import android.content.ComponentName;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
+
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -113,15 +117,15 @@ public class EditMyWeek extends Fragment {
 
         Toolbar toolbar = ((ListActivity) getActivity()).getToolbar();
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
-        currentUser = ((ListActivity)getActivity()).getCurrentUser();
-        client = ((ListActivity)getActivity()).getClient();
+        currentUser = ((ListActivity) getActivity()).getCurrentUser();
+        client = ((ListActivity) getActivity()).getClient();
         editDocument = (MyWeek) ((ListActivity) getActivity()).getDocument();
         if (((ListActivity) getActivity()).getMode() == Document.Mode.NEW) {
             isNewMode = true;
         }
         TextView footer = (TextView) getActivity().findViewById(R.id.footer);
 
-        if (isNewMode){
+        if (isNewMode) {
             toolbar.setTitle(getString(R.string.app_name) + " - New MyWeek");
         } else {
             toolbar.setTitle(getString(R.string.app_name) + " - Edit MyWeek");
@@ -141,8 +145,13 @@ public class EditMyWeek extends Fragment {
             cancelBoxView.setVisibility(View.VISIBLE);
             TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
             String byText = "by ";
-            User cancelUser = localDB.getUser(editDocument.getCancelledByID());
-            byText += cancelUser.getFullName() + " on ";
+            // Build 150 - Allow for earlier bug which didn't set the cancelled by used
+            if (editDocument.getCancelledByID() == null){
+                byText += "Unknown User" + " on ";
+            } else {
+                User cancelUser = localDB.getUser(editDocument.getCancelledByID());
+                byText += cancelUser.getFullName() + " on ";
+            }
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
             TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
@@ -185,7 +194,7 @@ public class EditMyWeek extends Fragment {
         });
 
         // School Title depends on client's age
-        if (client != null){
+        if (client != null) {
             // Calculate client's age
             Calendar dob = Calendar.getInstance();
             dob.setTime(client.getDateOfBirth());
@@ -195,7 +204,7 @@ public class EditMyWeek extends Fragment {
             if (now.get(Calendar.DAY_OF_YEAR) < dob.get(Calendar.DAY_OF_YEAR)) {
                 age--;
             }
-            if (age < 16 ){
+            if (age < 16) {
                 schoolTitle.setText("School*");
             }
         }
@@ -340,8 +349,8 @@ public class EditMyWeek extends Fragment {
             public void onClick(View view) {
                 if (validate()) {
                     editDocument.save(isNewMode);
-                        FragmentManager fragmentManager = getFragmentManager();
-                        fragmentManager.popBackStack();
+                    FragmentManager fragmentManager = getFragmentManager();
+                    fragmentManager.popBackStack();
                     ComponentName compName = ((CRISActivity) getActivity()).getCompName();
                     DevicePolicyManager deviceManager = ((CRISActivity) getActivity()).getDeviceManager();
                     boolean active = deviceManager.isAdminActive(compName);
@@ -483,12 +492,14 @@ public class EditMyWeek extends Fragment {
                             if (editText.getText().length() > 0) {
                                 editDocument.setCancellationDate(new Date());
                                 editDocument.setCancellationReason(editText.getText().toString());
-                                currentUser.getUserID();
+                                // Build 150 - Set the CancelledByID
+                                //currentUser.getUserID();
+                                editDocument.setCancelledByID(currentUser.getUserID());
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     editDocument.save(isNewMode);
-                                        FragmentManager fragmentManager = getFragmentManager();
-                                        fragmentManager.popBackStack();
+                                    FragmentManager fragmentManager = getFragmentManager();
+                                    fragmentManager.popBackStack();
 
                                 }
                             }
@@ -507,8 +518,8 @@ public class EditMyWeek extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 editDocument.save(isNewMode);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                FragmentManager fragmentManager = getFragmentManager();
+                fragmentManager.popBackStack();
             }
         }
     }

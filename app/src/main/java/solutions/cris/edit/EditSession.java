@@ -683,7 +683,9 @@ public class EditSession extends Fragment {
             }
 
             if (!dateError) {
-                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy hh:mm", Locale.UK);
+                // Build 154 - Corrected the date pattern to use 24 hour clock not 12 hour
+                //SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy hh:mm", Locale.UK);
+                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy kk:mm", Locale.UK);
                 Date dDateTime;
                 try {
                     dDateTime = sdf.parse(String.format("%s %s", sDate, sTime));

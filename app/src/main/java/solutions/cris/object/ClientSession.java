@@ -211,6 +211,8 @@ public class ClientSession extends Document implements Serializable {
         fNames.add("Age");
         // Build 139 - Add Year Group to Export
         fNames.add("Year Group");
+        // Build 155 - Add Address to export
+        fNames.add("Address");
         fNames.add("Postcode");
         fNames.add("Session Date");
         fNames.add("Attended");
@@ -333,8 +335,10 @@ public class ClientSession extends Document implements Serializable {
                         .setRange(new DimensionRange()
                                 .setSheetId(sheetID)
                                 .setDimension("COLUMNS")
-                                .setStartIndex(10)
-                                .setEndIndex(13))
+                                // Build 139 - Adding Year Group to Export shifts column to right
+                                // Build 155 - Adding Address to Export shifts column to right
+                                .setStartIndex(12)
+                                .setEndIndex(15))
                 ));
         // 1st row is bold/Centered
         requests.add(new Request()
@@ -382,8 +386,9 @@ public class ClientSession extends Document implements Serializable {
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
                                 // Build 139 - Adding Year Group to Export shifts column to right
-                                .setStartColumnIndex(6)
-                                .setEndColumnIndex(7)
+                                // Build 155 - Adding Address to Export shifts column to right
+                                .setStartColumnIndex(7)
+                                .setEndColumnIndex(8)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -400,6 +405,8 @@ public class ClientSession extends Document implements Serializable {
         row.add(client.getAge());
         // Build 139 - Add Year Group to Export
         row.add(client.getYearGroup());
+        // Build 155 Added Address to Export
+        row.add(client.getAddress());
         row.add(client.getPostcode());
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getReferenceDate()));

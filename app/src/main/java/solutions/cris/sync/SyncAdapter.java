@@ -220,6 +220,8 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 checkWebDatabaseVersion(organisation);  // Done
                 // Download new records
                 downloadCount = downloadRecords();
+                // Build 143 - Download Website MyWeek Documents
+                downloadCount += downloadMyWeeks();
 
                 // Build 128 - Unsynced records are in batches of 200 for repeat until count = 0
                 // Upload unsynced records
@@ -323,8 +325,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
             notificationManager.cancel(notificationID);
             syncActivity.appendLog("Cleared Notification");
         } else {
+            // Build 150 - Added Channel ID
             NotificationCompat.Builder builder =
-                    new NotificationCompat.Builder(getContext())
+                    new NotificationCompat.Builder(getContext(),Main.CHANNEL_ID)
                             .setAutoCancel(true)
                             .setColor(ResourcesCompat.getColor(getContext().getResources(), R.color.colorPrimary, null))
                             .setSmallIcon(R.drawable.ic_cris_notification)
@@ -426,6 +429,33 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 throw new CRISException("Error parsing JSON data: " + ex.getMessage());
             }
         }
+    }
+
+    private int downloadMyWeeks() {
+        // Check for any new MyWeeks from the MyWeek Website and add to their CRIS record
+        int count = 0;
+        try {
+            WebConnection webConnection = new WebConnection(localDB);
+            // Build 148 - Encode/decode Notes field
+            //JSONObject jsonOutput = webConnection.post("pdo_get_myweek_website_records.php");
+            JSONObject jsonOutput = webConnection.post("pdo_get_myweek_website_records_2.php");
+            String result = jsonOutput.getString("result");
+            if (result.equals("FAILURE")) {
+                throw new CRISException("FAILURE: " + jsonOutput.getString("error_message"));
+            } else {
+                count = localDB.downloadWebsiteMyWeeks(jsonOutput);
+
+                syncActivity.appendLog(String.format(Locale.UK,
+                        "Downloaded Website MyWeeks (%d)",count));
+
+            }
+        } catch (JSONException ex) {
+            throw new CRISException("JSON Error in DownloadRecords(): " + ex.getMessage());
+
+        } catch (Exception ex) {
+            throw new CRISException("Error in DownloadRecords(): " + ex.getMessage());
+        }
+        return count;
     }
 
     private int downloadRecords() {

@@ -14,7 +14,10 @@ package solutions.cris;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.Manifest;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -24,8 +27,11 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -45,13 +51,19 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
 import solutions.cris.edit.ChangePassword;
@@ -63,18 +75,26 @@ import solutions.cris.list.ListSessions;
 import solutions.cris.list.ListSyncActivity;
 import solutions.cris.list.ListSysAdmin;
 import solutions.cris.list.ListUsers;
+import solutions.cris.object.Case;
 import solutions.cris.object.Client;
+import solutions.cris.object.ClientSession;
 import solutions.cris.object.Document;
+import solutions.cris.object.Group;
+import solutions.cris.object.ListItem;
 import solutions.cris.object.Note;
 import solutions.cris.object.NoteType;
 import solutions.cris.object.PdfDocument;
+import solutions.cris.object.RawDocument;
 import solutions.cris.object.Role;
+import solutions.cris.object.Session;
 import solutions.cris.object.SyncActivity;
 import solutions.cris.object.SystemError;
 import solutions.cris.object.User;
 import solutions.cris.read.ReadClientHeader;
 import solutions.cris.sync.SyncManager;
 //import solutions.cris.utils.CRISDeviceAdmin;
+import solutions.cris.sync.WebConnection;
+import solutions.cris.utils.CRISKPIItem;
 import solutions.cris.utils.CRISMenuItem;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.ExceptionHandler;
@@ -105,11 +125,12 @@ public class Main extends CRISActivity {
     public static final String EXTRA_SHARE_TEXT = "solutions.cris.ShareText";
     // Builod 139 - Added KPIs
     public static final String EXTRA_KPI_TYPE = "solutions.cris.KPIType";
+    private static final int MENU_SYNC_WEBSITE_MYWEEKS = Menu.FIRST + 10;
 
+    public static final String CHANNEL_ID = "solutions.cris.channelid";
 
     // Receiver for broadcasts when Sync Adapter completes each sync
     private SyncReceiver myReceiver;
-
     private ArrayList<CRISMenuItem> menuItems;
     private MainMenuAdapter adapter;
     private LocalDB localDB;
@@ -129,7 +150,7 @@ public class Main extends CRISActivity {
         shareText = "";
         Intent intent = getIntent();
         String action = intent.getAction();
-        if (Intent.ACTION_SEND.equals(action) ) {
+        if (Intent.ACTION_SEND.equals(action)) {
             if (intent.getStringExtra(Intent.EXTRA_TEXT) != null) {
                 shareText = intent.getStringExtra(Intent.EXTRA_TEXT);
             }
@@ -152,6 +173,10 @@ public class Main extends CRISActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        // Build 150 - Added Notification Channel
+        createNotificationChannel();
+
         // If we are not logged in, this call will return null
         currentUser = User.getCurrentUser();
         if (currentUser == null) {
@@ -256,6 +281,22 @@ public class Main extends CRISActivity {
         }
     }
 
+    private void createNotificationChannel() {
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = "FLOUR";
+            String description = "Shipton Mill";
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
+    }
+
     private void doListClick(View view, int position) {
         String title = ((CRISMenuItem) view.getTag()).getTitle();
         Intent intent;
@@ -327,14 +368,17 @@ public class Main extends CRISActivity {
         return false;
     }
 
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_main, menu);
         super.onCreateOptionsMenu(menu);
+
+        //MenuItem syncMyWeekOption = menu.add(0, MENU_SYNC_WEBSITE_MYWEEKS, 40, "Sync Website MyWeeks");
+        //syncMyWeekOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         return true;
     }
+
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -360,12 +404,70 @@ public class Main extends CRISActivity {
                 }
                 return true;
 
+            // Not used, kept for future testing/debugging
+            //case MENU_SYNC_WEBSITE_MYWEEKS:
+            //    // Load the data in the background
+            //    new SyncMyWeeks().execute();
+            //    return true;
+
             default:
                 // If we got here, the user's action was not recognized.
                 // Invoke the superclass to handle it.
                 return super.onOptionsItemSelected(item);
         }
     }
+
+    // Not used, kept for future testing/debugging
+    /*
+    private class SyncMyWeeks extends AsyncTask<Void, Integer, String> {
+
+        @Override
+        protected String doInBackground(Void... params) {
+            // Runs in Background Thread
+            int count = 0;
+            String message = "Starting...";
+            try {
+                WebConnection webConnection = new WebConnection(localDB);
+                JSONObject jsonOutput = webConnection.post("pdo_get_myweek_website_records.php");
+                String result = jsonOutput.getString("result");
+                if (result.equals("FAILURE")) {
+                    throw new CRISException("pdo_get_myweek_website_records.php: " + jsonOutput.getString("error_message"));
+                } else {
+                    int records = 0;
+                    records = localDB.downloadWebsiteMyWeeks(jsonOutput);
+                    message = String.format("Sync Completed. New MyWeeks created: %d",records);
+                }
+            } catch (JSONException ex) {
+                // Build 138 - Add Partial Downloads
+                message = "Error parsing JSON data: " + ex.getMessage();
+
+            } catch (Exception ex) {
+                message = ex.getMessage();
+            }
+            return message;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+        }
+
+        @Override
+        protected void onPostExecute(String message) {
+            // Runs on UI Thread
+
+            new AlertDialog.Builder(Main.this)
+                    .setTitle("Sync MyWeeks")
+                    .setMessage(message)
+                    .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                        }
+                    })
+                    .show();
+        }
+    }
+    */
 
     @Override
     public void onDestroy() {
@@ -387,14 +489,38 @@ public class Main extends CRISActivity {
 
     private void showChanges() {
 
-        String changes = "Added facility to complete MyWeek from link to website.\n\n" +
+        String changes = "Modified Session export to include full address\n\n" +
                 "--------------- Older Changes ---------------\n\n" +
+                "Fixed bug where setting session time to 12:00 to 12:59 saved the session as 00:00 to 00:59.\n\n" +
+                "Disabled the hashtag functionality in Notes\n\n" +
+                "Enabled Broadcast Text from Client List\n\n" +
+                "Fixed a whole set of possible crashes due to users switching the screen " +
+                "orientation. The fix locks the screen orientation to portrait for a substantial " +
+                "proportion of the apps screens. If this proves problematical, it may be possible " +
+                "to relax this limit for some screens.\n\n" +
+                "A number of minor bug-fixes.\n\n" +
+                "Stopped cancelled MyWeek documents from appearing in header.\n\n" +
+                "Fixed problem with Notification of unread documents./n/n" +
+                "Modified SMS/Email text when sending MyWeek Website link.\n\n" +
+                "Fixed bug in Website MyWeek download where non-standard characters in Notes " +
+                "caused MyWeeks to be lost.\n\n" +
+                "Added system admin facility to check MyWeek website sync and recover missing documents\n\n" +
+                "Reduced SMS Send batch size to help seinding isues.\n\n" +
+                "Fixed bug causing crash when swiping left and right on unread notes\n\n" +
+                "Show MyWeek scores (stars) in client header even if session is not attended.\n\n" +
+                "Default 'create note' in Session Register Send MyWeek Link to Yes\n\n" +
+                "Add Created By to My Week export to enable MyWeeks created by 'The Client' to be recognised\n\n" +
+                "Fixed bug causing intermittant crashes with database constraint errors\n\n" +
+                "Added facility to complete MyWeek from link to website. Links may "+
+                "be sent by text or email from the Session Register or from an individual " +
+                "client using the 'Send MyWeek Link' menu option. Once the MyWeek is " +
+                "completed it is downloaded by the next sync and added to the client's records.\n\n" +
                 "Added Key Performance Indicator Menu - Active Cases and Percentage Session Attendance.\n\n" +
                 "Modified CAT Tool to include Living With/Caring for Grandparents.\n\n" +
                 "Add the facility to link a second group to a client's case.\n\n" +
                 "Add School Year Group to Export (new column after age)\n\n" +
                 "Add a counter and better diagnostics to initialisation of new smartphones/tablets.\n\n" +
-                                "Send SMS broadcast messages in batches to solve a problem with some network providers.\n\n" +
+                "Send SMS broadcast messages in batches to solve a problem with some network providers.\n\n" +
                 "Only display current schools when 'selecting clients by school'\n\n" +
                 "Only display current agencies when 'selecting clients by agency'\n\n" +
                 "Fixed bug that created multiple Text Message Notes.\n\n" +
@@ -426,7 +552,7 @@ public class Main extends CRISActivity {
                 "to unknown status of 'consent to photography'.\n\n" +
                 "Added audit trail displaying change history for documents. Swipe the document " +
                 "from left to right to see the changes.\n\n" +
-                "Upgraded database interface.\n\n"  +
+                "Upgraded database interface.\n\n" +
                 "Added 'Automatically invite to Group Sessions' checkbox to Case " +
                 "document and use to control client register for new sessions.\n\n" +
                 "Added 'Photography/Media Consent' checkbox to Case document. Replaced PDF " +
@@ -439,7 +565,7 @@ public class Main extends CRISActivity {
                 "Added Case Summary to Case documents\n\n" +
                 "Change to 'Follow' mechanism to ensure that a note which " +
                 "triggers a follow is visible as the first unread document. Previously, " +
-                 "the follow start was set marginally after the creation date of the " +
+                "the follow start was set marginally after the creation date of the " +
                 "associated note so only subsequent documents were made visible. \n\n" +
                 "Fix to stop unread notes being incorrectly notified\n\n" +
                 "Bug fix to handle problem with unattached, unread notes\n\n" +
@@ -699,6 +825,49 @@ public class Main extends CRISActivity {
 
     }
 
+    private CRISMenuItem getSyncMenuItem() {
+
+        String summary = "Initialising...";
+        Date menuDate = null;
+        // Set Icon(0) will display the 'spinner'
+        int icon = 0;
+        // If the current user is NoPriv then kick off a sync (a periodic sync is pending
+        // but may not start immediately
+        if (currentUser.getRoleID() == Role.noPrivilegeID) {
+            syncManager.requestManualSync();
+        } else {
+            // Get the most recent sync activity record and proceed according to its status
+            SyncActivity syncActivity;
+            syncActivity = localDB.getLatestSyncActivity(currentUser);
+            if (syncActivity == null) {
+                // New database setup. Should have a NoPriv user but just in case:
+                syncManager.requestManualSync();
+            } else {
+                menuDate = syncActivity.getCreationDate();
+                String status = syncActivity.getResult();
+                switch (status) {
+                    case "SUCCESS":
+                        summary = "Last update was successful.";
+                        icon = R.drawable.ic_sync_activity_green;
+                        break;
+                    case "FAILURE":
+                        summary = "Last update failed.";
+                        icon = R.drawable.ic_sync_activity_red;
+                        break;
+                    case "PARTIAL":
+                        summary = syncActivity.getSummary();
+                        icon = R.drawable.ic_sync_activity_red;
+                        syncManager.requestManualSync();
+                        break;
+                    default:
+                        summary = "Initialising: " + status;
+                        syncManager.requestManualSync();
+                }
+            }
+        }
+        return new CRISMenuItem("Sync", summary, icon, menuDate);
+    }
+
     private class MainMenuAdapter extends ArrayAdapter<CRISMenuItem> {
 
         MainMenuAdapter(Context context, List<CRISMenuItem> objects) {
@@ -766,49 +935,6 @@ public class Main extends CRISActivity {
             }
             return convertView;
         }
-    }
-
-    private CRISMenuItem getSyncMenuItem() {
-
-        String summary = "Initialising...";
-        Date menuDate = null;
-        // Set Icon(0) will display the 'spinner'
-        int icon = 0;
-        // If the current user is NoPriv then kick off a sync (a periodic sync is pending
-        // but may not start immediately
-        if (currentUser.getRoleID() == Role.noPrivilegeID) {
-            syncManager.requestManualSync();
-        } else {
-            // Get the most recent sync activity record and proceed according to its status
-            SyncActivity syncActivity;
-            syncActivity = localDB.getLatestSyncActivity(currentUser);
-            if (syncActivity == null) {
-                // New database setup. Should have a NoPriv user but just in case:
-                syncManager.requestManualSync();
-            } else {
-                menuDate = syncActivity.getCreationDate();
-                String status = syncActivity.getResult();
-                switch (status) {
-                    case "SUCCESS":
-                        summary = "Last update was successful.";
-                        icon = R.drawable.ic_sync_activity_green;
-                        break;
-                    case "FAILURE":
-                        summary = "Last update failed.";
-                        icon = R.drawable.ic_sync_activity_red;
-                        break;
-                    case "PARTIAL":
-                        summary = syncActivity.getSummary();
-                        icon = R.drawable.ic_sync_activity_red;
-                        syncManager.requestManualSync();
-                        break;
-                    default:
-                        summary = "Initialising: " + status;
-                        syncManager.requestManualSync();
-                }
-            }
-        }
-        return new CRISMenuItem("Sync", summary, icon, menuDate);
     }
 
     private class SyncReceiver extends BroadcastReceiver {

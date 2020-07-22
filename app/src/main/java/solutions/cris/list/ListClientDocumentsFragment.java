@@ -1,19 +1,28 @@
 package solutions.cris.list;
 
+import android.Manifest;
+import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.database.MatrixCursor;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.BaseColumns;
 
 import androidx.annotation.NonNull;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuItemCompat;
 import androidx.cursoradapter.widget.CursorAdapter;
@@ -23,6 +32,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.ShareActionProvider;
 import androidx.appcompat.widget.Toolbar;
+
+import android.telephony.SmsManager;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -45,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.edit.EditCAT;
@@ -62,6 +74,7 @@ import solutions.cris.object.Contact;
 import solutions.cris.object.CriteriaAssessmentTool;
 import solutions.cris.object.Document;
 import solutions.cris.object.Image;
+import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
@@ -82,6 +95,8 @@ import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.PickList;
 import solutions.cris.utils.SwipeDetector;
+
+import static solutions.cris.list.BroadcastMessageFragment.SMS_BATCH_LIMIT;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -113,6 +128,8 @@ public class ListClientDocumentsFragment extends Fragment {
     private static final int MENU_FOLLOW_CLIENT = Menu.FIRST + 8;
     private static final int MENU_UNFOLLOW_CLIENT = Menu.FIRST + 9;
     private static final int MENU_SEND_MYWEEK_LINK = Menu.FIRST + 10;
+
+    public enum SendStatuses {SUCCESS, FAIL, NOT_SENT}
 
     private ArrayList<Document> adapterList;
     private ListView listView;
@@ -161,6 +178,10 @@ public class ListClientDocumentsFragment extends Fragment {
 
     private MenuItem shareOption;
 
+    ListItem emailListItem;
+    ListItem textListItem;
+    boolean noteAdded = false;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -184,10 +205,12 @@ public class ListClientDocumentsFragment extends Fragment {
 
         // Build 125 - Tablet re-orientation not working because read mode will be set and
         // adapter will not be refreshed in onResume. Set to Edit mode to force a reload
-        if (savedInstanceState != null){
+        if (savedInstanceState != null) {
             ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
         }
 
+        // Add the Text Message, Email and Phone Message Note Types, if necessary
+        checkNoteTypesExist();
 
         // Initialise the list view
         this.listView = (ListView) parent.findViewById(R.id.list_view);
@@ -241,6 +264,22 @@ public class ListClientDocumentsFragment extends Fragment {
                 CursorAdapter.FLAG_REGISTER_CONTENT_OBSERVER);
     }
 
+    private void checkNoteTypesExist() {
+        // Check for Text Message, Email and Phone Message Note Types and create if missing
+        ArrayList<ListItem> noteTypes = localDB.getAllListItems(ListType.NOTE_TYPE.toString(), true);
+        int newItemOrder = noteTypes.size();
+        emailListItem = localDB.getListItem("Email", ListType.NOTE_TYPE);
+        if (emailListItem == null) {
+            emailListItem = new NoteType(User.getCurrentUser(), "Email", newItemOrder++);
+            emailListItem.save(true);
+        }
+        textListItem = localDB.getListItem("Text Message", ListType.NOTE_TYPE);
+        if (textListItem == null) {
+            textListItem = new NoteType(User.getCurrentUser(), "Text Message", newItemOrder++);
+            textListItem.save(true);
+        }
+    }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -249,6 +288,8 @@ public class ListClientDocumentsFragment extends Fragment {
             ((ListActivity) getActivity()).setMode(Document.Mode.READ);
             // Clear until next New/Edit
             ((ListActivity) getActivity()).setDocument(null);
+            // Build 144 - Reload the client in case an EdirClient has been done
+            client = ((ListActivity) getActivity()).getClient();
             int hidden = 0;
             int clientSessionPos = 4;
             // Create the adapter
@@ -292,6 +333,12 @@ public class ListClientDocumentsFragment extends Fragment {
                 } else {
                     hidden++;
                 }
+            }
+            // Build 143 - Website MyWeek can be added before or after the Reference Date
+            // of the Client Session so need separate loop through documents
+            // See testForMyWeeks()
+            for (Document document : documents) {
+                testForMyWeeks(document);
             }
             // If there'e been a change, save the client record
             checkClientChanges();
@@ -463,18 +510,39 @@ public class ListClientDocumentsFragment extends Fragment {
                     newPos--;
                 }
             }
-            if (document.getDocumentType() == Document.MyWeek) {
-                MyWeek myWeek = (MyWeek) document;
-                ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
-                for (int i = 0; i < 5; i++) {
-                    if (clientSessions[i] != null && clientSessions[i].getSessionID().equals(myWeek.getSessionID())) {
+            // Build 143 - Website MyWeek can be added before or after the Reference Date
+            // of the Client Session so need separate loop through documents
+            // See testForMyWeeks()
+            //if (document.getDocumentType() == Document.MyWeek) {
+            //    MyWeek myWeek = (MyWeek) document;
+            //    ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
+            //    for (int i = 0; i < 5; i++) {
+            //        if (clientSessions[i] != null && clientSessions[i].getSessionID().equals(myWeek.getSessionID())) {
+            //            clientSessions[i].setStatus((int) myWeek.getScore());
+            //        }
+            //    }
+
+            //}
+        }
+        return newPos;
+    }
+
+    private void testForMyWeeks(Document document) {
+        if (document.getDocumentType() == Document.MyWeek) {
+            MyWeek myWeek = (MyWeek) document;
+            ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
+            for (int i = 0; i < 5; i++) {
+                if (clientSessions[i] != null && clientSessions[i].getSessionID().equals(myWeek.getSessionID())) {
+                    // Build 150 - Don't set score for cancelled MyWeeks
+                    if (myWeek.getCancelledFlag()){
+                        clientSessions[i].setStatus(0);
+                    } else {
                         clientSessions[i].setStatus((int) myWeek.getScore());
                     }
                 }
-
             }
+
         }
-        return newPos;
     }
 
     private void checkClientChanges() {
@@ -544,7 +612,17 @@ public class ListClientDocumentsFragment extends Fragment {
         firstAttendedSession = new Date(Long.MIN_VALUE);
         // Finally, save if changed
         if (assocDocumentChanged) {
-            client.save(false);
+            // Build 151 - All steps taken to reload the client document so that this save does not cause a
+            // constraint error. However, a case still occured (Build 150) so now catch teh exception and ignore
+            // client will be out-of-date but will get updated on next view of the client record
+            try {
+                client.save(false);
+                // Build 144 - Reload the client in the Activity Root to avoid a constraint error
+                // if the client document is then edited via EditClient
+                ((ListActivity) getActivity()).setClient(client);
+            } catch (Exception ex){
+                //ignore
+            }
         }
 
     }
@@ -700,8 +778,10 @@ public class ListClientDocumentsFragment extends Fragment {
         MenuItem selectCancelledOption = menu.add(0, MENU_SELECT_UNCANCELLED, 11, "Show Uncancelled Documents");
         selectCancelledOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem selectContactOption = menu.add(0, MENU_SELECT_CONTACTS, 12, "Show Contact Documents");
-        selectContactOption.setIcon(ContextCompat.getDrawable(getActivity(), R.drawable.ic_action_show_contacts));
-        selectContactOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+        // Build 151 - Odd crash recorded where getActivity was null - easiest to lose this line of code!
+        //selectContactOption.setIcon(ContextCompat.getDrawable(getActivity(), R.drawable.ic_action_show_contacts));
+        //selectContactOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+        selectContactOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem selectTypeOption = menu.add(0, MENU_SELECT_TYPE, 13, "Select Documents by Type");
         selectTypeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem sortDateOption = menu.add(0, MENU_SORT_DATE, 20, "Sort by Date");
@@ -716,8 +796,7 @@ public class ListClientDocumentsFragment extends Fragment {
             followOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         }
         MenuItem sendMyWeekOption = menu.add(0, MENU_SEND_MYWEEK_LINK, 40, "Send MyWeek Link");
-        sortTypeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-
+        sendMyWeekOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
 
         final MenuItem searchItem = menu.findItem(R.id.action_search);
@@ -906,7 +985,33 @@ public class ListClientDocumentsFragment extends Fragment {
                 return true;
 
             case MENU_SEND_MYWEEK_LINK:
+                AlertDialog sendMyweek = new AlertDialog.Builder(getActivity()).create();
+                sendMyweek.setTitle("Send MyWeek Link");
+                sendMyweek.setMessage("Send a link to the client's contact number (if " +
+                        "a mobile) or to their contact email address");
+                sendMyweek.setButton(DialogInterface.BUTTON_NEGATIVE, "Send Email",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                sendMyweekLinkEmail();
+                            }
+                        });
+                sendMyweek.setButton(DialogInterface.BUTTON_NEUTRAL, "Cancel",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
 
+                            }
+                        });
+                if (client.getContactNumber().startsWith("07")) {
+                    sendMyweek.setButton(DialogInterface.BUTTON_POSITIVE, "Send Text", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            trySendMyweekLinkText();
+                        }
+                    });
+                }
+                sendMyweek.show();
                 return true;
 
             default:
@@ -915,6 +1020,178 @@ public class ListClientDocumentsFragment extends Fragment {
         }
     }
 
+    private void sendMyweekLinkEmail() {
+        // Loop through the broadcast list looking for email mode clients
+        Intent emailIntent = new Intent(Intent.ACTION_SEND);
+        emailIntent.setType("text/plain");
+
+        SharedPreferences prefs = ((ListActivity) getActivity()).getSharedPreferences(
+                getString(R.string.shared_preference_file), Context.MODE_PRIVATE);
+        String organisation = "CRIS";
+        if (prefs.contains(getString(R.string.pref_organisation))) {
+            organisation = prefs.getString(getString(R.string.pref_organisation), "");
+        }
+        String dbName = localDB.getDatabaseName();
+        // Session ID is simply a random UUID since there is no session. When the
+        // record is synced there will be no session so iID will be ignored
+        String message = SendMyWeekLinkFragment.getMyWeekLinkMessage(organisation,
+                dbName, client, UUID.randomUUID());
+        String subject = String.format("MyWeek Link from %s", organisation);
+        emailIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
+        emailIntent.putExtra(Intent.EXTRA_TEXT, message);
+        String[] emails = {client.getEmailAddress()};
+        emailIntent.putExtra(Intent.EXTRA_EMAIL, emails);
+        startActivity(emailIntent);
+        // Add note
+        Note newNote = new Note(currentUser, client.getClientID());
+        newNote.setContent("Link to MyWeek sent by Email");
+        newNote.setNoteType(emailListItem);
+        newNote.setNoteTypeID(emailListItem.getListItemID());
+        newNote.save(true, User.getCurrentUser());
+    }
+
+    private void trySendMyweekLinkText() {
+        // First we need to check whether the user has granted the SMS permission
+        if (ContextCompat.checkSelfPermission(((ListActivity) getActivity()), Manifest.permission.SEND_SMS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(((ListActivity) getActivity()),
+                    new String[]{Manifest.permission.SEND_SMS},
+                    Main.REQUEST_PERMISSION_SEND_SMS);
+        } else if (ContextCompat.checkSelfPermission(((ListActivity) getActivity()), Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(((ListActivity) getActivity()),
+                    new String[]{Manifest.permission.READ_PHONE_STATE},
+                    Main.REQUEST_PERMISSION_SEND_SMS);
+        } else {
+            sendMyweekLinkText();
+        }
+    }
+
+    public void sendMyweekLinkText() {
+        SmsManager smsManager = SmsManager.getDefault();
+
+        // Test for SMS capability on device
+        boolean deviceHasSMS = false;
+        // Build 137 - Some network providers have set a limit on the number of texts which
+        // can be sent in one go. To work around this, they will be sent in batches of 20
+        Integer textsSent = 0;
+        SendStatuses sendStatus = SendStatuses.NOT_SENT;
+        String sendResult = "";
+        Bundle configValues = smsManager.getCarrierConfigValues();
+        if (configValues != null) {
+            String test = configValues.toString();
+            deviceHasSMS = true;
+        }
+        SharedPreferences prefs = ((ListActivity) getActivity()).getSharedPreferences(
+                getString(R.string.shared_preference_file), Context.MODE_PRIVATE);
+        String organisation = "CRIS";
+        if (prefs.contains(getString(R.string.pref_organisation))) {
+            organisation = prefs.getString(getString(R.string.pref_organisation), "");
+        }
+        String dbName = localDB.getDatabaseName();
+        // Session ID is simply a random UUID since there is no session. When the
+        // record is synced there will be no session so iID will be ignored
+        String message = SendMyWeekLinkFragment.getMyWeekLinkMessage(organisation,
+                dbName, client, UUID.randomUUID());
+        ArrayList<String> dividedMessage = smsManager.divideMessage(message);
+
+        // Build 137 - Could be 2nd batch so check sent flag
+        //if (entry.getMessageMode().equals("Text")){
+        if (sendStatus.equals(SendStatuses.NOT_SENT) && textsSent < SMS_BATCH_LIMIT) {
+            textsSent++;
+            // Clear the send result
+            sendResult = "";
+            noteAdded = false;
+            if (deviceHasSMS) {
+                try {
+                    PendingIntent piSend = PendingIntent.getBroadcast(((ListActivity) getContext()), 0, new Intent("Action1"), 0);
+                    ArrayList<PendingIntent> piSendArray = new ArrayList<>();
+                    for (Integer i = 0; i < dividedMessage.size(); i++) {
+                        piSendArray.add(piSend);
+                    }
+                    ((ListActivity) getActivity()).registerReceiver(new BroadcastReceiver() {
+
+                        @Override
+                        public void onReceive(Context context, Intent intent) {
+                            // Check the result
+                            String message = "";
+                            switch (getResultCode()) {
+                                case Activity.RESULT_OK:
+                                    message = "";
+                                    break;
+                                case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
+                                    message = "Unknown Error";
+                                    break;
+                                case SmsManager.RESULT_ERROR_NO_SERVICE:
+                                    message = "No Service";
+                                    break;
+                                case SmsManager.RESULT_ERROR_NULL_PDU:
+                                    message = "Null PDU";
+                                    break;
+                                case SmsManager.RESULT_ERROR_RADIO_OFF:
+                                    message = "Radio off";
+                                    break;
+                                case SmsManager.RESULT_ERROR_LIMIT_EXCEEDED:
+                                    message = "Over Limit";
+                                    break;
+                                case SmsManager.RESULT_ERROR_SHORT_CODE_NOT_ALLOWED:
+                                    message = "Not allowed";
+                                    break;
+                                case SmsManager.RESULT_ERROR_SHORT_CODE_NEVER_ALLOWED:
+                                    message = "Not allowed";
+                                    break;
+                                default:
+                                    message = String.format("Error: %d", getResultCode());
+                            }
+                            if (getResultCode() == Activity.RESULT_OK) {
+                                // Add note
+                                if (!noteAdded) {
+                                    Note newNote = new Note(currentUser, client.getClientID());
+                                    String broadcastMessage = message;
+                                    newNote.setContent("Link to MyWeek sent by Text");
+                                    newNote.setNoteType(textListItem);
+                                    newNote.setNoteTypeID(textListItem.getListItemID());
+                                    newNote.save(true, User.getCurrentUser());
+                                    // Build 128 Set isNoteAdded flag to prevent multiples
+                                    noteAdded = true;
+                                }
+                            }
+                            // Inform the user of result
+                            showSendMyweekTextResult(message);
+                        }
+                    }, new IntentFilter("Action1"));
+                    smsManager.sendMultipartTextMessage(client.getContactNumber(),
+                            null,
+                            dividedMessage,
+                            piSendArray,
+                            null);
+                } catch (Exception e) {
+                    // SMS Send failed so switch to email
+                    showSendMyweekTextResult(e.getMessage());
+                }
+            } else {
+                // SMS Send failed so switch to email
+                showSendMyweekTextResult("Device cannot sent SMS Text messages.");
+            }
+        }
+    }
+
+    private void showSendMyweekTextResult(String message) {
+        if (message.length() == 0) {
+            message = "Text message sent successfully";
+        } else {
+            message = "Send Text Failed: " + message;
+        }
+        new AlertDialog.Builder(getActivity())
+                .setTitle("Send MyWeek Link")
+                .setMessage("Text message sent successfully")
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
+    }
 
     private ArrayList<Document> loadDocuments() {
         ArrayList<Document> documents = localDB.getAllDocuments(client.getClientID());
@@ -1012,6 +1289,19 @@ public class ListClientDocumentsFragment extends Fragment {
                 .show();
     }
 
+    private void doUnexpectedMissingDocument() {
+        new AlertDialog.Builder(getActivity())
+                .setTitle("Unexpected Problem")
+                .setMessage("For some reason, the selected document was not found. Please try once more and if the " +
+                        "error persists, return to the main menu and try again. If this problem happens regularly, please " +
+                        "make a note of what you were trying to do and let your system administrator know.")
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
+    }
     private void doClientSession() {
         new AlertDialog.Builder(getActivity())
                 .setTitle("Client Sessions")
@@ -1083,76 +1373,85 @@ public class ListClientDocumentsFragment extends Fragment {
             }
         }
         if (accessAllowed) {
-            ((ListActivity) getActivity()).setDocument(document);
-            localDB.read(document, currentUser);
-            FragmentManager fragmentManager = getFragmentManager();
-            FragmentTransaction fragmentTransaction;
-            Fragment fragment;
+            // Build 151 - Just in case anything has updated the document
+            // in the database (making the adapter version out-of-date)
+            // reload it
+            document = localDB.getDocument(document.getDocumentID());
+            // Build 151 -Double check that there is a document
+            if (document != null) {
+                ((ListActivity) getActivity()).setDocument(document);
+                localDB.read(document, currentUser);
+                FragmentManager fragmentManager = getFragmentManager();
+                FragmentTransaction fragmentTransaction;
+                Fragment fragment;
 
-            switch (document.getDocumentType()) {
-                case Document.Case:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadCase();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
-                case Document.Client:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadClient();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
-                case Document.Contact:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadContact();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
-                case Document.ClientSession:
-                    doClientSession();
-                    break;
-                case Document.CriteriaAssessmentTool:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadCAT();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
-                case Document.Image:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadImage();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
-                case Document.MyWeek:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadMyWeek();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
-                case Document.Note:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new EditNote();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
-                case Document.PdfDocument:
-                    PdfDocument pdfDocument = (PdfDocument) document;
-                    PdfDocument.displayPDFDocument(pdfDocument, parent.getContext());
-                    break;
-                case Document.Transport:
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadTransport();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
-                    break;
+                switch (document.getDocumentType()) {
+                    case Document.Case:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadCase();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.Client:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadClient();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.Contact:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadContact();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.ClientSession:
+                        doClientSession();
+                        break;
+                    case Document.CriteriaAssessmentTool:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadCAT();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.Image:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadImage();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.MyWeek:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadMyWeek();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.Note:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new EditNote();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.PdfDocument:
+                        PdfDocument pdfDocument = (PdfDocument) document;
+                        PdfDocument.displayPDFDocument(pdfDocument, parent.getContext());
+                        break;
+                    case Document.Transport:
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadTransport();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                }
+            } else {
+                doUnexpectedMissingDocument();
             }
         } else {
             doNoPrivilege();
@@ -1212,72 +1511,81 @@ public class ListClientDocumentsFragment extends Fragment {
                     }
                 }
                 if (accessAllowed) {
-                    ((ListActivity) getActivity()).setDocument(document);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
-                    Fragment fragment;
-                    switch (document.getDocumentType()) {
-                        case Document.Case:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditCase();
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
-                            break;
-                        case Document.Client:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditClient();
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
-                            break;
-                        case Document.Contact:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditContact();
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
-                            break;
-                        case Document.ClientSession:
-                            doClientSession();
-                            break;
-                        case Document.CriteriaAssessmentTool:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditCAT();
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
-                            break;
-                        case Document.Image:
-                            ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.EDIT, Document.Image);
-                            break;
-                        case Document.MyWeek:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditMyWeek();
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
-                            break;
-                        case Document.Note:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditNote();
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
-                            break;
-                        case Document.PdfDocument:
-                            ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.EDIT, Document.PdfDocument);
-                            break;
-                        case Document.Transport:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditTransport();
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
-                            break;
-                        default:
-                            throw new CRISException(String.format(Locale.UK,
-                                    "Unexpected document type: %d", document.getDocumentType()));
+                    // Build 145 - Just in case anything has updated the document
+                    // in the database (making the adapter version out-of-date)
+                    // reload it
+                    document = localDB.getDocument(document.getDocumentID());
+                    // Build 151 -Double check that there is a document
+                    if (document != null) {
+                        ((ListActivity) getActivity()).setDocument(document);
+                        FragmentManager fragmentManager = getFragmentManager();
+                        FragmentTransaction fragmentTransaction;
+                        Fragment fragment;
+                        switch (document.getDocumentType()) {
+                            case Document.Case:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditCase();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
+                                break;
+                            case Document.Client:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditClient();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
+                                break;
+                            case Document.Contact:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditContact();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
+                                break;
+                            case Document.ClientSession:
+                                doClientSession();
+                                break;
+                            case Document.CriteriaAssessmentTool:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditCAT();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
+                                break;
+                            case Document.Image:
+                                ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.EDIT, Document.Image);
+                                break;
+                            case Document.MyWeek:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditMyWeek();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
+                                break;
+                            case Document.Note:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditNote();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
+                                break;
+                            case Document.PdfDocument:
+                                ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.EDIT, Document.PdfDocument);
+                                break;
+                            case Document.Transport:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditTransport();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
+                                break;
+                            default:
+                                throw new CRISException(String.format(Locale.UK,
+                                        "Unexpected document type: %d", document.getDocumentType()));
+                        }
+                    } else {
+                        doUnexpectedMissingDocument();
                     }
                 } else {
                     doNoPrivilege();

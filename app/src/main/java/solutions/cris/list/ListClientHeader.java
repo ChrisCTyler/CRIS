@@ -203,9 +203,11 @@ public class ListClientHeader extends ListActivity {
         headerAttendance5.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek5.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[4] != null) {
+            // Build 144 - Show MyWeek score even if session not attended
+            headerMyWeek5.setImageDrawable(getStarIcon(clientSessions[4].getStatus()));
             if (clientSessions[4].isAttended()) {
                 headerAttendance5.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_tick));
-                headerMyWeek5.setImageDrawable(getStarIcon(clientSessions[4].getStatus()));
+
             } else {
                 headerAttendance5.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
@@ -215,9 +217,11 @@ public class ListClientHeader extends ListActivity {
         headerAttendance4.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek4.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[3] != null) {
+            // Build 144 - Show MyWeek score even if session not attended
+            headerMyWeek4.setImageDrawable(getStarIcon(clientSessions[3].getStatus()));
             if (clientSessions[3].isAttended()) {
                 headerAttendance4.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_tick));
-                headerMyWeek4.setImageDrawable(getStarIcon(clientSessions[3].getStatus()));
+
             } else {
                 headerAttendance4.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
@@ -226,10 +230,10 @@ public class ListClientHeader extends ListActivity {
         ImageView headerMyWeek3 = (ImageView) findViewById(R.id.header_myweek_3);
         headerAttendance3.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek3.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
-        if (clientSessions[2] != null) {
+        if (clientSessions[2] != null) {// Build 144 - Show MyWeek score even if session not attended
+            headerMyWeek3.setImageDrawable(getStarIcon(clientSessions[2].getStatus()));
             if (clientSessions[2].isAttended()) {
                 headerAttendance3.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_tick));
-                headerMyWeek3.setImageDrawable(getStarIcon(clientSessions[2].getStatus()));
             } else {
                 headerAttendance3.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
@@ -239,9 +243,10 @@ public class ListClientHeader extends ListActivity {
         headerAttendance2.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek2.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[1] != null) {
+            // Build 144 - Show MyWeek score even if session not attended
+            headerMyWeek2.setImageDrawable(getStarIcon(clientSessions[1].getStatus()));
             if (clientSessions[1].isAttended()) {
                 headerAttendance2.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_tick));
-                headerMyWeek2.setImageDrawable(getStarIcon(clientSessions[1].getStatus()));
             } else {
                 headerAttendance2.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
@@ -251,9 +256,10 @@ public class ListClientHeader extends ListActivity {
         headerAttendance1.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek1.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[0] != null) {
+            // Build 144 - Show MyWeek score even if session not attended
+            headerMyWeek1.setImageDrawable(getStarIcon(clientSessions[0].getStatus()));
             if (clientSessions[0].isAttended()) {
                 headerAttendance1.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_tick));
-                headerMyWeek1.setImageDrawable(getStarIcon(clientSessions[0].getStatus()));
             } else {
                 headerAttendance1.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }

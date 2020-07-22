@@ -17,6 +17,7 @@ package solutions.cris.list;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -34,8 +35,12 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -46,6 +51,7 @@ import solutions.cris.exceptions.CRISException;
 import solutions.cris.object.Note;
 import solutions.cris.object.Sync;
 import solutions.cris.object.User;
+import solutions.cris.sync.WebConnection;
 import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISMenuItem;
 import solutions.cris.utils.ExceptionHandler;
@@ -79,6 +85,8 @@ public class ListSysAdmin extends CRISActivity {
             menuItems.add(new CRISMenuItem("System Errors", "", R.drawable.ic_system_error, null));
             // Build 128 Duplicate Text Message Fix
             menuItems.add(new CRISMenuItem("Remove Duplicate Notes", "", R.drawable.ic_system_error, null));
+            // Build 148 Check for missing MyWeek website records
+            menuItems.add(new CRISMenuItem("Check MyWeek Downloads", "", R.drawable.ic_system_error, null));
 
             // Setup the List view listener
             ListView listView = (ListView) findViewById(R.id.list_view);
@@ -94,6 +102,10 @@ public class ListSysAdmin extends CRISActivity {
                             break;
                         case "Remove Duplicate Notes":
                             doDuplicateNotes();
+                            break;
+                        case "Check MyWeek Downloads":
+                            // Load the data in the background
+                            new CheckMyWeekDownloads().execute();
                             break;
                         default:
                             throw new CRISException("Invalid main Menu Option: " + title);
@@ -211,6 +223,54 @@ public class ListSysAdmin extends CRISActivity {
             }
             return convertView;
         }
+    }
+
+    /**
+     * An asynchronous task that handles the loading and processing of the KPI data.
+     * Placing the API calls in their own task ensures the UI stays responsive.
+     */
+    private class CheckMyWeekDownloads extends AsyncTask<Void, Integer, String> {
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+            int count = 0;
+            String output = "Initiating check...\n";
+            try {
+                WebConnection webConnection = new WebConnection(localDB);
+                //JSONObject jsonOutput = webConnection.post("pdo_get_all_myweek_website_records.php");
+                JSONObject jsonOutput = webConnection.post("pdo_get_all_myweek_website_records.php");
+                String result = jsonOutput.getString("result");
+                if (result.equals("FAILURE")) {
+                    output += "FAILURE: " + jsonOutput.getString("error_message");
+                } else {
+                    output += localDB.checkWebsiteMyWeeks(jsonOutput);
+                }
+            } catch (JSONException ex) {
+                output += "JSON Error in CheckMyWeekDownloads(): " + ex.getMessage();
+
+            } catch (Exception ex) {
+                output += "Error in CheckMyWeekDownloads(): " + ex.getMessage();
+            }
+            return output;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+
+        }
+
+        @Override
+        protected void onPostExecute(String output) {
+            // Runs on UI Thread
+            Intent intent = new Intent(getBaseContext(), AlertAndContinue.class);
+            intent.putExtra("title", String.format("Missing Website MyWeeks"));
+            intent.putExtra("message", output);
+            startActivity(intent);
+        }
+
+
     }
 
 }
