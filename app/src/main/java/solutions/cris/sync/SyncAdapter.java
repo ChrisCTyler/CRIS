@@ -23,6 +23,7 @@ import android.app.PendingIntent;
 import android.content.AbstractThreadedSyncAdapter;
 import android.content.ContentProviderClient;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -44,9 +45,12 @@ import org.json.JSONObject;
 import java.io.FileInputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.Locale;
+import java.util.Queue;
 import java.util.UUID;
 
 import solutions.cris.Main;
@@ -67,7 +71,7 @@ import solutions.cris.object.User;
  * Handle the transfer of data between a server and an
  * app, using the Android sync adapter framework.
  */
-class SyncAdapter extends AbstractThreadedSyncAdapter {
+public class SyncAdapter extends AbstractThreadedSyncAdapter {
 
     // Global variables
     private LocalDB localDB;
@@ -75,10 +79,16 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
     private AESEncryption aesEncryption;
     private SyncActivity syncActivity;
     private long syncTimeOffset = 0;
+    // Build 181 - Set when recheck hits PARTIAL limit to indicate the new recheck date
+    long partialRecheckDate = 0;
     //private Context context = getContext();
     private static final int notificationID = 0;
     // Define a variable to contain a content resolver instance
     //ContentResolver mContentResolver;
+
+    public final static int IGNORE = 0;
+    public final static int ADD = 1;
+    public final static int RECHECK = 2;
 
     SyncAdapter(Context context, boolean autoInitialize) {
         super(context, autoInitialize);
@@ -110,36 +120,64 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
             ContentProviderClient provider,
             SyncResult syncResult) {
 
+        // Build 181 - Alter exception handler to go to next file if it's a file error
+        // but crash completely if it's a sync error
+        String organisation = "";
+        //boolean runningOrganisation = false;
         String prefOrganisation = "";
 
-        // Check for new unread documents if the organisation is the current pref
-        SharedPreferences prefs = getContext().getSharedPreferences(
-                getContext().getString(R.string.shared_preference_file), Context.MODE_PRIVATE);
-        if (prefs.contains(getContext().getString(R.string.pref_organisation))) {
-            prefOrganisation = prefs.getString(getContext().getString(R.string.pref_organisation), "");
-        }
-        // The sync routines run on their own thread. Access to the database is
-        // all that is common between the UI and the sync thread.
-        // Tablet may be syncing more than one database/organisation via the
-        // set of org_ files, each of which contains the organisation and the email
-        // Each database will be synced in turn
-        String[] files = getContext().fileList();
-        for (String fileName : files) {
-            syncActivityID = "";
-            try {
+        try {
+            // Build 181 Get running organisation and execure manual or automatic syncs accordingly
+            // Check for new unread documents if the organisation is the current pref
+            SharedPreferences prefs = getContext().getSharedPreferences(
+                    getContext().getString(R.string.shared_preference_file), Context.MODE_PRIVATE);
+            if (prefs.contains(getContext().getString(R.string.pref_organisation))) {
+                prefOrganisation = prefs.getString(getContext().getString(R.string.pref_organisation), "");
+            }
+
+            // Build 181 - Get the re-sync from date from the extras (zero for no resync)
+            Date timeNow = new Date();
+            long recheckDate = extras.getLong(SyncManager.SYNC_RECHECK_DATE, timeNow.getTime());
+            boolean isRecheck = extras.getBoolean(SyncManager.SYNC_RECHECK, false);
+            boolean isManual = extras.getBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, false);
+            // Build 181 - Ensure partial receheck data is now (defined earlier as zero
+            partialRecheckDate = timeNow.getTime();
+
+            String diagString = "Automatic - ";
+            if (isManual) {
+                diagString = "Manual - ";
+                if (isRecheck) {
+                    diagString += "Recheck";
+                } else {
+                    diagString += "No Recheck";
+                }
+            }
+
+            // The sync routines run on their own thread. Access to the database is
+            // all that is common between the UI and the sync thread.
+            // Tablet may be syncing more than one database/organisation via the
+            // set of org_ files, each of which contains the organisation and the email
+            // Each database will be synced in turn
+
+
+            String[] files = getContext().fileList();
+            for (String fileName : files) {
+                syncActivityID = "";
+
                 // Remove the org_ from the filename to give the database name
                 if (fileName.startsWith("org_")) {
                     String dbName = fileName.substring(4);
                     FileInputStream fis;
                     byte[] bBuf;
+                    String email = "";
+
                     fis = getContext().openFileInput(fileName);
                     bBuf = new byte[fis.available()];
                     int len = fis.read(bBuf);
                     fis.close();
                     if (len > 0) {
                         String sBuf = new String(bBuf);
-                        String organisation = "";
-                        String email = "";
+
                         if (!sBuf.isEmpty()) {
                             String[] lines = sBuf.split("\n");
                             organisation = lines[0];
@@ -154,28 +192,38 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                         } else if (!dbName.equals(AESEncryption.getDatabaseName(organisation))) {
                             throw new CRISException(String.format("Attempting sync for %s with invalid dbName: %s",
                                     AESEncryption.getDatabaseName(organisation), dbName));
-                        } else {
-                            boolean runningOrganisation = false;
+                        }
+                        // Build 181 - Check whether this is the organisation which is currently logged in
+                        if (isManual || isRecheck) {
                             if (prefOrganisation.equals(organisation)) {
-                                runningOrganisation = true;
+                                performOneSync(organisation, email, prefOrganisation, organisation, recheckDate, diagString);
                             }
-                            performOneSync(organisation, email, runningOrganisation);
+                        } else {
+                            performOneSync(organisation, email, prefOrganisation, organisation, recheckDate, "Automatic");
                         }
                     }
                 }
-
-            } catch (Exception ex) {
-                Intent intent = new Intent();
-                intent.setAction(SyncManager.SYNC_ACTION);
-                intent.putExtra(SyncManager.SYNC_STATUS, "FAILURE");
-                intent.putExtra(SyncManager.SYNC_ACTIVITY_ID, syncActivityID);
-                intent.putExtra(SyncManager.SYNC_EXCEPTION_MESSAGE, ex.getMessage());
-                getContext().sendBroadcast(intent);
             }
+        } catch (
+                Exception ex) {
+            // Build 181 Broadcast with prefOrganisation so that Main.SyncReceiver() handles it
+            Intent intent = new Intent();
+            intent.setAction(SyncManager.SYNC_ACTION);
+            intent.putExtra(SyncManager.SYNC_STATUS, "FAILURE");
+            intent.putExtra(SyncManager.SYNC_ACTIVITY_ID, syncActivityID);
+            intent.putExtra(SyncManager.SYNC_EXCEPTION_MESSAGE, String.format("Sync Org: %s\n%s", organisation, ex.getMessage()));
+            intent.putExtra(SyncManager.SYNC_ORGANISATION, prefOrganisation);
+            getContext().sendBroadcast(intent);
         }
+
     }
 
-    private void performOneSync(String organisation, String email, boolean runningOrganisation) {
+    private void performOneSync(String organisation,
+                                String email,
+                                String prefOrganisation,
+                                String Organisation,
+                                long recheckDate,
+                                String diagString) {
 
         // Any failure of a web service call must raise an exception which will
         // log a system error. It is assumed that the exception will remain until
@@ -186,7 +234,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         // 1. Check database for need to create/upgrade
         // 2. Download records and deal with any conflicts
         // 3. Upload
-
+        SimpleDateFormat sDate = new SimpleDateFormat("dd/MM/yyyy", Locale.UK);
         int uploadCount = 0;
         int downloadCount;
         String syncStatus = "SUCCESS";
@@ -204,7 +252,13 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
             try {
                 // Create a Sync Result record
                 syncActivity = new SyncActivity(currentUser);
-                syncActivity.appendLog(String.format(Locale.UK, "Diag date: %d", syncActivity.getCreationDate().getTime()));
+
+                syncActivity.appendLog(diagString);
+                Date tempDate = new Date(recheckDate);
+                syncActivity.appendLog("Recheck date: " + sDate.format(tempDate));
+                // Build 181
+                syncActivity.appendLog("Diag date: " + sDate.format(syncActivity.getCreationDate()));
+                //syncActivity.appendLog(String.format(Locale.UK, "Diag date: %d", syncActivity.getCreationDate().getTime()));
                 syncActivityID = syncActivity.getRecordID().toString();
                 // Build 107 - Added Upload Test
                 //uploadTest();
@@ -219,7 +273,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 // Check web database exists and create tables if necessary
                 checkWebDatabaseVersion(organisation);  // Done
                 // Download new records
-                downloadCount = downloadRecords();
+                downloadCount = downloadRecords(recheckDate);
                 // Build 143 - Download Website MyWeek Documents
                 downloadCount += downloadMyWeeks();
 
@@ -263,7 +317,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 }
 
                 // Check for new unread documents if the organisation is the current pref
-                if (runningOrganisation) {
+                if (prefOrganisation.equals(organisation)) {
                     checkUnread(unreadDocCount, currentUser);
                 }
                 // Save the Sync Result record
@@ -278,12 +332,21 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 syncActivity.setCompletionDate(completionDate);
                 localDB.save(syncActivity);
             } catch (Exception ex) {
+                // Build 181 Add PARTIAL_RECHECK handler. Load max of 200 syncs at a time
+                if (ex.getMessage().startsWith("PARTIAL_RECHECK")) {
+                    syncActivity.setResult("PARTIAL_RECHECK");
+                    syncActivity.setSummary(ex.getMessage());
+                    syncActivity.setCompletionDate(new Date());
+                    localDB.save(syncActivity);
+                    syncStatus = "PARTIAL_RECHECK";
+                }
                 // Build 138 - Add Partial Downloads. Load max of 200 syncs at a time
-                if (ex.getMessage().startsWith("PARTIAL")){
+                else if (ex.getMessage().startsWith("PARTIAL")) {
                     syncActivity.setResult("PARTIAL");
                     syncActivity.setSummary(ex.getMessage());
                     syncActivity.setCompletionDate(new Date());
                     localDB.save(syncActivity);
+                    syncStatus = "PARTIAL";
                 } else {
                     // Log a System Error
                     SystemError systemError = new SystemError(currentUser, ex);
@@ -295,19 +358,25 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     syncActivity.appendLog("*************** Stack Trace *************\n" + sbStackTrace.toString());
                     syncActivity.setCompletionDate(new Date());
                     localDB.save(syncActivity);
+                    syncStatus = "FAILURE";
+                    // Build 184 - Report exception Message
+                    syncExceptionMessage = ex.getMessage();
                 }
             }
         } catch (Exception ex) {
+            // Broadcast a failure. Unless this is the running orgaisation it will be ignored
             syncStatus = "FAILURE";
             syncExceptionMessage = ex.getMessage();
         } finally {
-            // Send Broadcast if this was the currently running org
+            // Build 181 Any broadcast from a non-running organisation will be ignored in Main.SyncReceiver()
             Intent intent = new Intent();
             intent.setAction(SyncManager.SYNC_ACTION);
             intent.putExtra(SyncManager.SYNC_STATUS, syncStatus);
             intent.putExtra(SyncManager.SYNC_ACTIVITY_ID, syncActivityID);
             intent.putExtra(SyncManager.SYNC_EXCEPTION_MESSAGE, syncExceptionMessage);
             intent.putExtra(SyncManager.SYNC_ORGANISATION, organisation);
+            // Build 181 Add partial receck data in case its a PARTIAL_RECHECK
+            intent.putExtra(SyncManager.SYNC_PARTIAL_RECHECK_DATE, partialRecheckDate);
             getContext().sendBroadcast(intent);
 
         }
@@ -327,7 +396,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         } else {
             // Build 150 - Added Channel ID
             NotificationCompat.Builder builder =
-                    new NotificationCompat.Builder(getContext(),Main.CHANNEL_ID)
+                    new NotificationCompat.Builder(getContext(), Main.CHANNEL_ID)
                             .setAutoCancel(true)
                             .setColor(ResourcesCompat.getColor(getContext().getResources(), R.color.colorPrimary, null))
                             .setSmallIcon(R.drawable.ic_cris_notification)
@@ -397,7 +466,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     ArrayList<String> sqlList = LocalDBOpenHelper.getWebUpgradeSql(version);
                     for (String sql : sqlList) {
                         //postJSON.put("Update_" + Integer.toString(version) + "_" + Integer.toString(count++), sql);
-                        webConnection.getInputJSON().put("Update_" + Integer.toString(version) + "_" + Integer.toString(count++), sql);
+                        webConnection.getInputJSON().put("Update_" + version + "_" + count++, sql);
                     }
                 }
                 // Finally, write the organisation
@@ -446,7 +515,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                 count = localDB.downloadWebsiteMyWeeks(jsonOutput);
 
                 syncActivity.appendLog(String.format(Locale.UK,
-                        "Downloaded Website MyWeeks (%d)",count));
+                        "Downloaded Website MyWeeks (%d)", count));
 
             }
         } catch (JSONException ex) {
@@ -458,92 +527,226 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         return count;
     }
 
-    private int downloadRecords() {
+    // Build 161 - Modified to recheck recent syncs. Adding records if the records do not exist
+    // So that it normally completes in 1 batch, the number of recent syncs is set to syncBatch -10
+    // Build 164 - Recheck facility has MAJOR bug. Itis rechecking the forst 50 syncs each time
+    // rather than the 50 just before the first null syncID. It is also rechecking before the null
+    // records are handled so recehck is repeated in PARTIAL cases. A better solution will be
+    // to maintain a FIFO buffer of non-null syncIDs and process it once the null syncIDs have
+    // completed
+    // Build 181 - Pass in recheckCount (from menu option)
+    private int downloadRecords(long recheckDate) {
+        SimpleDateFormat sDate = new SimpleDateFormat("dd/MM/yyyy", Locale.UK);
         int count = 0;
+        UUID syncID = null;
         try {
             // Get the SyncIDs for syncs since last successful SyncActivity start date (CreationDate)
             JSONObject jsonSync = getDownloadSyncIDs();
             // Build 138 - Add Partial Downloads. Load max of 200 syncs at a time
             int syncCount = 0;
-            int syncBatch = 100;
+            int syncBatch = 200;
+            // Build 164 - Define the FIFO Queue
+            Queue<JSONObject> recheckQueue = new LinkedList<JSONObject>();
             // Loop through the output rows
             JSONArray names = jsonSync.names();
-            for (int i = 0; i < names.length(); i++) {
+            // Build 181 - Recheck Added
+            int syncTotal = names.length();
+            int syncsRemaining = syncTotal;
+            for (int i = 0; i < syncTotal; i++) {
+                // Build 181 - Take account of recehck que when extimating syncsRemaining
+                syncsRemaining--;
                 String name = names.getString(i);
                 if (!name.equals("result")) {
                     JSONObject row = jsonSync.getJSONObject(names.getString(i));
-                    // Ignoring SyncIDs in local database (ones this tablet created in last sync)
-                    if (localDB.getSync(UUID.fromString(row.getString("SyncID"))) == null) {
+                    // Build 161 - Recheck of last 100
+                    //int action = IGNORE;
+                    syncID = null;
+                    syncID = UUID.fromString(row.getString("SyncID"));
+                    // Build 181 - Store local syncID to enable later date check
+                    //if (localDB.getSync(syncID) == null) {
+                    Sync localSyncID = localDB.getSync(syncID);
+                    if (localSyncID == null) {
+                        // Build 164 - Call the new downloadOneSyncID unless partial count exceeded
                         // Build 138 - Add Partial Downloads. Load max of 200 syncs at a time
-                        syncCount ++;
+                        syncCount++;
                         if (syncCount > syncBatch) {
                             // Calculate the approximate time remaining
-                            int syncsRemaining = names.length()-i;
+                            // Build 161 - Recheck of last 100
+                            //int syncsRemaining = names.length()-i;
                             Date timeNow = new Date();
                             Date timeStart = syncActivity.getCreationDate();
                             long interval = timeNow.getTime() - timeStart.getTime();
-                            long secondsRemaining = syncsRemaining * interval / syncBatch /1000;
-                            throw new CRISException(String.format("PARTIAL: %d remaining (approx. %d seconds)",syncsRemaining, secondsRemaining));
+                            long secondsRemaining = syncsRemaining * interval / syncBatch / 1000;
+                            throw new CRISException(String.format("PARTIAL: %d remaining (approx. %d seconds)", syncsRemaining, secondsRemaining));
                         }
-                        // Build 138 - Partial Initialisation - Add diagnostic
-                        String syncID = row.getString("SyncID");
-                        syncActivity.appendLog(String.format(Locale.UK,
-                                "Initiating downloaded using SyncID: %s", syncID));
-                        Sync newSync = new Sync(row.getString("TableName"), 0);
-                        newSync.setSyncID(UUID.fromString(row.getString("SyncID")));
-                        newSync.setSyncDate(new Date(row.getLong("SyncDate")));
-                        JSONObject jsonOutput;
-                        //JSONObject postJSON = getPostJSON(localDB);
-                        WebConnection webConnection = new WebConnection(localDB);
-                        JSONObject syncValues = new JSONObject();
-                        syncValues.put("SyncID", newSync.getSyncID().toString());
-                        syncValues.put("TableName", newSync.getTableName());
-                        //json.put("sync", syncValues);
-                        webConnection.getInputJSON().put("sync", syncValues);
-                        //jsonOutput = postJSON("get_records.php", json);
-                        jsonOutput = webConnection.post("pdo_get_records.php");
-                        String result = jsonOutput.getString("result");
-                        if (result.equals("FAILURE")) {
-                            throw new CRISException("pdo_get_records.php: " + jsonOutput.getString("error_message"));
-                        } else {
-                            int records;
-                            switch (row.getString("TableName")) {
-                                case "ListItem":
-                                    records = localDB.downloadListItems(jsonOutput, newSync);
-                                    break;
-                                case "User":
-                                    records = localDB.downloadUsers(jsonOutput, newSync);
-                                    break;
-                                case "Document":
-                                    records = localDB.downloadDocuments(jsonOutput, newSync);
-                                    break;
-                                case "SystemError":
-                                    records = localDB.downloadSystemErrors(jsonOutput, newSync);
-                                    break;
-                                case "Blobs":
-                                    records = localDB.downloadBlobs(jsonOutput, newSync);
-                                    break;
-                                case "ReadAudit":
-                                    records = localDB.downloadReadAudits(jsonOutput, newSync);
-                                    break;
-                                case "Follow":
-                                    records = localDB.downloadFollows(jsonOutput, newSync);
-                                    break;
-                                default:
-                                    throw new CRISException("Unexpected table name in downloadRecords: " + row.getString("TableName"));
-                            }
-                            syncActivity.appendLog(String.format(Locale.UK,
-                                    "Downloaded %s (%d)", row.getString("TableName"), records));
-                            count += records;
+                        count += downloadOneSyncID(syncID, row, ADD);
+                        //action = ADD;
+                        // Build 163 - Reduce the number of rechecks now that everybody has
+                        // downloaded the missing records.
+                        //} else if (syncsRemaining < syncBatch - 10){
+                        // Build 164 - Add SyncID to queue and maintain queue at size = recheckCount
+                        //} else if (syncsRemaining < recheckCount){
+                        // Build 181 - Add syncIDs to recheck queue if later than the recheck date
+                        //} else {
+                        //      action = RECHECK;
+                        //      recheckQueue.add(row);
+                        //      if (recheckQueue.size() > recheckCount) {
+                        //          recheckQueue.remove();
+                        //}
+                    } else {
+                        // Build 181 - Add sync to recheck queue if later than recheck date
+                        if (localSyncID.getSyncDate().getTime() >= recheckDate) {
+                            recheckQueue.add(row);
+                            syncsRemaining++;
                         }
                     }
                 }
             }
-        } catch (JSONException ex) {
-            // Build 138 - Add Partial Downloads
-            //throw new CRISException("Error parsing JSON data: " + ex.getMessage());
-            throw new CRISException("Error in DownloadRecords(): " + ex.getMessage());
+            // Build 164 = Now process the recheck queue
 
+            boolean first = true;
+            int recheckCount = 0;
+            while (recheckQueue.size() > 0) {
+                JSONObject row = recheckQueue.poll();
+                if (row != null) {
+                    syncID = UUID.fromString(row.getString("SyncID"));
+                    // Build 181 - Display date of first entry in the queue
+                    if (first) {
+                        first = false;
+                        syncActivity.appendLog(String.format("Rechecking %d most recent upload batches", recheckQueue.size()));
+                        Sync firstSync = localDB.getSync(syncID);
+                        if (firstSync != null) {
+                            syncActivity.appendLog("Earliest batch rechecked: " + sDate.format(firstSync.getSyncDate()));
+                        }
+                    }
+                    // Build 181 - Number of recehecks will be significant so implement PARTIAL mechanism
+                    syncsRemaining--;
+                    syncCount++;
+                    if (syncCount > syncBatch) {
+                        // Calculate the approximate time remaining
+                        // Build 161 - Recheck of last 100
+                        //int syncsRemaining = names.length()-i;
+                        Date timeNow = new Date();
+                        Date timeStart = syncActivity.getCreationDate();
+                        long interval = timeNow.getTime() - timeStart.getTime();
+                        long secondsRemaining = syncsRemaining * interval / syncBatch / 1000;
+                        // Build 181 - PARTIAL will need to restart from this syncID date so set global
+                        // variable to use when exception is handled
+                        Sync localSyncID = localDB.getSync(syncID);
+                        partialRecheckDate = localSyncID.getSyncDate().getTime();
+                        syncActivity.appendLog(String.format("%d Missing records added", recheckCount));
+                        Date tempDate = new Date(partialRecheckDate);
+                        syncActivity.appendLog("Partial Recheck Date: " + sDate.format(tempDate));
+                        throw new CRISException(String.format("PARTIAL_RECHECK: %d remaining (approx. %d seconds)", syncsRemaining, secondsRemaining));
+                    }
+
+                    // Build 169 - Remove diagnostic
+                    //syncActivity.appendLog(String.format(Locale.UK,
+                    //        "RECHECK using SyncID: %s", syncID));
+                    recheckCount += downloadOneSyncID(syncID, row, RECHECK);
+                }
+            }
+
+            // Build 181 - Diagnostic if recheck happened
+            if (!first) {
+                if (recheckCount > 0) {
+                    syncActivity.appendLog(String.format("%d Missing records added", recheckCount));
+                } else {
+                    syncActivity.appendLog("No missing records found");
+                }
+            }
+            count += recheckCount;
+
+
+        } catch (JSONException ex) {
+            // Build 164 - Improve error message
+            String id = "null";
+            if (syncID != null) {
+                id = syncID.toString();
+            }
+            throw new CRISException("" + String.format("Error parsing JSON data (syncID=%s): %s", id, ex.getMessage()));
+
+        } catch (Exception ex) {
+            // Build 163 - Allow PARTIAL exception to propagate
+            if (ex.getMessage().startsWith("PARTIAL")) {
+                throw ex;
+            } else {
+                //Build 161 - download can throw SQL exceptions
+                throw new CRISException("Error in DownloadRecords(): " + ex.getMessage());
+            }
+        }
+        return count;
+    }
+
+    private int downloadOneSyncID(UUID syncID, JSONObject row, int action) throws JSONException {
+        int count = 0;
+        // Build 161
+        if (action == ADD) {
+            syncActivity.appendLog(String.format(Locale.UK,
+                    "Initiating download using SyncID: %s", syncID));
+        }
+        Sync newSync = new Sync(row.getString("TableName"), 0);
+        newSync.setSyncID(UUID.fromString(row.getString("SyncID")));
+        newSync.setSyncDate(new Date(row.getLong("SyncDate")));
+        JSONObject jsonOutput;
+        //JSONObject postJSON = getPostJSON(localDB);
+        WebConnection webConnection = new WebConnection(localDB);
+        JSONObject syncValues = new JSONObject();
+        syncValues.put("SyncID", newSync.getSyncID().toString());
+        syncValues.put("TableName", newSync.getTableName());
+        //json.put("sync", syncValues);
+        webConnection.getInputJSON().put("sync", syncValues);
+        //jsonOutput = postJSON("get_records.php", json);
+        jsonOutput = webConnection.post("pdo_get_records.php");
+        String result = jsonOutput.getString("result");
+        if (result.equals("FAILURE")) {
+            throw new CRISException("pdo_get_records.php: " + jsonOutput.getString("error_message"));
+        } else {
+            int records = 0;
+            switch (row.getString("TableName")) {
+                case "ListItem":
+                    records = localDB.downloadListItems(jsonOutput, newSync, action, syncActivity);
+                    break;
+                case "User":
+                    records = localDB.downloadUsers(jsonOutput, newSync, action, syncActivity);
+                    break;
+                case "Document":
+                    records = localDB.downloadDocuments(jsonOutput, newSync, action, syncActivity);
+                    break;
+                case "SystemError":
+                    records = localDB.downloadSystemErrors(jsonOutput, newSync, action, syncActivity);
+                    break;
+                case "Blobs":
+                    records = localDB.downloadBlobs(jsonOutput, newSync, action, syncActivity);
+                    break;
+                case "ReadAudit":
+                    // Build 161
+                    if (action == ADD) {
+                        records = localDB.downloadReadAudits(jsonOutput, newSync);
+                    }
+                    break;
+                case "Follow":
+                    // Build 161
+                    if (action == ADD) {
+                        records = localDB.downloadFollows(jsonOutput, newSync);
+                    }
+                    break;
+                default:
+                    throw new CRISException("Unexpected table name in downloadRecords: " + row.getString("TableName"));
+            }
+            // Build 161 - Recheck added so count can be zero
+            // Build 161
+            if (action == ADD) {
+                syncActivity.appendLog(String.format(Locale.UK,
+                        "Downloaded %s (%d)", row.getString("TableName"), records));
+
+            } else {
+                if (records != 0) {
+                    syncActivity.appendLog(String.format(Locale.UK,
+                            "Recheck %s (%d added)", row.getString("TableName"), records));
+                }
+            }
+            count += records;
         }
 
         return count;
@@ -551,11 +754,15 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
 
     private JSONObject getDownloadSyncIDs() {
         JSONObject jsonOutput;
-        Long lastSync = Long.MIN_VALUE;
         //JSONObject postJSON = getPostJSON(localDB);
         WebConnection webConnection = new WebConnection(localDB);
         try {
             JSONObject values = new JSONObject();
+            // This facility was designed to speed the sync process by only looking at
+            // syncIDs created since the last sync on this device. However, not implemented since
+            // it potentially misses syncs from devices with incorrect date/time and the total
+            // download of syncIDs is not too large to be manageable.
+            Long lastSync = Long.MIN_VALUE;
             values.put("SyncDate", lastSync);
             //json.put("sync", values);
             webConnection.getInputJSON().put("sync", values);
@@ -597,7 +804,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("SyncID", sync.getSyncID().toString());
                     values.put("ReadDate", cursor.getLong(3));
                     //json.put("ReadAudit_" + Integer.toString(count++), values);
-                    webConnection.getInputJSON().put("ReadAudit_" + Integer.toString(count++), values);
+                    webConnection.getInputJSON().put("ReadAudit_" + count++, values);
                     cursor.moveToNext();
                 }
                 // Add in the Sync record
@@ -660,7 +867,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("Cancelled", cursor.getInt(3));
                     values.put("StartDate", cursor.getLong(4));
                     //json.put("Follow_" + Integer.toString(count++), values);
-                    webConnection.getInputJSON().put("Follow_" + Integer.toString(count++), values);
+                    webConnection.getInputJSON().put("Follow_" + count++, values);
                     cursor.moveToNext();
                 }
                 // Add in the Sync record
@@ -729,7 +936,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("SerialisedObject", Base64.encodeToString(encrypted, Base64.DEFAULT));
                     // Add to overall JSON object
                     //json.put("ListItem_" + Integer.toString(count++), values);
-                    webConnection.getInputJSON().put("ListItem_" + Integer.toString(count++), values);
+                    webConnection.getInputJSON().put("ListItem_" + count++, values);
                     cursor.moveToNext();
                 }
                 // Add in the Sync record
@@ -798,7 +1005,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     syncActivity.appendLog("Name: " + cursor.getString(7));
                     // Add to overall JSON object
                     //json.put("User_" + Integer.toString(count++), values);
-                    webConnection.getInputJSON().put("User_" + Integer.toString(count++), values);
+                    webConnection.getInputJSON().put("User_" + count++, values);
                     cursor.moveToNext();
                 }
                 // Add in the Sync record
@@ -865,7 +1072,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("SerialisedObject", Base64.encodeToString(cursor.getBlob(4), Base64.DEFAULT));
                     // Add to overall JSON object
                     //json.put("SystemError_" + Integer.toString(count++), values);
-                    webConnection.getInputJSON().put("SystemError_" + Integer.toString(count++), values);
+                    webConnection.getInputJSON().put("SystemError_" + count++, values);
                     cursor.moveToNext();
                 }
                 // Add in the Sync record
@@ -990,7 +1197,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
                     values.put("SessionID", sessionID);
                     // Add to overall JSON object
                     //json.put("Document_" + Integer.toString(count++), values);
-                    webConnection.getInputJSON().put("Document_" + Integer.toString(count++), values);
+                    webConnection.getInputJSON().put("Document_" + count++, values);
                     cursor.moveToNext();
                 }
                 // Add in the Sync record

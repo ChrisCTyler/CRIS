@@ -14,13 +14,16 @@ package solutions.cris.list;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+
 import androidx.annotation.NonNull;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import androidx.core.app.ActivityCompat;
@@ -28,6 +31,7 @@ import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -47,6 +51,8 @@ import solutions.cris.object.Client;
 import solutions.cris.object.ClientSession;
 import solutions.cris.object.CriteriaAssessmentTool;
 import solutions.cris.object.Document;
+import solutions.cris.object.ListItem;
+import solutions.cris.object.MACAYC18;
 import solutions.cris.object.User;
 import solutions.cris.utils.ExceptionHandler;
 import solutions.cris.utils.LocalSettings;
@@ -177,9 +183,7 @@ public class ListClientHeader extends ListActivity {
     }
 
 
-
-
-    private Drawable getStarIcon(int score){
+    private Drawable getStarIcon(int score) {
         switch (score) {
             case 1:
                 return ContextCompat.getDrawable(this, R.drawable.ic_star_red);
@@ -189,7 +193,7 @@ public class ListClientHeader extends ListActivity {
                 return ContextCompat.getDrawable(this, R.drawable.ic_star_yellow);
             case 4:
                 return ContextCompat.getDrawable(this, R.drawable.ic_star_green);
-             case 5:
+            case 5:
                 return ContextCompat.getDrawable(this, R.drawable.ic_star_blue);
             case 6:
                 return ContextCompat.getDrawable(this, R.drawable.ic_star_purple);
@@ -197,9 +201,10 @@ public class ListClientHeader extends ListActivity {
                 return ContextCompat.getDrawable(this, R.drawable.ic_star_grey);
         }
     }
+
     private void loadClientSessions() {
-        ImageView headerAttendance5 = (ImageView) findViewById(R.id.header_attendance_5);
-        ImageView headerMyWeek5 = (ImageView) findViewById(R.id.header_myweek_5);
+        ImageView headerAttendance5 = findViewById(R.id.header_attendance_5);
+        ImageView headerMyWeek5 = findViewById(R.id.header_myweek_5);
         headerAttendance5.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek5.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[4] != null) {
@@ -212,8 +217,8 @@ public class ListClientHeader extends ListActivity {
                 headerAttendance5.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
         }
-        ImageView headerAttendance4 = (ImageView) findViewById(R.id.header_attendance_4);
-        ImageView headerMyWeek4 = (ImageView) findViewById(R.id.header_myweek_4);
+        ImageView headerAttendance4 = findViewById(R.id.header_attendance_4);
+        ImageView headerMyWeek4 = findViewById(R.id.header_myweek_4);
         headerAttendance4.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek4.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[3] != null) {
@@ -226,8 +231,8 @@ public class ListClientHeader extends ListActivity {
                 headerAttendance4.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
         }
-        ImageView headerAttendance3 = (ImageView) findViewById(R.id.header_attendance_3);
-        ImageView headerMyWeek3 = (ImageView) findViewById(R.id.header_myweek_3);
+        ImageView headerAttendance3 = findViewById(R.id.header_attendance_3);
+        ImageView headerMyWeek3 = findViewById(R.id.header_myweek_3);
         headerAttendance3.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek3.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[2] != null) {// Build 144 - Show MyWeek score even if session not attended
@@ -238,8 +243,8 @@ public class ListClientHeader extends ListActivity {
                 headerAttendance3.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
         }
-        ImageView headerAttendance2 = (ImageView) findViewById(R.id.header_attendance_2);
-        ImageView headerMyWeek2 = (ImageView) findViewById(R.id.header_myweek_2);
+        ImageView headerAttendance2 = findViewById(R.id.header_attendance_2);
+        ImageView headerMyWeek2 = findViewById(R.id.header_myweek_2);
         headerAttendance2.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek2.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[1] != null) {
@@ -251,8 +256,8 @@ public class ListClientHeader extends ListActivity {
                 headerAttendance2.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross));
             }
         }
-        ImageView headerAttendance1 = (ImageView) findViewById(R.id.header_attendance_1);
-        ImageView headerMyWeek1 = (ImageView) findViewById(R.id.header_myweek_1);
+        ImageView headerAttendance1 = findViewById(R.id.header_attendance_1);
+        ImageView headerMyWeek1 = findViewById(R.id.header_myweek_1);
         headerAttendance1.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_cross_grey));
         headerMyWeek1.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_star_grey));
         if (clientSessions[0] != null) {
@@ -273,25 +278,25 @@ public class ListClientHeader extends ListActivity {
         // Sets isBirthdayFlag;
         int age = client.getAge();
 
-        ImageView headerIcon = (ImageView) findViewById(R.id.header_icon);
-        TextView firstNamesView = (TextView) findViewById(R.id.header_first_names);
-        TextView lastNameView = (TextView) findViewById(R.id.header_last_name);
-        TextView dateOfBirthView = (TextView) findViewById(R.id.header_date_of_birth);
-        TextView addressView = (TextView) findViewById(R.id.header_address);
-        TextView postcodeView = (TextView) findViewById(R.id.header_postcode);
-        final TextView contactNumberView = (TextView) findViewById(R.id.header_contact_number);
-        final TextView contactNumber2View = (TextView) findViewById(R.id.header_contact_number2);
-        final TextView emailView = (TextView) findViewById(R.id.header_email_address);
-        TextView genderView = (TextView) findViewById(R.id.header_gender);
-        TextView groupView = (TextView) findViewById(R.id.header_group);
-        TextView groupLabel = (TextView) findViewById(R.id.header_label_group);
-        TextView tierView = (TextView) findViewById(R.id.header_tier);
-        TextView tierLabel = (TextView) findViewById(R.id.header_label_tier);
-        final TextView keyworkerView = (TextView) findViewById(R.id.header_keyworker);
-        TextView keyworkerLabel = (TextView) findViewById(R.id.header_label_keyworker);
-        TextView toolView = (TextView) findViewById(R.id.header_tool);
-        TextView toolLabel = (TextView) findViewById(R.id.header_label_tool);
-        TextView following = (TextView) findViewById(R.id.header_following);
+        ImageView headerIcon = findViewById(R.id.header_icon);
+        TextView firstNamesView = findViewById(R.id.header_first_names);
+        TextView lastNameView = findViewById(R.id.header_last_name);
+        TextView dateOfBirthView = findViewById(R.id.header_date_of_birth);
+        TextView addressView = findViewById(R.id.header_address);
+        TextView postcodeView = findViewById(R.id.header_postcode);
+        final TextView contactNumberView = findViewById(R.id.header_contact_number);
+        final TextView contactNumber2View = findViewById(R.id.header_contact_number2);
+        final TextView emailView = findViewById(R.id.header_email_address);
+        TextView genderView = findViewById(R.id.header_gender);
+        TextView groupView = findViewById(R.id.header_group);
+        TextView groupLabel = findViewById(R.id.header_label_group);
+        TextView tierView = findViewById(R.id.header_tier);
+        TextView tierLabel = findViewById(R.id.header_label_tier);
+        final TextView keyworkerView = findViewById(R.id.header_keyworker);
+        TextView keyworkerLabel = findViewById(R.id.header_label_keyworker);
+        TextView toolView = findViewById(R.id.header_tool);
+        TextView toolLabel = findViewById(R.id.header_label_tool);
+        TextView following = findViewById(R.id.header_following);
 
         emailView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -360,14 +365,38 @@ public class ListClientHeader extends ListActivity {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
         dateOfBirthView.setText(String.format(Locale.UK,
                 "%s (%d)", sDate.format(client.getDateOfBirth()), age));
-        addressView.setText(client.getAddress());
+        // Build 188 - Address is now non-mandatory
+        if (client.getAddress().length() == 0) {
+            addressView.setText("Not Specified", null);
+        } else {
+            addressView.setText(client.getAddress(), null);
+        }
         postcodeView.setText(client.getPostcode());
-        contactNumberView.setText(client.getContactNumber());
+        // Build 188 - Contact Number is now non-mandatory
+        //contactNumberView.setText(client.getContactNumber());
+        if (client.getContactNumber().length() == 0) {
+            contactNumberView.setText("Not Specified", null);
+        } else {
+            contactNumberView.setText(client.getContactNumber(), null);
+        }
         if (client.getContactNumber2() != null) {
             contactNumber2View.setText(client.getContactNumber2());
         }
-        emailView.setText(client.getEmailAddress());
-        genderView.setText(client.getGender().getItemValue());
+        // Build 188 - Email Address is now non-mandatory
+        //emailView.setText(client.getEmailAddress());
+        if (client.getEmailAddress().length() == 0) {
+            emailView.setText("Not Specified", null);
+        } else {
+            emailView.setText(client.getEmailAddress(), null);
+        }
+        //genderView.setText(client.getGender().getItemValue());
+        // Build 170 - Instance of null gender found so handle the possibility
+        ListItem gender = client.getGender();
+        if (gender == null) {
+            genderView.setText("Unknown");
+        } else {
+            genderView.setText(gender.getItemValue());
+        }
 
         groupLabel.setText(String.format("%s: ", localSettings.Group));
         tierLabel.setText(String.format("%s: ", localSettings.Tier));
@@ -406,11 +435,23 @@ public class ListClientHeader extends ListActivity {
             toolView.setVisibility(View.GONE);
         } else {
             Document tool = client.getCurrentTool();
-            CriteriaAssessmentTool cat = (CriteriaAssessmentTool) tool;
+            //Build 187 - Added MACA as possible tool
             toolLabel.setVisibility(View.VISIBLE);
-            toolLabel.setText(String.format("%s: ", cat.getScoreLabel()));
             toolView.setVisibility(View.VISIBLE);
-            toolView.setText(String.format("%s  ", cat.getScoreText()));
+            switch (tool.getDocumentType()) {
+                case Document.CriteriaAssessmentTool:
+                    CriteriaAssessmentTool cat = (CriteriaAssessmentTool) tool;
+                    toolLabel.setText(String.format("%s: ", cat.getScoreLabel()));
+                    toolView.setText(String.format("%s  ", cat.getScoreText()));
+                    break;
+                case Document.MACAYC18:
+                    MACAYC18 macayc18 = (MACAYC18) tool;
+                    toolLabel.setText(String.format("%s: ", macayc18.getScoreLabel()));
+                    toolView.setText(String.format("%s  ", macayc18.getScoreText()));
+                    break;
+                default:
+                    throw new CRISException(String.format("Unexpected assessment tool in LoadHeader: %d", tool.getDocumentType()));
+            }
         }
         if (isFollowingClient) {
             following.setVisibility(View.VISIBLE);

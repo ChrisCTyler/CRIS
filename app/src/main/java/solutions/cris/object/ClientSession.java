@@ -4,6 +4,7 @@ import com.google.api.services.sheets.v4.model.CellData;
 import com.google.api.services.sheets.v4.model.CellFormat;
 import com.google.api.services.sheets.v4.model.DimensionProperties;
 import com.google.api.services.sheets.v4.model.DimensionRange;
+import com.google.api.services.sheets.v4.model.ExtendedValue;
 import com.google.api.services.sheets.v4.model.GridRange;
 import com.google.api.services.sheets.v4.model.NumberFormat;
 import com.google.api.services.sheets.v4.model.RepeatCellRequest;
@@ -214,6 +215,14 @@ public class ClientSession extends Document implements Serializable {
         // Build 155 - Add Address to export
         fNames.add("Address");
         fNames.add("Postcode");
+        //Build 156 - Add Telephone Number to export
+        fNames.add("Telephone");
+        // Build 181 - Add Email, Commissioner, School, FSM, SENCO to export
+        fNames.add("Email");
+        fNames.add("Commissioner");
+        fNames.add("School");
+        fNames.add("FSM");
+        fNames.add("SEND");
         fNames.add("Session Date");
         fNames.add("Attended");
         // Build 110
@@ -337,8 +346,21 @@ public class ClientSession extends Document implements Serializable {
                                 .setDimension("COLUMNS")
                                 // Build 139 - Adding Year Group to Export shifts column to right
                                 // Build 155 - Adding Address to Export shifts column to right
-                                .setStartIndex(12)
-                                .setEndIndex(15))
+                                // Build 156 - Adding Telephone number to Export shifts column to right
+                                .setStartIndex(13)
+                                .setEndIndex(16))
+                ));
+        // Set some Cell dimensions (Telephone Number Field)
+        requests.add(new Request()
+                .setUpdateDimensionProperties(new UpdateDimensionPropertiesRequest()
+                        .setFields("pixelSize")
+                        .setProperties(new DimensionProperties()
+                                .setPixelSize(120))
+                        .setRange(new DimensionRange()
+                                .setSheetId(sheetID)
+                                .setDimension("COLUMNS")
+                                .setStartIndex(7)
+                                .setEndIndex(8))
                 ));
         // 1st row is bold/Centered
         requests.add(new Request()
@@ -372,7 +394,8 @@ public class ClientSession extends Document implements Serializable {
                                 .setStartColumnIndex(2)
                                 .setEndColumnIndex(3)
                                 .setStartRowIndex(1))));
-        // 6th column is a date
+
+        // 13th column is a date
         requests.add(new Request()
                 .setRepeatCell(new RepeatCellRequest()
                         .setCell(new CellData()
@@ -387,8 +410,10 @@ public class ClientSession extends Document implements Serializable {
                                 .setSheetId(sheetID)
                                 // Build 139 - Adding Year Group to Export shifts column to right
                                 // Build 155 - Adding Address to Export shifts column to right
-                                .setStartColumnIndex(7)
-                                .setEndColumnIndex(8)
+                                // Build 156 - Adding Telephone number to Export shifts column to right
+                                // Build 181 - Inserted an extra 5 fields
+                                .setStartColumnIndex(13)
+                                .setEndColumnIndex(14)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -408,6 +433,54 @@ public class ClientSession extends Document implements Serializable {
         // Build 155 Added Address to Export
         row.add(client.getAddress());
         row.add(client.getPostcode());
+        // Build 156 Added Telephone Number to Export
+        row.add("t: " + client.getContactNumber());
+        // Build 181 - Add Email, Commissioner, School, FSM, SENCO to export
+        row.add(client.getEmailAddress());
+        Case currentCase = client.getCurrentCase();
+        if (currentCase != null) {
+            if (currentCase.getCommissioner() != null) {
+                row.add(currentCase.getCommissioner().getItemValue());
+            } else {
+                row.add("");    // Commissioner
+            }
+        } else {
+            row.add("");    // Commissioner
+        }
+        Contact currentSchool = client.getCurrentSchool();
+        if (currentSchool != null) {
+            if (currentSchool.getSchool() != null) {
+                row.add(currentSchool.getSchool().getItemValue());
+                if (currentSchool.isFreeSchoolMeals()) {
+                    row.add("TRUE");
+                } else {
+                    row.add("FALSE");
+                }
+                // Build 183
+                boolean isSEND = false;
+                if (currentSchool.isSpecialNeeds()) {
+                    isSEND = true;
+                }
+                if (currentSchool.getRelationshipType() != null) {
+                    if (currentSchool.getRelationshipType().getItemValue().equals("SENCO")) {
+                        isSEND = true;
+                    }
+                }
+                if (isSEND) {
+                    row.add("TRUE");
+                } else {
+                    row.add("FALSE");
+                }
+            } else {
+                row.add(String.format("Invalid School Contact Document (Not School) - %s", currentSchool.getContactName()));
+                row.add("");    // FSM
+                row.add("");    // SENCO/SEND
+            }
+        } else {
+            row.add("");        // School
+            row.add("");        // FSM
+            row.add("");        // SENCO/SEND
+        }
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
             row.add(sDate.format(getReferenceDate()));
         } else {
@@ -442,9 +515,14 @@ public class ClientSession extends Document implements Serializable {
             row.add("Unknown");
             row.add("Unknown");
         } else {
-            row.add(getItemValue(session.getGroup()));
+            // Build 171 tidy-up
+            //row.add(getItemValue(session.getGroup()));
+            row.add(session.getGroup().getItemValue());
+
             row.add(session.getSessionName());
-            row.add(getFullName(session.getSessionCoordinator()));
+            // Build 171 tidy-up
+            //row.add(getFullName(session.getSessionCoordinator()));
+            row.add(session.getSessionCoordinator().getFullName());
             row.add(session.getPostcode());
         }
         if (note == null) {
@@ -465,7 +543,9 @@ public class ClientSession extends Document implements Serializable {
             row.add("");    // Return
             row.add("");    // Used
         } else {
-            row.add(getItemValue(transport.getTransportOrganisation()));
+            // Build 171 Tidy up
+            //row.add(getItemValue(transport.getTransportOrganisation()));
+            row.add(transport.getTransportOrganisation().getItemValue());
             if (transport.isBooked()) {          // Booked
                 row.add("True");
             } else {
@@ -496,7 +576,8 @@ public class ClientSession extends Document implements Serializable {
         return row;
 
     }
-
+    // Build 171 See GetExportData()
+    /*
     private String getItemValue(ListItem item) {
         if (item == null) {
             return "Unknown";
@@ -505,6 +586,7 @@ public class ClientSession extends Document implements Serializable {
         }
     }
 
+
     private String getFullName(User user) {
         if (user == null) {
             return "Unknown";
@@ -512,4 +594,5 @@ public class ClientSession extends Document implements Serializable {
             return user.getFullName();
         }
     }
+         */
 }

@@ -73,12 +73,20 @@ public class Session extends Document implements Serializable {
     private Group group;
 
     public Group getGroup() {
-        if (groupID != null && group == null) {
-            if (groupID.equals(Group.adHocGroupID)) {
-                group = Group.getAdHocGroup();
-            } else {
-                LocalDB localDB = LocalDB.getInstance();
-                group = (Group) localDB.getListItem(groupID);
+        // Build 167 - Rework to mak it more robust
+        if (groupID == null) {
+            group = Group.getUnknownGroup();
+        } else {
+            if (group == null) {
+                if (groupID.equals(Group.adHocGroupID)) {
+                    group = Group.getAdHocGroup();
+                } else {
+                    LocalDB localDB = LocalDB.getInstance();
+                    group = (Group) localDB.getListItem(groupID);
+                    if (group == null) {
+                        group = Group.getUnknownGroup();
+                    }
+                }
             }
         }
         return group;
@@ -241,7 +249,7 @@ public class Session extends Document implements Serializable {
                 sessionCoordinator.getContactNumber()));
 
         // v2.0.084 4 Oct 2017 If the name has been changed set the group to ad-hoc
-        if (!sessionName.toString().trim().equals(group.getItemValue().trim())) {
+        if (!sessionName.trim().equals(group.getItemValue().trim())) {
             // Session Name has been changed
             setGroupID(Group.adHocGroupID);
             group = Group.getAdHocGroup();
@@ -435,7 +443,9 @@ public class Session extends Document implements Serializable {
         LocalDB localDB = LocalDB.getInstance();
         SimpleDateFormat sDate = new SimpleDateFormat("dd/MM/yyyy", Locale.UK);
         List<Object> row = new ArrayList<>();
-        row.add(getItemValue(getGroup()));
+        // Build 171 Tidy up
+        //row.add(getItemValue(getGroup()));
+        row.add(getGroup().getItemValue());
         row.add(getSessionName());
         row.add(getFullName(getSessionCoordinator()));
         row.add(getFullName(getKeyWorker()));
@@ -466,6 +476,8 @@ public class Session extends Document implements Serializable {
         return otherStaffString;
     }
 
+    // Build 171 Tidy up
+    /*
     private String getItemValue(ListItem item) {
         if (item == null) {
             return "Unknown";
@@ -473,6 +485,8 @@ public class Session extends Document implements Serializable {
             return item.getItemValue();
         }
     }
+
+     */
 
     private String getFullName(User user) {
         if (user == null) {

@@ -35,6 +35,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -86,6 +87,12 @@ public class EditContact extends Fragment {
     private EditText endDateView;
     private EditText additionalInformationView;
     private Spinner relationshipSpinner;
+    // Build 181
+    private LinearLayout freeSchoolMealsLayoutView;
+    private CheckBox freeSchoolMeals;
+    // Build 183
+    private LinearLayout specialNeedsLayoutView;
+    private CheckBox specialNeeds;
 
     private LocalDB localDB;
     private View parent;
@@ -130,7 +137,7 @@ public class EditContact extends Fragment {
         fab.setVisibility(View.GONE);
 
         // Clear the footer
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         footer.setText("");
 
         // Get the document to be edited from the activity
@@ -140,38 +147,50 @@ public class EditContact extends Fragment {
 
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
-            LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
+            LinearLayout cancelBoxView = parent.findViewById(R.id.cancel_box_layout);
             cancelBoxView.setVisibility(View.VISIBLE);
-            TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
+            TextView cancelBy = parent.findViewById(R.id.cancel_by);
             String byText = "by ";
             User cancelUser = localDB.getUser(editDocument.getCancelledByID());
             byText += cancelUser.getFullName() + " on ";
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
-            TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
+            TextView cancelReason = parent.findViewById(R.id.cancel_reason);
             cancelReason.setText(String.format("Reason: %s", editDocument.getCancellationReason()));
         }
 
-        contactTypeSpinner = (Spinner) parent.findViewById(R.id.contact_type_spinner);
-        agencySpinner = (Spinner) parent.findViewById(R.id.agency_spinner);
-        agencyLayout = (LinearLayout) parent.findViewById(R.id.agency_layout);
-        schoolSpinner = (Spinner) parent.findViewById(R.id.school_spinner);
-        schoolLayout = (LinearLayout) parent.findViewById(R.id.school_layout);
-        backgroundInformationView = (TextView) parent.findViewById(R.id.background_information);
-        backgroundLayout = (LinearLayout) parent.findViewById(R.id.background_layout);
-        addressLayout = (LinearLayout) parent.findViewById(R.id.address_layout);
-        nameView = (EditText) parent.findViewById(R.id.name);
-        addressView = (EditText) parent.findViewById(R.id.address);
-        postcodeView = (EditText) parent.findViewById(R.id.postcode);
-        contactNumberView = (EditText) parent.findViewById(R.id.contact_number);
-        emailAddressView = (EditText) parent.findViewById(R.id.email_address);
-        startDateView = (EditText) parent.findViewById(R.id.start_date);
-        endDateView = (EditText) parent.findViewById(R.id.end_date);
-        additionalInformationView = (EditText) parent.findViewById(R.id.additional_information);
-        relationshipSpinner = (Spinner) parent.findViewById(R.id.relationship_spinner);
+        contactTypeSpinner = parent.findViewById(R.id.contact_type_spinner);
+        agencySpinner = parent.findViewById(R.id.agency_spinner);
+        agencyLayout = parent.findViewById(R.id.agency_layout);
+        schoolSpinner = parent.findViewById(R.id.school_spinner);
+        schoolLayout = parent.findViewById(R.id.school_layout);
+        backgroundInformationView = parent.findViewById(R.id.background_information);
+        backgroundLayout = parent.findViewById(R.id.background_layout);
+        addressLayout = parent.findViewById(R.id.address_layout);
+        nameView = parent.findViewById(R.id.name);
+        addressView = parent.findViewById(R.id.address);
+        postcodeView = parent.findViewById(R.id.postcode);
+        contactNumberView = parent.findViewById(R.id.contact_number);
+        emailAddressView = parent.findViewById(R.id.email_address);
+        startDateView = parent.findViewById(R.id.start_date);
+        endDateView = parent.findViewById(R.id.end_date);
+        additionalInformationView = parent.findViewById(R.id.additional_information);
+        relationshipSpinner = parent.findViewById(R.id.relationship_spinner);
+
+        // Build 181
+        freeSchoolMealsLayoutView = parent.findViewById(R.id.free_school_meals_layout);
+        freeSchoolMealsLayoutView.setVisibility(View.GONE);
+        freeSchoolMeals = parent.findViewById(R.id.free_school_meals);
+        freeSchoolMeals.setVisibility(View.GONE);
+        // Build 183
+        specialNeedsLayoutView = parent.findViewById(R.id.special_needs_layout);
+        specialNeedsLayoutView.setVisibility(View.GONE);
+        specialNeeds = parent.findViewById(R.id.special_needs);
+        specialNeeds.setVisibility(View.GONE);
+
 
         // Set up the hint text
-        hintTextView = (TextView) parent.findViewById(R.id.hint_text);
+        hintTextView = parent.findViewById(R.id.hint_text);
         hintTextView.setText(getHintText());
         // Restore value of hintDisplayed (Set to opposite, toggle to come
         if (savedInstanceState != null) {
@@ -213,6 +232,12 @@ public class EditContact extends Fragment {
                             addressLayout.setVisibility(View.GONE);
                             addressView.setText("");
                             postcodeView.setText("");
+                            // Build 181
+                            freeSchoolMealsLayoutView.setVisibility(View.GONE);
+                            freeSchoolMeals.setVisibility(View.GONE);
+                            // Build 183
+                            specialNeedsLayoutView.setVisibility(View.GONE);
+                            specialNeeds.setVisibility(View.GONE);
                             break;
                         case "School Contact":
                             schoolLayout.setVisibility(View.VISIBLE);
@@ -223,6 +248,12 @@ public class EditContact extends Fragment {
                             addressLayout.setVisibility(View.GONE);
                             addressView.setText("");
                             postcodeView.setText("");
+                            // Build 181
+                            freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
+                            freeSchoolMeals.setVisibility(View.VISIBLE);
+                            // Build 181
+                            freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
+                            freeSchoolMeals.setVisibility(View.VISIBLE);
                             break;
                         default:
                             schoolLayout.setVisibility(View.GONE);
@@ -233,6 +264,9 @@ public class EditContact extends Fragment {
                             editDocument.setAgency(null);
                             backgroundLayout.setVisibility(View.GONE);
                             addressLayout.setVisibility(View.VISIBLE);
+                            // Build 181
+                            specialNeedsLayoutView.setVisibility(View.GONE);
+                            specialNeeds.setVisibility(View.GONE);
                     }
                 }
             }
@@ -330,7 +364,7 @@ public class EditContact extends Fragment {
         });
 
         // Cancel Button
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -341,7 +375,7 @@ public class EditContact extends Fragment {
             }
         });
         // Save Button
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -357,12 +391,19 @@ public class EditContact extends Fragment {
         Date today = new Date();
 
         if (isNewMode) {
+            // Build 181 - Default to Free School Meals
+            freeSchoolMeals.setChecked(true);
+            // Build 183 - Default to Free School Meals
+            specialNeeds.setChecked(false);
             startDateView.setText(sDate.format(today));
             nameView.clearFocus();
 
         } else {
             // Edit Mode
-            contactTypeSpinner.setSelection(contactTypePickList.getPosition(editDocument.getContactType()));
+            // Build 171 - Handle unexpected null ListItem ID
+            if (!editDocument.getContactType().getItemValue().equals("Unknown")) {
+                contactTypeSpinner.setSelection(contactTypePickList.getPosition(editDocument.getContactType()));
+            }
             // Build 125 - 18/07/2019 Odd case where crash happened because contact type was not set
             // in edit mode. Should not be possible due to prior validation check. However, the
             // following code change is safer
@@ -403,6 +444,14 @@ public class EditContact extends Fragment {
                         agencyLayout.setVisibility(View.GONE);
                         addressLayout.setVisibility(View.GONE);
                         schoolSpinner.setSelection(schoolPickList.getPosition(editDocument.getSchool()));
+                        // Build 181
+                        freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
+                        freeSchoolMeals.setVisibility(View.VISIBLE);
+                        freeSchoolMeals.setChecked(editDocument.isFreeSchoolMeals());
+                        // Build 183
+                        specialNeedsLayoutView.setVisibility(View.VISIBLE);
+                        specialNeeds.setVisibility(View.VISIBLE);
+                        specialNeeds.setChecked(editDocument.isSpecialNeeds());
                         break;
                 }
             }
@@ -416,7 +465,10 @@ public class EditContact extends Fragment {
                 endDateView.setText(sDate.format(editDocument.getEndDate()));
             }
             additionalInformationView.setText(editDocument.getContactAdditionalInformation());
-            relationshipSpinner.setSelection(relationshipPickList.getPosition(editDocument.getRelationshipType()));
+            // Build 171 - Handle unexpected null ListItem ID
+            if (!editDocument.getRelationshipType().getItemValue().equals("Unknown")) {
+                relationshipSpinner.setSelection(relationshipPickList.getPosition(editDocument.getRelationshipType()));
+            }
         }
     }
 
@@ -562,6 +614,11 @@ public class EditContact extends Fragment {
         endDateView.setError(null);
         additionalInformationView.setError(null);
 
+        // Build 181 - In case School Contact changed to other contact type, set FSM false here
+        editDocument.setFreeSchoolMeals(false);
+        // Build 183 - In case Special Needs changed to other contact type, set FSM false here
+        editDocument.setSpecialNeeds(false);
+
         // Holds most recent view to fail validation. The validation
         // should check the fields in the displayed order
         View focusView = null;
@@ -615,6 +672,10 @@ public class EditContact extends Fragment {
                     editDocument.setSchoolID(newSchool.getListItemID());
                     // PickList contained
                     editDocument.setSchool(localDB.getListItem(editDocument.getSchoolID()));
+                    // Build 181
+                    editDocument.setFreeSchoolMeals(freeSchoolMeals.isChecked());
+                    // Build 183
+                    editDocument.setSpecialNeeds(specialNeeds.isChecked());
                 }
             } else {
                 editDocument.setSchoolID(null);

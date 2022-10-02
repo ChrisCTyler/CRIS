@@ -107,7 +107,7 @@ public class EditPdfDocument extends Fragment {
         localDB = LocalDB.getInstance();
         Toolbar toolbar = ((ListActivity) getActivity()).getToolbar();
         FloatingActionButton fab;
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         currentUser = ((ListActivity)getActivity()).getCurrentUser();
         editDocument = (PdfDocument) ((ListActivity) getActivity()).getDocument();
         fab = ((ListActivity) getActivity()).getFab();
@@ -129,23 +129,23 @@ public class EditPdfDocument extends Fragment {
 
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
-            LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
+            LinearLayout cancelBoxView = parent.findViewById(R.id.cancel_box_layout);
             cancelBoxView.setVisibility(View.VISIBLE);
-            TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
+            TextView cancelBy = parent.findViewById(R.id.cancel_by);
             String byText = "by ";
             User cancelUser = localDB.getUser(editDocument.getCancelledByID());
             byText += cancelUser.getFullName() + " on ";
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
-            TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
+            TextView cancelReason = parent.findViewById(R.id.cancel_reason);
             cancelReason.setText(String.format("Reason: %s",editDocument.getCancellationReason()));
         }
 
         // Set up the form.
-        titleView = (EditText) parent.findViewById(R.id.pdf_document_title);
-        issueDateView = (EditText) parent.findViewById(R.id.pdf_document_issue_date);
-        fileNameView = (Spinner) parent.findViewById(R.id.file_name_spinner);
-        pdfTypeView = (Spinner) parent.findViewById(R.id.pdf_type_spinner);
+        titleView = parent.findViewById(R.id.pdf_document_title);
+        issueDateView = parent.findViewById(R.id.pdf_document_issue_date);
+        fileNameView = parent.findViewById(R.id.file_name_spinner);
+        pdfTypeView = parent.findViewById(R.id.pdf_type_spinner);
 
         // Initialise the Pdf Type Spinner
         pdfPickList = new PickList(localDB, ListType.CLIENT_PDF_TYPE);
@@ -156,7 +156,7 @@ public class EditPdfDocument extends Fragment {
         pdfTypeView.setSelection(pdfPickList.getDefaultPosition());
 
         // Set up the hint text
-        hintTextView = (TextView) parent.findViewById(R.id.hint_text);
+        hintTextView = parent.findViewById(R.id.hint_text);
         hintTextView.setText(getHintText());
         toggleHint();
         hintTextView.setOnClickListener(new View.OnClickListener() {
@@ -167,7 +167,7 @@ public class EditPdfDocument extends Fragment {
         });
 
         // Set up the Summary hint text
-        summaryHintTextView = (TextView) parent.findViewById(R.id.summary_hint_text);
+        summaryHintTextView = parent.findViewById(R.id.summary_hint_text);
         summaryHintTextView.setText(getSummaryHintText());
         toggleSummaryHint();
         summaryHintTextView.setOnClickListener(new View.OnClickListener() {
@@ -277,7 +277,7 @@ public class EditPdfDocument extends Fragment {
         });
 
         // Cancel Button
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -288,7 +288,7 @@ public class EditPdfDocument extends Fragment {
             }
         });
         // Save Button
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -306,8 +306,12 @@ public class EditPdfDocument extends Fragment {
             titleView.setText(editDocument.getSummary(), null);
             Date issueDate = editDocument.getReferenceDate();
             issueDateView.setText(sDate.format(issueDate.getTime()));
-            int position = pdfPickList.getOptions().indexOf(editDocument.getPdfType().getItemValue());
-            pdfTypeView.setSelection(position);
+            // Build 171 - Handle unexpected null ListItem ID
+            if (!editDocument.getPdfType().getItemValue().equals("Unknown")) {
+                int position = pdfPickList.getOptions().indexOf(editDocument.getPdfType().getItemValue());
+                pdfTypeView.setSelection(position);
+            }
+
         } else {
             issueDateView.setText(sDate.format(new Date()));
         }

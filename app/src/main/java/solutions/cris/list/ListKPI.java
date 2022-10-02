@@ -70,7 +70,7 @@ public class ListKPI extends CRISActivity {
             // Add the global uncaught exception handler
             Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
             setContentView(R.layout.activity_list);
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             toolbar.setTitle(getString(R.string.app_name) + " - Key Performance Indicators");
             setSupportActionBar(toolbar);
 
@@ -82,9 +82,12 @@ public class ListKPI extends CRISActivity {
             menuItems.add(new CRISMenuItem("Total/Active Cases (Last 12 Months)", "", R.drawable.ic_list, null));
             menuItems.add(new CRISMenuItem("Avg. Session Attendance", "", R.drawable.ic_list, null));
             menuItems.add(new CRISMenuItem("Avg. Session Attendance (Last 12 Months)", "", R.drawable.ic_list, null));
+            // Build 157 - Total Attendance KPIs
+            menuItems.add(new CRISMenuItem("Total Session Attendance", "", R.drawable.ic_list, null));
+            menuItems.add(new CRISMenuItem("Total Session Attendance (Last 12 Months)", "", R.drawable.ic_list, null));
 
             // Setup the List view listener
-            ListView listView = (ListView) findViewById(R.id.list_view);
+            ListView listView = findViewById(R.id.list_view);
             listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                     String title = ((CRISMenuItem) view.getTag()).getTitle();
@@ -131,12 +134,12 @@ public class ListKPI extends CRISActivity {
                 convertView = getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
             }
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
-            TextView viewItemDate = (TextView) convertView.findViewById(R.id.item_date);
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
-            TextView viewItemTitle = (TextView) convertView.findViewById(R.id.item_title);
-            ProgressBar syncProgress = (ProgressBar) convertView.findViewById(R.id.sync_progress);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
+            TextView viewItemDate = convertView.findViewById(R.id.item_date);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
+            TextView viewItemTitle = convertView.findViewById(R.id.item_title);
+            ProgressBar syncProgress = convertView.findViewById(R.id.sync_progress);
 
             final CRISMenuItem menuItem = menuItems.get(position);
             convertView.setTag(menuItem);

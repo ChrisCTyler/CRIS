@@ -6,6 +6,8 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.os.Bundle;
 
+import java.util.Date;
+
 import static android.content.Context.ACCOUNT_SERVICE;
 
 //        CRIS - Client Record Information System
@@ -38,6 +40,10 @@ public class SyncManager {
     public static final String SYNC_STATUS = "solutions.cris.SyncStatus";
     public static final String SYNC_EXCEPTION_MESSAGE = "solutions.cris.SyncExceptionMessage";
     public static final String SYNC_ORGANISATION = "solutions.cris.SyncOrgansiation";
+    // Build 181 Resync Options
+    public static final String SYNC_RECHECK = "solutions.cris.SyncRecheck";
+    public static final String SYNC_RECHECK_DATE = "solutions.cris.SyncRecheckDate";
+    public static final String SYNC_PARTIAL_RECHECK_DATE = "solutions.cris.SyncPartialRecheckDate";
 
     private static volatile SyncManager syncManager;
 
@@ -61,18 +67,33 @@ public class SyncManager {
 
     public void requestManualSync(){
         Bundle settingsBundle = new Bundle();
+        settingsBundle.putBoolean(SYNC_RECHECK, false);
+        settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
+        settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
+        //Build 181 - Now to indicate that this is not a re-sync
+        Date timeNow = new Date();
+        settingsBundle.putLong(SYNC_RECHECK_DATE, timeNow.getTime());
+        ContentResolver.requestSync(syncAccount, AUTHORITY, settingsBundle);
+    }
+
+    // Build 181 - Requestor for ReSync (has non-zero duration)
+    public void requestReSync(long recheckDate) {
+        Bundle settingsBundle = new Bundle();
+        settingsBundle.putBoolean(SYNC_RECHECK, true);
+        settingsBundle.putLong(SYNC_RECHECK_DATE, recheckDate);
         settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
         settingsBundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
         ContentResolver.requestSync(syncAccount, AUTHORITY, settingsBundle);
     }
 
     public void addPeriodicSync(){
+        Bundle settingsBundle = new Bundle();
         // It would appear that either the Cancel or the Remove causes problems with the ASUS
         // tablets making them intermittantly unable to resolve host names
-        //ContentResolver.cancelSync(syncAccount,AUTHORITY);
-        Bundle settingsBundle = new Bundle();
-        //ContentResolver.removePeriodicSync(syncAccount, AUTHORITY, settingsBundle);
-        //settingsBundle = new Bundle();
+        // Build 181 - Restore removePeriodicSync to ensure only one runs once - problem with inability to
+        // resolve host names seems to still happen intermittantly anyway.
+        ContentResolver.cancelSync(syncAccount, AUTHORITY);
+        ContentResolver.removePeriodicSync(syncAccount, AUTHORITY, settingsBundle);
         ContentResolver.addPeriodicSync(syncAccount,AUTHORITY,settingsBundle,SYNC_INTERVAL_IN_MINUTES * 60);
     }
 

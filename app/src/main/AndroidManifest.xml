@@ -90,6 +90,12 @@
             android:label="@string/title_activity_list_users"
             android:theme="@style/AppTheme" />
         <activity
+            android:name=".list.ListUnreadDocuments"
+            android:screenOrientation="portrait"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:label="@string/title_activity_list_unread_documents"
+            android:theme="@style/AppTheme" />
+        <activity
             android:name=".list.ListLibrary"
             android:screenOrientation="portrait"
             android:configChanges="keyboardHidden|orientation|screenSize"

@@ -1,5 +1,6 @@
 package solutions.cris.db;
 
+import android.app.LauncherActivity;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -21,6 +22,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -38,6 +40,7 @@ import solutions.cris.object.Group;
 import solutions.cris.object.Image;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
+import solutions.cris.object.MACAYC18;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
 import solutions.cris.object.NoteType;
@@ -52,6 +55,7 @@ import solutions.cris.object.SystemError;
 import solutions.cris.object.Transport;
 import solutions.cris.object.TransportOrganisation;
 import solutions.cris.object.User;
+import solutions.cris.sync.SyncAdapter;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.SwipeDetector;
 
@@ -117,7 +121,10 @@ public class LocalDB {
         return instance;
     }
 
-    public void checkDBUpgrade(User currentUser) {
+    // Build 178 - If an upgrade occurs, return the latest version and reset
+    // openHelper.getOldVersion to prevent repeated execution
+    //public void checkDBUpgrade(User currentUser) {
+    public int checkDBUpgrade(User currentUser) {
         int version = this.openHelper.getOldVersion();
         while (version < this.openHelper.getNewVersion()) {
             version++;
@@ -131,6 +138,15 @@ public class LocalDB {
 
         // V2.0.076 Added SessionID to Document table which needs to be populated
         updateClientSessionSessionID();
+
+        // Build 178 - If an upgrade occurs, return the latest version
+        if (this.openHelper.getOldVersion() != this.openHelper.getNewVersion()) {
+            // Prevent repeat running
+            this.openHelper.setOldVersion(version);
+            return version;
+        } else {
+            return 0;
+        }
     }
 
     public void updateClientSessionSessionID() {
@@ -241,6 +257,15 @@ public class LocalDB {
         return serialised;
     }
 
+    // SYSTEM ADMIN
+
+    public Cursor rawSQL(String query, String[] selectionArgs) {
+        String output = "Running SQL...\n";
+        LocalDB localDB = LocalDB.getInstance();
+        Cursor cursor = database.rawQuery(query, selectionArgs);
+        return cursor;
+    }
+
     // READ AUDIT
     //ReadByID CHAR(36) NOT NULL
     //DocumentID CHAR(36) NOT NULL
@@ -257,6 +282,19 @@ public class LocalDB {
         database.replaceOrThrow("ReadAudit", null, values);
     }
 
+    public boolean isRead(UUID documentID, UUID userID) {
+        boolean readFlag = false;
+        String[] tableColumns = new String[]{"ReadByID"};
+        String whereClause = " DocumentID = ? AND ReadByID = ?";
+        String[] whereArgs = new String[]{documentID.toString(), userID.toString()};
+        Cursor cursor = database.query("ReadAudit", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            readFlag = true;
+        }
+        cursor.close();
+        return readFlag;
+    }
+
     public int downloadReadAudits(JSONObject jsonOutput, Sync sync) {
         JSONArray names;
         try {
@@ -264,7 +302,6 @@ public class LocalDB {
             names = jsonOutput.names();
             for (int i = 0; i < names.length(); i++) {
                 String name = names.getString(i);
-
                 if (!name.equals("result")) {
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
                     ContentValues values = new ContentValues();
@@ -276,6 +313,7 @@ public class LocalDB {
                 }
             }
             // Save the sync
+
             save(sync);
             database.execSQL("COMMIT");
         } catch (JSONException ex) {
@@ -334,7 +372,7 @@ public class LocalDB {
         return follow;
     }
 
-    private Date followStartDate(UUID userID, UUID clientID) {
+    public Date followStartDate(UUID userID, UUID clientID) {
         Date followDate = new Date(Long.MIN_VALUE);
         String[] tableColumns = new String[]{"StartDate"};
         String whereClause = "UserID = ? AND ClientID = ?";
@@ -348,8 +386,11 @@ public class LocalDB {
         return followDate;
     }
 
+    // Build 161 - Added the facility to recheck whether a record was added and add if
+    // if it was missed. String action is Add or Recheck
     public int downloadFollows(JSONObject jsonOutput, Sync sync) {
         JSONArray names;
+
         try {
             database.execSQL("BEGIN TRANSACTION");
             names = jsonOutput.names();
@@ -358,6 +399,7 @@ public class LocalDB {
 
                 if (!name.equals("result")) {
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
+
                     ContentValues values = new ContentValues();
                     values.put("UserID", row.getString("UserID"));
                     values.put("ClientID", row.getString("ClientID"));
@@ -373,6 +415,7 @@ public class LocalDB {
                 }
             }
             // Save the sync
+
             save(sync);
             database.execSQL("COMMIT");
         } catch (JSONException ex) {
@@ -442,6 +485,19 @@ public class LocalDB {
         return outputStream.toByteArray();
     }
 
+    public boolean existsBlobByBlobID(String blobID) {
+        boolean exists = false;
+        String[] tableColumns = new String[]{"Content"};
+        String whereClause = "BlobID = ?";
+        String[] whereArgs = new String[]{blobID};
+        Cursor cursor = database.query("Blobs", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            exists = true;
+        }
+        cursor.close();
+        return exists;
+    }
+
     public Cursor getOneUnsyncedBlob(UUID syncID) {
         // Set one Blob to new SyncID
         String sql = "UPDATE Blobs SET SyncID = \"" + syncID.toString() + "\" WHERE BlobID in (SELECT BlobID FROM Blobs WHERE SyncID is null LIMIT 1)";
@@ -453,16 +509,17 @@ public class LocalDB {
         return database.query("Blobs", tableColumns, whereClause, whereArgs, null, null, null);
     }
 
-    public int downloadBlobs(JSONObject jsonOutput, Sync sync) {
+    public int downloadBlobs(JSONObject jsonOutput, Sync sync, int action, SyncActivity syncActivity) {
         JSONArray names;
+        int count = 0;
         try {
             database.execSQL("BEGIN TRANSACTION");
             names = jsonOutput.names();
             for (int i = 0; i < names.length(); i++) {
                 String name = names.getString(i);
-
                 if (!name.equals("result")) {
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
+
                     ContentValues values = new ContentValues();
                     values.put("BlobID", row.getString("BlobID"));
                     values.put("SyncID", row.getString("SyncID"));
@@ -474,11 +531,46 @@ public class LocalDB {
                     byte[] encrypted = aesEncryption.encrypt(AESEncryption.LOCAL_CIPHER, decryptedChunk);
                     values.put("Content", encrypted);
                     values.put("NextChunk", row.getString("NextChunk"));
-                    database.replaceOrThrow("Blobs", null, values);
+                    // If this is a new record, use insert
+                    String blobID = row.getString("BlobID");
+                    boolean recordExists = existsBlobByBlobID(blobID);
+
+                    if (!recordExists) {
+                        try {
+                            database.insertOrThrow("Blobs", null, values);
+                            count++;
+                            if (action == SyncAdapter.RECHECK) {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "Blob inserted {%s}", row.getString("BlobID")));
+                            }
+                        } catch (Exception ex) {
+                            syncActivity.appendLog(String.format(Locale.UK,
+                                    "Blob insert failed: %s", ex.getMessage()));
+                        }
+                    } else {
+                        //Build 178 if record exists ALWAYS leave it alone
+                        /*
+                        // Record already exists so simply replace the contents
+                        if (action == SyncAdapter.ADD) {
+                            try {
+                                database.replaceOrThrow("Blobs", null, values);
+                                count++;
+                            } catch (Exception ex) {
+                                // Ignore, nothing should reach here
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "Blob replace failed: %s", ex.getMessage()));
+                            }
+                        } else {
+                            // In RECHECK case, if the record already exists, leave it alone
+                        }
+                         */
+                    }
                 }
             }
             // Save the sync
-            save(sync);
+            if (action == SyncAdapter.ADD) {
+                save(sync);
+            }
             database.execSQL("COMMIT");
         } catch (JSONException ex) {
             database.execSQL("ROLLBACK");
@@ -487,7 +579,9 @@ public class LocalDB {
             database.execSQL("ROLLBACK");
             throw ex;
         }
-        return names.length() - 1;
+        // Build 161 - In RECHECK case only some of the records will have been updated
+        //return names.length() - 1;
+        return count;
     }
 
     // Build 107 29 Aug 2018
@@ -600,6 +694,57 @@ public class LocalDB {
         return getUser(whereClause, whereArgs);
     }
 
+    public ArrayList<UUID> getRecordIDs(User user) {
+        UUID userID = user.getUserID();
+        ArrayList<UUID> recordIDs = new ArrayList<>();
+        String[] tableColumns = new String[]{"RecordID"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "UserID = ?";
+        whereArgs = new String[]{userID.toString()};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, "CreationDate DESC");
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                recordIDs.add(UUID.fromString(cursor.getString(0)));
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return recordIDs;
+    }
+
+    public User getUserByRecordID(UUID recordID) {
+        User newUser = null;
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "RecordID = ?";
+        whereArgs = new String[]{recordID.toString()};
+        Cursor cursor = database.query("User", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            newUser = deSerializeUser(cursor.getBlob(0));
+        }
+        cursor.close();
+        return newUser;
+    }
+
+    public boolean existsUserByRecordID(String recordID) {
+        boolean exists = false;
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "RecordID = ?";
+        whereArgs = new String[]{recordID};
+        Cursor cursor = database.query("User", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            exists = true;
+        }
+        cursor.close();
+        return exists;
+    }
+
     private User deSerializeUser(byte[] encrypted) {
         User newUser;
         AESEncryption aesEncryption = AESEncryption.getInstance();
@@ -695,17 +840,21 @@ public class LocalDB {
         }
     }
 
-    public int downloadUsers(JSONObject jsonOutput, Sync sync) {
+    // Build 161 - Added the facility to recheck whether a record was added and add if
+    // if it was missed. String action is Add or Recheck
+    public int downloadUsers(JSONObject jsonOutput, Sync sync, int action, SyncActivity syncActivity) {
         JSONArray names;
+        int count = 0;
+        // Build 163 - Add a random small value to the history date to prevent constraint errors
+        Double randomInterval = (Math.random() * 100) + 1;
         try {
             database.execSQL("BEGIN TRANSACTION");
             names = jsonOutput.names();
-
             for (int i = 0; i < names.length(); i++) {
                 String name = names.getString(i);
                 if (!name.equals("result")) {
-
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
+
                     ContentValues values = new ContentValues();
                     values.put("RecordID", row.getString("RecordID"));
                     values.put("SyncID", row.getString("SyncID"));
@@ -723,13 +872,110 @@ public class LocalDB {
                     byte[] encrypted = aesEncryption.encrypt(AESEncryption.LOCAL_CIPHER, decrypted);
                     // Write to the local database
                     values.put("SerialisedObject", encrypted);
-                    database.replaceOrThrow("User", null, values);
+                    // If this is a new record, use insert
+                    String recordID = row.getString("RecordID");
+                    boolean recordExists = existsUserByRecordID(recordID);
+
+                    if (!recordExists) {
+                        try {
+                            database.insertOrThrow("User", null, values);
+                            count++;
+                            if (action == SyncAdapter.RECHECK) {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "User inserted {%s}", row.getString("RecordID")));
+                            }
+                        } catch (Exception ex) {
+                            if (ex.getMessage().contains("UNIQUE constraint failed")) {
+                                // This is the two independent edits case
+                                // Get the local current User
+                                UUID userUUID = UUID.fromString(row.getString("UserID"));
+                                User user = getUser(userUUID);
+                                Long downloadCreationDate = row.getLong("CreationDate");
+                                if (user != null) {
+                                    // The older of the two needs the addition of a history date
+                                    if (user.getCreationDate().getTime() > downloadCreationDate) {
+                                        values.remove("HistoryDate");
+                                        // The local User may already be history so modify its creation date
+                                        // slightly so that this nes User does not clash
+                                        // Build 163 - Add a random interval to avoid constraint errors
+                                        //values.put("HistoryDate", user.getCreationDate().getTime() + 10);
+                                        values.put("HistoryDate", user.getCreationDate().getTime() + randomInterval.longValue());
+                                        // Retry the insert
+                                        try {
+                                            database.insertOrThrow("User", null, values);
+                                            count++;
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "User inserted (History modified) {%s}", row.getString("RecordID")));
+                                        } catch (Exception ex2) {
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Failed to insert User (History Modified: %s", ex2.getMessage()));
+                                        }
+                                    } else {
+                                        // Update the HistoryDate in the local User
+                                        String whereClause = "RecordID = ?";
+                                        String[] whereArgs = new String[]{user.getRecordID().toString()};
+                                        ContentValues userValues = new ContentValues();
+                                        // Build 163 - Add a random interval to avoid constraint errors
+                                        //userValues.put("HistoryDate", downloadCreationDate);
+                                        userValues.put("HistoryDate", downloadCreationDate + randomInterval.longValue());
+                                        // Do not clear the SyncID since this is a local fix. Each
+                                        // copy will fix it's own records
+                                        //values.putNull("SyncID");
+                                        // Build 163 - Add exception handler, just in case
+                                        try {
+                                            database.update("User", userValues, whereClause, whereArgs);
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Local User HistoryDate set {%s}", user.getRecordID().toString()));
+                                            try {
+                                                database.insertOrThrow("User", null, values);
+                                                count++;
+                                                syncActivity.appendLog(String.format(Locale.UK,
+                                                        "User inserted {%s}", row.getString("RecordID")));
+                                            } catch (Exception ex2) {
+                                                syncActivity.appendLog(String.format(Locale.UK,
+                                                        "Still failed to insert User: %s", ex2.getMessage()));
+                                            }
+                                        } catch (Exception ex2) {
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Error adding history date to local user: %s", ex2.getMessage()));
+                                        }
+                                    }
+                                } else {
+                                    syncActivity.appendLog(String.format(Locale.UK,
+                                            "User insert failed but no local User found: %s", ex.getMessage()));
+                                }
+                            } else {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "User insert failed (Not Constraint error): %s", ex.getMessage()));
+                            }
+                        }
+                    } else {
+                        //Build 178 if record exists ALWAYS leave it alone
+                        /*
+                        // Record already exists so simply replace the contents
+                        if (action == SyncAdapter.ADD) {
+                            try {
+                                database.replaceOrThrow("User", null, values);
+                                count++;
+                            } catch (Exception ex) {
+                                // Ignore, nothing should reach here
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "User replace failed: %s", ex.getMessage()));
+                            }
+                        } else {
+                            // In RECHECK case, if the record already exists, leave it alone
+                        }
+                         */
+                    }
                 }
 
             }
 
             // Save the sync
-            save(sync);
+            // Build 161 - Only save the sync if Add (Recheck already has the sync record)
+            if (action == SyncAdapter.ADD) {
+                save(sync);
+            }
             database.execSQL("COMMIT");
         } catch (JSONException ex) {
             database.execSQL("ROLLBACK");
@@ -738,7 +984,9 @@ public class LocalDB {
             database.execSQL("ROLLBACK");
             throw ex;
         }
-        return names.length() - 1;
+        // Build 161 - Recheck last 100
+        //return names.length() - 1;
+        return count;
     }
 
     // DOCUMENT
@@ -754,7 +1002,7 @@ public class LocalDB {
     //SerialisedObject BLOB
     //ReferenceDate INTEGER
 
-    private Document deSerializeDocument(byte[] encrypted, int docType) {
+    public Document deSerializeDocument(byte[] encrypted, int docType) {
         Document newDocument = null;
         AESEncryption aesEncryption = AESEncryption.getInstance();
         byte[] decrypt = aesEncryption.decrypt(AESEncryption.LOCAL_CIPHER, encrypted);
@@ -790,6 +1038,10 @@ public class LocalDB {
                 case Document.Image:
                     Image image = (Image) o.readObject();
                     newDocument = image;
+                    break;
+                case Document.MACAYC18:
+                    MACAYC18 macayc18 = (MACAYC18) o.readObject();
+                    newDocument = macayc18;
                     break;
                 case Document.MyWeek:
                     MyWeek newMyWeek = (MyWeek) o.readObject();
@@ -831,13 +1083,12 @@ public class LocalDB {
         return newDocument;
     }
 
-    public ArrayList<Document> getUnreadDocuments(User currentUser) {
-        ArrayList<Document> documents = new ArrayList<>();
-
+    public Cursor getUnreadDocumentsCursor(User currentUser) {
+        Cursor cursor = null;
         String query = "SELECT DOC.DocumentType, DOC.SerialisedObject, DOC.ClientID, DOC.CreationDate FROM Document AS DOC " +
                 "LEFT OUTER JOIN ReadAudit RA ON RA.ReadByID = ? AND " +
                 "DOC.DocumentID = RA.DocumentID AND RA.ReadDate > DOC.CreationDate  " +
-                "WHERE DOC.HistoryDate = " + Long.toString(Long.MIN_VALUE) + " " +
+                "WHERE DOC.HistoryDate = " + Long.MIN_VALUE + " " +
                 // Build 101 - Only search for Notes and My Weeks
                 "AND (DOC.DocumentType = 3 OR DOC.DocumentType = 5)  " +
                 "AND RA.DocumentID IS NULL AND DOC.CreatedByID != ? AND DOC.Cancelled = 0 " +
@@ -849,9 +1100,31 @@ public class LocalDB {
                 currentUser.getUserID().toString(),
                 currentUser.getUserID().toString(),
                 Client.nonClientDocumentID.toString()};
+        try {
+            cursor = database.rawQuery(query, selectionArgs);
+        } catch (Exception ex) {
+            // ignore
+        }
+        return cursor;
+
+    }
+
+    public ArrayList<Document> getUnreadDocuments(User currentUser) {
+        ArrayList<Document> documents = new ArrayList<>();
+
+        // Build 158 - Optimisation
+        boolean readAllDocuments = false;
+        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+            readAllDocuments = true;
+        }
+        boolean readNotes = false;
+        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
+            readNotes = true;
+        }
         // Build 151 - Belt and braces
         try {
-            Cursor cursor = database.rawQuery(query, selectionArgs);
+            //Cursor cursor = database.rawQuery(query, selectionArgs);
+            Cursor cursor = getUnreadDocumentsCursor(currentUser);
             if (cursor.getCount() > 0) {
                 // Build 151 - Spurious error where cursor exists but index crashes
                 // Added try/catch to restart after crash but limit to 10 to
@@ -874,21 +1147,22 @@ public class LocalDB {
                             if (clientID.equals(Document.nonClientDocumentID.toString())) {
                                 addDocument = true;
                             } else {
-                                Client client = (Client) getDocument(UUID.fromString(clientID));
+                                // Build 158 Move the client test to only when sure we want to add the document
+                                //Client client = (Client) getDocument(UUID.fromString(clientID));
                                 // Build 098 - test here (instead of Main so that count is correct in Sync)
                                 // Due to an earlier bug, there can be spurious documents which are not
                                 // linked to a client. These should be ignored
-                                if (client != null) {
-                                    if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+                                //if (client != null) {
+                                if (readAllDocuments) {
+                                    addDocument = true;
+                                } else if (readNotes) {
+                                    // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
+                                    // NB: Test for Sticky Notes is later
+                                    if (documentType == Document.Note) {
                                         addDocument = true;
-                                    } else if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
-                                        // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
-                                        // NB: Test for Sticky Notes is later
-                                        if (documentType == Document.Note) {
-                                            addDocument = true;
-                                        }
                                     }
                                 }
+                                //}
                                 //else{
                                 //    // From Build 086 READ_NOTES is used for READ_DEMOGRAPHICDOCUMENTS
                                 //    switch (documentType) {
@@ -921,7 +1195,7 @@ public class LocalDB {
                                 // only sticky notes are allowed
                                 if (documentType == Document.Note) {
                                     Note note = (Note) document;
-                                    if (!currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
+                                    if (!readAllDocuments) {
                                         if (!note.isStickyFlag()) {
                                             document = null;
                                         }
@@ -936,7 +1210,11 @@ public class LocalDB {
                                     }
                                 }
                                 if (document != null) {
-                                    documents.add(document);
+                                    // Build 158 - Finally check that client is non-null (See Build 98 fix earlier)
+                                    Client client = (Client) getDocument(UUID.fromString(clientID));
+                                    if (client != null) {
+                                        documents.add(document);
+                                    }
                                 }
                             }
                         }
@@ -952,7 +1230,7 @@ public class LocalDB {
                 }
             }
             cursor.close();
-        } catch (Exception ex){
+        } catch (Exception ex) {
             // ignore
         }
         return documents;
@@ -1143,6 +1421,27 @@ public class LocalDB {
         return documents;
     }
 
+    // Build 181
+    public boolean isSessionIDSet(UUID documentID) {
+        boolean isSet = false;
+        Document newDocument = null;
+        String[] tableColumns = new String[]{"SessionID"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "DocumentID = ? AND HistoryDate = ?";
+        whereArgs = new String[]{documentID.toString(), Long.toString(Long.MIN_VALUE)};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            String sessionID = cursor.getString(0);
+            if (sessionID.length() > 0) {
+                isSet = true;
+            }
+        }
+        cursor.close();
+        return isSet;
+    }
+
     public ArrayList<RawDocument> getAllRawDocumentsOfType(int documentType) {
         return getAllRawDocumentsOfType(documentType, new Date(Long.MIN_VALUE), new Date(Long.MAX_VALUE));
     }
@@ -1249,6 +1548,30 @@ public class LocalDB {
         String[] whereArgs;
         whereClause = "ClientID = ? AND HistoryDate = ? AND DocumentType = ? ";
         whereArgs = new String[]{clientID.toString(), Long.toString(Long.MIN_VALUE), Integer.toString(documentType)};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Document document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+                // New document types (post this version) will return as null documents, ignore.
+                if (document != null) {
+                    documents.add(document);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return documents;
+    }
+
+    // Build 181
+    public ArrayList<Document> getAllDocumentsOfType(UUID clientID, int documentType, UUID sessionID) {
+        ArrayList<Document> documents = new ArrayList<>();
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "ClientID = ? AND HistoryDate = ? AND DocumentType = ? AND SessionID = ?";
+        whereArgs = new String[]{clientID.toString(), Long.toString(Long.MIN_VALUE), Integer.toString(documentType), sessionID.toString()};
         Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
@@ -1377,6 +1700,21 @@ public class LocalDB {
         return newDocument;
     }
 
+    public boolean existsDocumentByRecordID(String recordID) {
+        boolean exists = false;
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "RecordID = ?";
+        whereArgs = new String[]{recordID};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            exists = true;
+        }
+        cursor.close();
+        return exists;
+    }
+
     public String getDocumentMetaData(UUID recordID, boolean isEarliest, SwipeDetector.Action action) {
         SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
         String content = "";
@@ -1458,12 +1796,14 @@ public class LocalDB {
         String whereClause;
         String[] whereArgs;
         Date now = new Date();
+        String nowString = Long.toString(now.getTime());
         whereClause = "ClientID = ? AND HistoryDate = ? AND Cancelled = 0 AND DocumentType != 'Client' AND ReferenceDate < ? ";
-        whereArgs = new String[]{client.getClientID().toString(), Long.toString(Long.MIN_VALUE), Long.toString(now.getTime())};
+        whereArgs = new String[]{client.getClientID().toString(), Long.toString(Long.MIN_VALUE), nowString};
         String orderBy = "ReferenceDate DESC LIMIT 1";
         Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, orderBy);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
+
             long time = cursor.getLong(0);
             if (time != Long.MIN_VALUE && time != 0) {
                 latest = new Date(time);
@@ -1471,6 +1811,28 @@ public class LocalDB {
         }
         cursor.close();
         return latest;
+
+    }
+
+    public HashMap<UUID, Date> getLatestDocumentDates() {
+        HashMap<UUID, Date> latestDates = new HashMap<UUID, Date>();
+        Date now = new Date();
+        String[] selectionArgs = new String[]{Long.toString(now.getTime())};
+        String query = "SELECT ClientID, MAX(ReferenceDate) FROM Document WHERE ReferenceDate < ? GROUP BY ClientID";
+        Cursor cursor = database.rawQuery(query, selectionArgs);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                long time = cursor.getLong(1);
+                if (time != Long.MIN_VALUE && time != 0) {
+                    UUID clientUUID = UUID.fromString(cursor.getString(0));
+                    latestDates.put(clientUUID, new Date(time));
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return latestDates;
 
     }
 
@@ -1537,6 +1899,46 @@ public class LocalDB {
             // Added in Database version 2
             values.put("ReferenceDate", document.getReferenceDate().getTime());
             // Added in Database version 18
+            // Build 181 - Modified to include Notes, etc. created via Session Register
+            switch (document.getDocumentType()) {
+                case Document.ClientSession:
+                    if (((ClientSession) document).getSessionID() != null) {
+                        values.put("SessionID", ((ClientSession) document).getSessionID().toString());
+                    } else {
+                        values.put("SessionID", "");
+                    }
+                    break;
+                case Document.Note:
+                    if (((Note) document).getSessionID() != null) {
+                        values.put("SessionID", ((Note) document).getSessionID().toString());
+                    } else {
+                        values.put("SessionID", "");
+                    }
+                    break;
+                case Document.PdfDocument:
+                    if (((PdfDocument) document).getSessionID() != null) {
+                        values.put("SessionID", ((PdfDocument) document).getSessionID().toString());
+                    } else {
+                        values.put("SessionID", "");
+                    }
+                    break;
+                case Document.Transport:
+                    if (((Transport) document).getSessionID() != null) {
+                        values.put("SessionID", ((Transport) document).getSessionID().toString());
+                    } else {
+                        values.put("SessionID", "");
+                    }
+                    break;
+                case Document.MyWeek:
+                    if (((MyWeek) document).getSessionID() != null) {
+                        values.put("SessionID", ((MyWeek) document).getSessionID().toString());
+                    } else {
+                        values.put("SessionID", "");
+                    }
+                    break;
+            }
+
+            /*
             if (document.getDocumentType() == Document.ClientSession) {
                 if (((ClientSession) document).getSessionID() != null) {
                     values.put("SessionID", ((ClientSession) document).getSessionID().toString());
@@ -1546,7 +1948,7 @@ public class LocalDB {
             } else {
                 values.put("SessionID", "");
             }
-
+            */
             database.insertOrThrow("Document", null, values);
             // All done so commit the changes
             database.execSQL("COMMIT");
@@ -1557,16 +1959,25 @@ public class LocalDB {
         }
     }
 
-    public int downloadDocuments(JSONObject jsonOutput, Sync sync) {
+    // Build 161 - Added the facility to recheck whether a record was added and add if
+    // if it was missed. String action is Add or Recheck
+    // This is also the function where we must resolve edit clashes. It is possible, but hopefully
+    // rare that the document to be downloaded is a new edit and the local document is also a new
+    // edit. Both will have null history dates causing an exception in the InsertOrThrow
+    public int downloadDocuments(JSONObject jsonOutput, Sync sync, int action, SyncActivity syncActivity) {
         JSONArray names;
+        int count = 0;
+        // Build 163 - Add a random small value to the history date to prevent constraint errors
+        Double randomInterval = (Math.random() * 100) + 1;
         try {
             database.execSQL("BEGIN TRANSACTION");
             names = jsonOutput.names();
             for (int i = 0; i < names.length(); i++) {
                 String name = names.getString(i);
-
                 if (!name.equals("result")) {
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
+
+                    // Build the values array for the Insert or Replace
                     ContentValues values = new ContentValues();
                     values.put("RecordID", row.getString("RecordID"));
                     values.put("SyncID", row.getString("SyncID"));
@@ -1600,12 +2011,108 @@ public class LocalDB {
                         sessionID = "";
                     }
                     values.put("SessionID", sessionID);
-                    database.replaceOrThrow("Document", null, values);
-                }
 
+                    // If this is a new record, use insert
+                    String recordID = row.getString("RecordID");
+                    boolean recordExists = existsDocumentByRecordID(recordID);
+
+                    if (!recordExists) {
+                        try {
+                            database.insertOrThrow("Document", null, values);
+                            count++;
+                            if (action == SyncAdapter.RECHECK) {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "Document inserted {%s}", row.getString("RecordID")));
+                            }
+                        } catch (Exception ex) {
+                            if (ex.getMessage().contains("UNIQUE constraint failed")) {
+                                // This is the two independent edits case
+                                // Get the local current document
+                                UUID documentUUID = UUID.fromString(row.getString("DocumentID"));
+                                Document document = getDocument(documentUUID);
+                                Long downloadCreationDate = row.getLong("CreationDate");
+                                if (document != null) {
+                                    // The older of the two needs the addition of a history date
+                                    if (document.getCreationDate().getTime() > downloadCreationDate) {
+                                        values.remove("HistoryDate");
+                                        // The local document may already be history so modify its creation date
+                                        // slightly so that this nes document does not clash
+                                        // Build 163 - Add a random interval to avoid constraint errors
+                                        //values.put("HistoryDate", document.getCreationDate().getTime());
+                                        values.put("HistoryDate", document.getCreationDate().getTime() + randomInterval.longValue());
+                                        // Retry the insert
+                                        try {
+                                            database.insertOrThrow("Document", null, values);
+                                            count++;
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Document inserted (History modified) {%s}", row.getString("RecordID")));
+                                        } catch (Exception ex2) {
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Failed to insert document (History Modified: %s", ex2.getMessage()));
+                                        }
+                                    } else {
+                                        // Update the HistoryDate in the local document
+                                        String whereClause = "RecordID = ?";
+                                        String[] whereArgs = new String[]{document.getRecordID().toString()};
+                                        ContentValues documentValues = new ContentValues();
+                                        // Build 163 - Add a random interval to avoid constraint errors
+                                        documentValues.put("HistoryDate", downloadCreationDate + randomInterval.longValue());
+                                        // Do not clear the SyncID since this is a local fix. Each
+                                        // copy will fix it's own records
+                                        //values.putNull("SyncID");
+                                        // Build 163 - Add exception handler, just in case
+                                        try {
+                                            database.update("Document", documentValues, whereClause, whereArgs);
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Local Document HistoryDate set {%s}", document.getRecordID().toString()));
+                                            try {
+                                                database.insertOrThrow("Document", null, values);
+                                                count++;
+                                                syncActivity.appendLog(String.format(Locale.UK,
+                                                        "Document inserted {%s}", row.getString("RecordID")));
+                                            } catch (Exception ex2) {
+                                                syncActivity.appendLog(String.format(Locale.UK,
+                                                        "Still failed to insert document: %s", ex2.getMessage()));
+                                            }
+                                        } catch (Exception ex2) {
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Error adding history date to local document: %s", ex2.getMessage()));
+                                        }
+                                    }
+                                } else {
+                                    syncActivity.appendLog(String.format(Locale.UK,
+                                            "Document insert failed but no local document found: %s", ex.getMessage()));
+                                }
+                            } else {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "Document insert failed (Not Constraint error): %s", ex.getMessage()));
+                            }
+                        }
+                    } else {
+                        //Build 178 if record exists ALWAYS leave it alone
+                        /*
+                        // Record already exists so simply replace the contents
+                        if (action == SyncAdapter.ADD) {
+                            try {
+                                database.replaceOrThrow("Document", null, values);
+                                count++;
+                            } catch (Exception ex) {
+                                // Ignore, nothing should reach here
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "Document replace failed: %s", ex.getMessage()));
+                            }
+                        } else {
+                            // In RECHECK case, if the record already exists, leave it alone
+                        }
+                         */
+                    }
+                }
             }
             // Save the sync
-            save(sync);
+            // Build 161 - Only save the sync if Add (Recheck already has the sync record)
+            if (action == SyncAdapter.ADD) {
+                save(sync);
+            }
             database.execSQL("COMMIT");
 
         } catch (JSONException ex) {
@@ -1613,9 +2120,14 @@ public class LocalDB {
             throw new CRISException("Error parsing JSON data: " + ex.getMessage());
         } catch (Exception ex) {
             database.execSQL("ROLLBACK");
+            syncActivity.appendLog(String.format(Locale.UK,
+                    "Exception: %s", ex.getMessage()));
             throw ex;
         }
-        return names.length() - 1;
+
+        // Build 161 - In RECHECK case only some of the records will have been updated
+        //return names.length() - 1;
+        return count;
     }
 
     // Build 143 - Download Website MyWeek Questionnaires
@@ -1666,8 +2178,7 @@ public class LocalDB {
                     try {
                         clientUUID = UUID.fromString(clientID);
                         myWeek = new MyWeek(theClient, UUID.fromString(clientID));
-                    }
-                    catch (Exception ex){
+                    } catch (Exception ex) {
                         // Ignore, this will be caught in System Admin MyWeek checker
                     }
                     if (myWeek != null) {
@@ -1681,7 +2192,7 @@ public class LocalDB {
                         // the exception which would lose all subsequent MyWeeks in this batch
                         try {
                             byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
-                            String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
+                            String notes = new String(bNotes, StandardCharsets.ISO_8859_1);
                             myWeek.setNote(notes);
                         } catch (Exception ex) {
                             myWeek.setNote("Error decoding the notes, please inform the System Administrator");
@@ -1795,8 +2306,7 @@ public class LocalDB {
                     try {
                         clientUUID = UUID.fromString(clientID);
                         clients = getAllDocumentsOfType(clientUUID, Document.Client);
-                    }
-                    catch (Exception ex){
+                    } catch (Exception ex) {
                         output += String.format("%d. Client had bad UUID string: %s\n", i, clientID);
                     }
                     if (clients == null || clients.size() == 0) {
@@ -1809,7 +2319,7 @@ public class LocalDB {
                             output += String.format("%d. Missing MyWeek for %s ", i, client.getFullName());
                             missing++;
                             // Now add the missing MyWeek document
-                            MyWeek myWeek = new MyWeek(theClient,UUID.fromString(clientID));
+                            MyWeek myWeek = new MyWeek(theClient, UUID.fromString(clientID));
                             Date referenceDate = new Date(creationDate);
                             myWeek.setReferenceDate(referenceDate);
                             myWeek.setSchoolScore(schoolScore);
@@ -1819,13 +2329,12 @@ public class LocalDB {
                             try {
                                 // Build 152 - Catch spurious characters causing decode errors
                                 byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
-                                String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
+                                String notes = new String(bNotes, StandardCharsets.ISO_8859_1);
                                 myWeek.setNote(notes);
                                 // and save it
                                 myWeek.save(true);
                                 output += " ... Added\n";
-                            }
-                            catch (Exception ex){
+                            } catch (Exception ex) {
                                 output += String.format("%d. Exception decoding note for %s\n", i, client.getFullName());
                             }
                         } else {
@@ -1966,6 +2475,25 @@ public class LocalDB {
         return listItems;
     }
 
+    // Build 175 Function to get ListItems for resetting of ListItem IDs
+    public ArrayList<ListItem> getAllListItemsByValue() {
+        ArrayList<ListItem> listItems = new ArrayList<>();
+        String[] tableColumns = new String[]{"RecordID, ListType, ItemValue, SerialisedObject"};
+        Cursor cursor = database.query("ListItem", tableColumns, null, null, null, null, "ListType, ItemValue, CreationDate ASC");
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                ListItem newItem = deSerializeListItem(cursor.getBlob(3), cursor.getString(1));
+                if (newItem != null) {
+                    listItems.add(newItem);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return listItems;
+    }
+
     public ListItem getListItem(UUID listItemID) {
         ListItem listItem = null;
         String[] tableColumns = new String[]{"ListType", "SerialisedObject"};
@@ -1977,6 +2505,10 @@ public class LocalDB {
             cursor.moveToFirst();
             listType = cursor.getString(0);
             listItem = deSerializeListItem(cursor.getBlob(1), listType);
+            // BUILD 164Test - Fix for listitem without a listitemID
+            if (listItem.getListItemID() == null) {
+                throw new CRISException("Found listitem with no listitemID");
+            }
         }
         cursor.close();
         if (listItem == null) {
@@ -1988,6 +2520,7 @@ public class LocalDB {
         }
         return listItem;
     }
+
 
     public ListItem getListItem(String itemValue, ListType listType) {
         ListItem listItem = null;
@@ -2026,6 +2559,19 @@ public class LocalDB {
         return listItem;
     }
 
+    public boolean existsListItemByRecordID(String recordID) {
+        boolean exists = false;
+        String[] tableColumns = new String[]{"ListType", "SerialisedObject"};
+        String whereClause = "RecordID = ?";
+        String[] whereArgs = new String[]{recordID};
+        String listType = "Unknown";
+        Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            exists = true;
+        }
+        cursor.close();
+        return exists;
+    }
 
     public ArrayList<UUID> getRecordIDs(ListItem listItem) {
         UUID listItemID = listItem.getListItemID();
@@ -2047,7 +2593,38 @@ public class LocalDB {
         return recordIDs;
     }
 
-    public String getListItemMetaData(UUID recordID, boolean isEarliest, SwipeDetector.Action action) {
+    public ArrayList<UUID> getListItemRecordIDsByValue(ListItem listItem) {
+        String listType = listItem.getListType().toString();
+        String itemValue = listItem.getItemValue();
+
+        return getListItemRecordIDsByValue(listType, itemValue);
+    }
+
+    public ArrayList<UUID> getListItemRecordIDsByValue(String listType, String itemValue) {
+        ArrayList<UUID> recordIDs = new ArrayList<>();
+        String[] tableColumns = new String[]{"RecordID"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "ListType = ? AND ItemValue = ?";
+        whereArgs = new String[]{listType, itemValue};
+        Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, "CreationDate DESC");
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                recordIDs.add(UUID.fromString(cursor.getString(0)));
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return recordIDs;
+    }
+
+    // Build 177 - Tidy Up calls from ListListItems and ListComplexListItems
+    public String getListItemMetaData(UUID recordID) {
+        return getListItemMetaData(recordID, SwipeDetector.Action.RL);
+    }
+
+    public String getListItemMetaData(UUID recordID, SwipeDetector.Action action) {
         SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
         String content = "";
         String[] tableColumns = new String[]{"CreatedByID", "CreationDate", "SyncID", "ListItemID", "HistoryDate"};
@@ -2058,12 +2635,15 @@ public class LocalDB {
         Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
+            Long historyDate = cursor.getLong(4);
             String userName = "Unknown User";
-            UUID userID = UUID.fromString(cursor.getString(0));
-            User user = getUser(userID);
+            User user = getUser(UUID.fromString(cursor.getString(0)));
             if (user != null) {
                 userName = user.getFullName();
             }
+            content = String.format("Created by: %s on %s.\n",
+                    userName,
+                    sDateTime.format(cursor.getLong(1)));
             if (action.equals(SwipeDetector.Action.RL)) {
                 content += String.format("ListItem ID: %s\n", cursor.getString(3));
                 content += String.format("Record ID: %s\n", recordID.toString());
@@ -2080,24 +2660,15 @@ public class LocalDB {
                         content += String.format("Synced on %s:\n", sDateTime.format(sync.getSyncDate()));
                     }
                 }
-                Long historyDate = cursor.getLong(4);
-                if (historyDate != Long.MIN_VALUE) {
-                    content += String.format("Superceded On: %s\n", sDateTime.format(historyDate));
-                }
             }
-            if (isEarliest) {
-                content += String.format("List Item created By: %s on %s.\n",
-                        userName,
-                        sDateTime.format(cursor.getLong(1)));
+            if (historyDate != Long.MIN_VALUE) {
+                content += String.format("Superceded On: %s\n", sDateTime.format(historyDate));
             } else {
-
-                content += String.format("The following changes were made by %s on %s:\n",
-                        userName,
-                        sDateTime.format(cursor.getLong(1)));
+                content += "Current (HistoryDate is Null)\n";
             }
 
         } else {
-            content += String.format("List Item not found, RecordID = %s\n", recordID.toString());
+            content = String.format("List Item not found, RecordID = %s\n", recordID.toString());
         }
         cursor.close();
         return content;
@@ -2153,16 +2724,51 @@ public class LocalDB {
         }
     }
 
-    public int downloadListItems(JSONObject jsonOutput, Sync sync) {
+    // Build 177 Special Update to fix ListItemID
+    public void listItemUpdate(ListItem listItem, User currentUser) {
+        ContentValues values = new ContentValues();
+        try {
+            database.execSQL("BEGIN TRANSACTION");
+            String whereClause = "RecordID = ?";
+            String[] whereArgs = new String[]{listItem.getRecordID().toString()};
+            values.put("ListItemID", listItem.getListItemID().toString());
+            values.put("SerialisedObject", serialize(listItem, AESEncryption.LOCAL_CIPHER));
+            database.update("ListItem", values, whereClause, whereArgs);
+            database.execSQL("COMMIT");
+        } catch (Exception ex) {
+            database.execSQL("ROLLBACK");
+            String message = displayListItemHistory(listItem);
+            throw new CRISException(message);
+        }
+    }
+
+    private String displayListItemHistory(ListItem listItem) {
+        //Loop through all instances of the document gathering data
+        String history = "";
+        ArrayList<UUID> recordIDs = getRecordIDs(listItem);
+        //ArrayList<UUID> recordIDs = getListItemRecordIDsByValue(listItem);
+        for (int i = 0; i < recordIDs.size(); i++) {
+            history += getListItemMetaData(recordIDs.get(i));
+        }
+        return history;
+    }
+
+
+    // Build 161 - Added the facility to recheck whether a record was added and add if
+    // if it was missed. String action is Add or Recheck
+    public int downloadListItems(JSONObject jsonOutput, Sync sync, int action, SyncActivity syncActivity) {
         JSONArray names;
+        int count = 0;
+        // Build 163 - Add a random small value to the history date to prevent constraint errors
+        Double randomInterval = (Math.random() * 100) + 1;
         try {
             database.execSQL("BEGIN TRANSACTION");
             names = jsonOutput.names();
             for (int i = 0; i < names.length(); i++) {
                 String name = names.getString(i);
-
                 if (!name.equals("result")) {
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
+
                     ContentValues values = new ContentValues();
                     values.put("RecordID", row.getString("RecordID"));
                     values.put("SyncID", row.getString("SyncID"));
@@ -2181,21 +2787,155 @@ public class LocalDB {
                     byte[] encrypted = aesEncryption.encrypt(AESEncryption.LOCAL_CIPHER, decrypted);
                     // Write to the local database
                     values.put("SerialisedObject", encrypted);
-                    database.replaceOrThrow("ListItem", null, values);
+                    // If this is a new record, use insert
+                    String recordID = row.getString("RecordID");
+                    boolean recordExists = existsListItemByRecordID(recordID);
+
+                    if (!recordExists) {
+                        try {
+                            database.insertOrThrow("ListItem", null, values);
+                            count++;
+                            if (action == SyncAdapter.RECHECK) {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "ListItem inserted {%s}", row.getString("RecordID")));
+                            }
+                        } catch (Exception ex) {
+                            if (ex.getMessage().contains("UNIQUE constraint failed")) {
+                                // This is the two independent edits case
+                                // Get the local current ListItemListItem
+                                UUID listItemUUID = UUID.fromString(row.getString("ListItemID"));
+                                ListItem listItem = getListItem(listItemUUID);
+                                Long downloadCreationDate = row.getLong("CreationDate");
+                                if (listItem != null) {
+                                    // The older of the two needs the addition of a history date
+                                    if (listItem.getCreationDate().getTime() > downloadCreationDate) {
+                                        values.remove("HistoryDate");
+                                        // The local ListItemt may already be history so modify its creation date
+                                        // slightly so that this next ListItem does not clash
+                                        // Build 163 - Add a random interval to avoid constraint errors
+                                        //values.put("HistoryDate", listItem.getCreationDate().getTime() + 10);
+                                        values.put("HistoryDate", listItem.getCreationDate().getTime() + randomInterval.longValue());
+                                        // Retry the insert
+                                        try {
+                                            database.insertOrThrow("ListItem", null, values);
+                                            count++;
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "ListItem inserted (History modified) {%s}", row.getString("RecordID")));
+                                        } catch (Exception ex2) {
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Failed to insert ListItem (History Modified: %s", ex2.getMessage()));
+                                        }
+                                    } else {
+                                        // Update the HistoryDate in the local ListItem
+                                        String whereClause = "RecordID = ?";
+                                        String[] whereArgs = new String[]{listItem.getRecordID().toString()};
+                                        ContentValues listItemValues = new ContentValues();
+                                        // Build 163 - Add a random interval to avoid constraint errors
+                                        //listItemValues.put("HistoryDate", downloadCreationDate);
+                                        listItemValues.put("HistoryDate", downloadCreationDate + randomInterval.longValue());
+                                        // Do not clear the SyncID since this is a local fix. Each
+                                        // copy will fix it's own records
+                                        //values.putNull("SyncID");
+                                        // Build 163 - Add exception handler, just in case
+                                        try {
+                                            database.update("ListItem", listItemValues, whereClause, whereArgs);
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Local ListItem HistoryDate set {%s}", listItem.getRecordID().toString()));
+                                            try {
+                                                database.insertOrThrow("ListItem", null, values);
+                                                count++;
+                                                syncActivity.appendLog(String.format(Locale.UK,
+                                                        "ListItem inserted {%s}", row.getString("RecordID")));
+                                            } catch (Exception ex2) {
+                                                syncActivity.appendLog(String.format(Locale.UK,
+                                                        "Still failed to insert ListItem: %s", ex2.getMessage()));
+                                            }
+                                        } catch (Exception ex2) {
+                                            syncActivity.appendLog(String.format(Locale.UK,
+                                                    "Error adding history date to local listitem: %s", ex2.getMessage()));
+                                        }
+                                    }
+                                } else {
+                                    // Build 178 - Ignore ListItems with unexpected ListItemIDs
+                                    String listType = row.getString("ListType");
+                                    String itemValue = row.getString("ItemValue");
+                                    syncActivity.appendLog(String.format("Bad ListItemID: %s %s", listType, itemValue));
+                                    /*
+                                    // Build 178 Diagnostics
+                                    try {
+                                        // Build 177 - Constraint must be ListType,ItemValue,HistoryDate so add more information
+                                        String message = String.format(Locale.UK,
+                                                "ListItem insert failed but no local ListItem found: %s\n", ex.getMessage());
+                                        // Build 178 - Bug, ListItem will be null
+                                        //ArrayList<UUID> recordIDs = getListItemRecordIDsByValue(listItem);
+
+                                        message += String.format("ListType: %s\n",listType);
+                                        message += String.format("itemValue: %s\n",itemValue);
+                                        message += String.format("LID: %s\n",row.getString("ListItemID"));
+                                        message += String.format("RID: %s\n",row.getString("RecordID"));
+                                        Date historyDate = new Date(row.getLong("HistoryDate"));
+                                        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
+                                        message += String.format("HistoryDate: %s\n",sDateTime.format(historyDate));
+                                        ArrayList<UUID> recordIDs = getListItemRecordIDsByValue(listType, itemValue);
+
+                                        for (int record = 0; record < recordIDs.size(); record++) {
+                                            message += getListItemMetaData(recordIDs.get(record));
+                                            message += "-------------------------------------------------------------\n";
+                                        }
+                                        syncActivity.appendLog(message);
+                                    } catch (Exception ex1){
+                                        syncActivity.appendLog(String.format(Locale.UK,
+                                                "ListItem insert failed but no local ListItem found: %s\n", ex.getMessage()));
+                                    }
+                                    */
+                                }
+                            } else {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "ListItem insert failed (Not Constraint error): %s", ex.getMessage()));
+                            }
+                        }
+                    } else {
+                        // Build 178 - if the record already exists, leave it alone in ADD case well
+                        // This code can modify the ListItems unexpectedly
+                        /*
+                        // Record already exists so simply replace the contents
+                        if (action == SyncAdapter.ADD) {
+                            try {
+                                database.replaceOrThrow("ListItem", null, values);
+                                count++;
+                            } catch (Exception ex) {
+                                // Ignore, nothing should reach here
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "ListItem replace failed: %s", ex.getMessage()));
+                            }
+                        } else {
+                            // In RECHECK case, if the record already exists, leave it alone
+                        }
+
+                         */
+                    }
                 }
             }
             // Save the sync
-            save(sync);
+            // Build 161 - Only save the sync if Add (Recheck already has the sync record)
+            if (action == SyncAdapter.ADD) {
+                save(sync);
+            }
             database.execSQL("COMMIT");
-        } catch (JSONException ex) {
+        } catch (
+                JSONException ex) {
             database.execSQL("ROLLBACK");
             throw new CRISException("Error parsing JSON data: " + ex.getMessage());
-        } catch (Exception ex) {
+        } catch (
+                Exception ex) {
             database.execSQL("ROLLBACK");
             throw ex;
         }
-        return names.length() - 1;
+        // Build 161 - Recheck last 100
+        //return names.length() - 1;
+        return count;
     }
+
 
     // SYSTEM ERROR
     // RecordID CHAR(16) PRIMARY KEY NOT NULL
@@ -2264,6 +3004,47 @@ public class LocalDB {
         return errors;
     }
 
+    public SystemError getSystemError(UUID systemErrorID) {
+        SystemError systemError = null;
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause = "SystemErrorID = ? AND HistoryDate = ?";
+        String[] whereArgs = new String[]{systemErrorID.toString(), Long.toString(Long.MIN_VALUE)};
+        Cursor cursor = database.query("SystemError", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            systemError = deSerializeSystemError(cursor.getBlob(0));
+        }
+        cursor.close();
+        return systemError;
+    }
+
+    public SystemError getSystemErrorByRecordID(UUID recordID) {
+        SystemError systemError = null;
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause = "RecordID = ?";
+        String[] whereArgs = new String[]{recordID.toString()};
+        Cursor cursor = database.query("SystemError", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            systemError = deSerializeSystemError(cursor.getBlob(0));
+        }
+        cursor.close();
+        return systemError;
+    }
+
+    public boolean existsSystemErrorByRecordID(String recordID) {
+        boolean exists = false;
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        String whereClause = "RecordID = ?";
+        String[] whereArgs = new String[]{recordID};
+        Cursor cursor = database.query("SystemError", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            exists = true;
+        }
+        cursor.close();
+        return exists;
+    }
+
     public void save(SystemError systemError) {
         ContentValues values = new ContentValues();
         values.put("RecordID", systemError.getRecordID().toString());
@@ -2275,8 +3056,11 @@ public class LocalDB {
     }
 
 
-    public int downloadSystemErrors(JSONObject jsonOutput, Sync sync) {
+    // Build 161 - Added the facility to recheck whether a record was added and add if
+    // if it was missed. String action is Add or Recheck
+    public int downloadSystemErrors(JSONObject jsonOutput, Sync sync, int action, SyncActivity syncActivity) {
         JSONArray names;
+        int count = 0;
         try {
             database.execSQL("BEGIN TRANSACTION");
             names = jsonOutput.names();
@@ -2285,6 +3069,7 @@ public class LocalDB {
 
                 if (!name.equals("result")) {
                     JSONObject row = jsonOutput.getJSONObject(names.getString(i));
+
                     ContentValues values = new ContentValues();
                     values.put("RecordID", row.getString("RecordID"));
                     values.put("SyncID", row.getString("SyncID"));
@@ -2301,11 +3086,48 @@ public class LocalDB {
                     values.put("SerialisedObject", encrypted);
                     */
                     values.put("SerialisedObject", Base64.decode(row.getString("SerialisedObject"), Base64.DEFAULT));
-                    database.replaceOrThrow("SystemError", null, values);
+                    // If this is a new record, use insert
+                    String recordID = row.getString("RecordID");
+                    boolean recordExists = existsSystemErrorByRecordID(recordID);
+
+                    if (!recordExists) {
+                        try {
+                            database.insertOrThrow("SystemError", null, values);
+                            count++;
+                            if (action == SyncAdapter.RECHECK) {
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "SystemError inserted {%s}", row.getString("RecordID")));
+                            }
+                        } catch (Exception ex) {
+                            syncActivity.appendLog(String.format(Locale.UK,
+                                    "System Error insert failed: %s", ex.getMessage()));
+                        }
+                    } else {
+                        //Build 178 if record exists ALWAYS leave it alone
+                        /*
+                        // Record already exists so simply replace the contents
+                        if (action == SyncAdapter.ADD) {
+                            try {
+                                database.replaceOrThrow("SystemError", null, values);
+                                count++;
+                            } catch (Exception ex) {
+                                // Ignore, nothing should reach here
+                                syncActivity.appendLog(String.format(Locale.UK,
+                                        "SystemError replace failed: %s", ex.getMessage()));
+                            }
+                        } else {
+                            // In RECHECK case, if the record already exists, leave it alone
+                        }
+                         */
+                    }
                 }
             }
             // Save the sync
-            save(sync);
+            // Build 161 - Only save the sync if Add (Recheck already has the sync record)
+            if (action == SyncAdapter.ADD) {
+                save(sync);
+            }
+
             database.execSQL("COMMIT");
         } catch (JSONException ex) {
             database.execSQL("ROLLBACK");
@@ -2314,7 +3136,9 @@ public class LocalDB {
             database.execSQL("ROLLBACK");
             throw ex;
         }
-        return names.length() - 1;
+        // Build 161 - Recheck last 100
+        //return names.length() - 1;
+        return count;
     }
 
     // SYNC
@@ -2358,6 +3182,31 @@ public class LocalDB {
         String[] tableColumns = new String[]{"*"};
         String orderBy = "CreationDate DESC";
         Cursor cursor = database.query("SyncActivity", tableColumns, null, null, null, null, orderBy);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                SyncActivity newResult = new SyncActivity(currentUser);
+                newResult.setRecordID(UUID.fromString(cursor.getString(0)));
+                newResult.setCreationDate(new Date(cursor.getLong(1)));
+                newResult.setCompletionDate(new Date(cursor.getLong(2)));
+                newResult.setCreatedByID(UUID.fromString(cursor.getString(3)));
+                newResult.setResult(cursor.getString(4));
+                newResult.setSummary(cursor.getString(5));
+                newResult.setLog(cursor.getString(6));
+                syncResults.add(newResult);
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return syncResults;
+    }
+
+    // Build 158 - New function
+    public ArrayList<SyncActivity> getRecentSyncResults(User currentUser, String count) {
+        ArrayList<SyncActivity> syncResults = new ArrayList<>();
+        String[] tableColumns = new String[]{"*"};
+        String orderBy = "CreationDate DESC";
+        Cursor cursor = database.query("SyncActivity", tableColumns, null, null, null, null, orderBy, count);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
             while (!cursor.isAfterLast()) {

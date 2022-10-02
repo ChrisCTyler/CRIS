@@ -36,6 +36,7 @@ public class User extends CrisObject implements Serializable {
     private static final long serialVersionUID = CrisObject.SVUID_USER;
     public static final UUID unknownUser = UUID.fromString("86dab870-9449-11e6-ae22-56b6b6499611");
     public static final UUID firstTimeUser = UUID.fromString("b319fdf6-e779-4abb-b123-1ba5e681abd7");
+    public static final UUID theClientUser = UUID.fromString("b800cf1b-4bfc-4915-8545-14e99e5e7669");
 
     private static volatile User currentUser;
 
@@ -212,13 +213,14 @@ public class User extends CrisObject implements Serializable {
     private Role role;
 
     public Role getRole() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (roleID != null && role == null) {
             LocalDB localDB = LocalDB.getInstance();
             role = (Role) localDB.getListItem(roleID);
-            if (role == null) {
-                // Only occurrence should be loading new tablet when this is the first sync and no roles exist
-                role = new Role(new User(User.unknownUser), Role.noPrivilegeID);
-            }
+        }
+        // Only occurrence should be loading new tablet when this is the first sync and no roles exist
+        if (role == null) {
+            role = new Role(new User(User.unknownUser), Role.noPrivilegeID);
         }
         return role;
     }

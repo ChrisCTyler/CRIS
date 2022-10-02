@@ -35,6 +35,8 @@ public class Group extends ListItem implements Serializable {
     private static final long serialVersionUID = CrisObject.SVUID_GROUP;
 
     public static final UUID adHocGroupID = UUID.fromString("587f2835-d5f6-4593-ab95-137489ae3162");
+    // Build 167 - Add Unknown Group to catch errors
+    public static final UUID unknownGroupID = UUID.fromString("bc88ab25-2978-4c36-a0a8-07d8628ffdf2");
 
     public final static String[] frequencyTypeValues = {"Please select", "Days",
             "Weeks", "Fortnights", "Months"};
@@ -56,6 +58,12 @@ public class Group extends ListItem implements Serializable {
         return group;
     }
 
+    // Build 167 - Add Unknown Group to catch errors
+    public static Group getUnknownGroup() {
+        Group group = new Group(new User(User.unknownUser), "Unknown Group", 0);
+        group.setListItemID(Group.unknownGroupID);
+        return group;
+    }
     private UUID keyWorkerID;
 
     public UUID getKeyWorkerID() {

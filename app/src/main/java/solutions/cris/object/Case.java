@@ -191,9 +191,13 @@ public class Case extends Document implements Serializable {
     }
 
     public ListItem getTier() {
+        // Build 171 - Handle the unexpected null ListItem case
         if (tierID != null && tier == null) {
             LocalDB localDB = LocalDB.getInstance();
             tier = localDB.getListItem(tierID);
+        }
+        if (tier == null) {
+            tier = new ListItem(User.getCurrentUser(), ListType.TIER, "Unknown", 0);
         }
         return tier;
     }
@@ -214,9 +218,15 @@ public class Case extends Document implements Serializable {
     }
 
     public ListItem getGroup() {
-        if (groupID != null) {
+        // Build 171 - Handle the unexpected null ListItem ID case
+        if (groupID != null && group == null) {
             LocalDB localDB = LocalDB.getInstance();
             group = localDB.getListItem(groupID);
+        }
+        if (group == null) {
+            // Build 176 Group is a complex list item
+            //group = new ListItem(User.getCurrentUser(),ListType.GROUP,"Unknown",0);
+            group = new Group(User.getCurrentUser(), "Unknown", 0);
         }
         return group;
     }
@@ -237,9 +247,15 @@ public class Case extends Document implements Serializable {
     }
 
     public ListItem getGroup2() {
-        if (group2ID != null) {
+        // Build 171 - Handle the unexpected null ListItemID case
+        if (group2ID != null && group2 == null) {
             LocalDB localDB = LocalDB.getInstance();
             group2 = localDB.getListItem(group2ID);
+        }
+        if (group2 == null) {
+            // Build 176 Group is a complex list item
+            //group2 = new ListItem(User.getCurrentUser(),ListType.GROUP,"Unknown",0);
+            group2 = new Group(User.getCurrentUser(), "Unknown", 0);
         }
         return group2;
     }
@@ -260,9 +276,13 @@ public class Case extends Document implements Serializable {
     }
 
     public ListItem getCommissioner() {
-        if (commissionerID != null) {
+        // Build 171 - Handle the unexpected null ListItemID case
+        if (commissionerID != null && commissioner == null) {
             LocalDB localDB = LocalDB.getInstance();
             commissioner = localDB.getListItem(commissionerID);
+        }
+        if (commissioner == null) {
+            commissioner = new ListItem(User.getCurrentUser(), ListType.COMMISSIONER, "Unknown", 0);
         }
         return commissioner;
     }

@@ -2,7 +2,28 @@
 <menu
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_view_sync_history"
+        android:title="@string/action_view_sync_history"
+        app:showAsAction="never"
+        android:orderInCategory="3" />
+    <item
+        android:id="@+id/action_resync_30"
+        android:title="@string/action_resync_30"
+        app:showAsAction="never"
+        android:orderInCategory="3" />
 
+    <item
+        android:id="@+id/action_resync_60"
+        android:title="@string/action_resync_60"
+        app:showAsAction="never"
+        android:orderInCategory="3" />
+
+    <item
+        android:id="@+id/action_resync_90"
+        android:title="@string/action_resync_90"
+        app:showAsAction="never"
+        android:orderInCategory="4" />
     <item
         android:id="@+id/show_changes"
         android:title="@string/action_show_changes"
@@ -14,6 +35,11 @@
         app:showAsAction="never"
         android:orderInCategory="10"/>
     <item
+        android:id="@+id/fix_listitems"
+        android:title="@string/action_fix_listitems"
+        app:showAsAction="never"
+        android:orderInCategory="6" />
+    <item
         android:id="@+id/disable_device_policy"
         android:title="Disable Device Administration Policy"
         app:showAsAction="never"
@@ -22,6 +48,6 @@
         android:id="@+id/action_logout"
         android:title="@string/action_logout"
         app:showAsAction="never"
-        android:orderInCategory="14"/>
+        android:orderInCategory="16" />
 
 </menu>

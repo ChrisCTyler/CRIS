@@ -79,14 +79,14 @@ public class ListComplexListItems extends CRISActivity {
             // Add the global uncaught exception handler
             Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
             setContentView(R.layout.activity_list_with_action);
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             // ListType is passed as an extra
             listType = getIntent().getStringExtra(Main.EXTRA_LIST_TYPE);
             toolbar.setTitle(getString(R.string.app_name) + " - " + listType);
             setSupportActionBar(toolbar);
 
             // Initialise the list view
-            this.listView = (ListView) findViewById(R.id.list_view);
+            this.listView = findViewById(R.id.list_view);
             final SwipeDetector swipeDetector = new SwipeDetector();
             this.listView.setOnTouchListener(swipeDetector);
             this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -100,7 +100,7 @@ public class ListComplexListItems extends CRISActivity {
                 }
             });
 
-            FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+            FloatingActionButton fab = findViewById(R.id.fab);
                 fab.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
@@ -236,73 +236,81 @@ public class ListComplexListItems extends CRISActivity {
         //Loop through all instances of the document gathering data
         String history = "";
         LocalDB localDB = LocalDB.getInstance();
-        ArrayList<UUID> recordIDs = localDB.getRecordIDs(item);
+        // Build 175
+        //ArrayList<UUID> recordIDs = localDB.getRecordIDs(item);
+        ArrayList<UUID> recordIDs = localDB.getListItemRecordIDsByValue(item);
         switch (listType) {
             case "AGENCY":
+                history += String.format("The current List Item contents are:\n\n%s\n",
+                        item.textSummary());
                 for (int i=0; i < recordIDs.size(); i++){
                     boolean isEarliest = (i == recordIDs.size()-1);
-                    history += localDB.getListItemMetaData(recordIDs.get(i), isEarliest, action);
+                    history += localDB.getListItemMetaData(recordIDs.get(i), action);
                     if (!isEarliest){
-                        history += Agency.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+                        history += String.format("Changes:\n%s",
+                                Agency.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action));
                     }
                 }
-                history += String.format("\nThe current List Item contents are:\n\n%s\n",
-                    ((Agency) item).textSummary());
                 break;
             case "NOTE_TYPE":
+                history += String.format("The current List Item contents are:\n\n%s\n",
+                        item.textSummary());
                 for (int i=0; i < recordIDs.size(); i++){
                     boolean isEarliest = (i == recordIDs.size()-1);
-                    history += localDB.getListItemMetaData(recordIDs.get(i), isEarliest, action);
+                    history += localDB.getListItemMetaData(recordIDs.get(i), action);
                     if (!isEarliest){
-                        history += NoteType.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+                        history += String.format("Changes:\n%s",
+                                NoteType.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action));
                     }
                 }
-                history += String.format("\nThe current List Item contents are:\n\n%s\n",
-                        ((NoteType) item).textSummary());
                 break;
             case "GROUP":
+                history += String.format("The current List Item contents are:\n\n%s\n",
+                        item.textSummary());
                 for (int i=0; i < recordIDs.size(); i++){
                     boolean isEarliest = (i == recordIDs.size()-1);
-                    history += localDB.getListItemMetaData(recordIDs.get(i), isEarliest, action);
+                    history += localDB.getListItemMetaData(recordIDs.get(i), action);
                     if (!isEarliest){
-                        history += Group.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+                        history += String.format("Changes:\n%s",
+                                Group.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action));
                     }
                 }
-                history += String.format("\nThe current List Item contents are:\n\n%s\n",
-                        ((Group) item).textSummary());
                 break;
             case "ROLE":
+                history += String.format("The current List Item contents are:\n\n%s\n",
+                        item.textSummary());
                 for (int i=0; i < recordIDs.size(); i++){
                     boolean isEarliest = (i == recordIDs.size()-1);
-                    history += localDB.getListItemMetaData(recordIDs.get(i), isEarliest, action);
+                    history += localDB.getListItemMetaData(recordIDs.get(i), action);
                     if (!isEarliest){
-                        history += Role.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+                        history += String.format("Changes:\n%s",
+                                Role.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action));
                     }
                 }
-                history += String.format("\nThe current List Item contents are:\n\n%s\n",
-                        ((Role) item).textSummary());
                 break;
             case "SCHOOL":
+                history += String.format("The current List Item contents are:\n\n%s\n",
+                        item.textSummary());
                 for (int i=0; i < recordIDs.size(); i++){
                     boolean isEarliest = (i == recordIDs.size()-1);
-                    history += localDB.getListItemMetaData(recordIDs.get(i), isEarliest, action);
+                    history += localDB.getListItemMetaData(recordIDs.get(i), action);
                     if (!isEarliest){
-                        history += School.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+                        history += String.format("Changes:\n%s",
+                                School.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action));
                     }
                 }
-                history += String.format("\nThe current List Item contents are:\n\n%s\n",
-                        ((School) item).textSummary());
                 break;
             case "TRANSPORT_ORGANISATION":
+                history += String.format("The current List Item contents are:\n\n%s\n",
+                        item.textSummary());
                 for (int i=0; i < recordIDs.size(); i++){
                     boolean isEarliest = (i == recordIDs.size()-1);
-                    history += localDB.getListItemMetaData(recordIDs.get(i), isEarliest, action);
+                    history += localDB.getListItemMetaData(recordIDs.get(i), action);
                     if (!isEarliest){
-                        history += TransportOrganisation.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+                        history += String.format("Changes:\n%s",
+                                TransportOrganisation.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action));
                     }
                 }
-                history += String.format("\nThe current List Item contents are:\n\n%s\n",
-                        ((TransportOrganisation) item).textSummary());
                 break;
             default:
                 throw new CRISException("Unexpected listType: " + listType);
@@ -326,10 +334,10 @@ public class ListComplexListItems extends CRISActivity {
             if (convertView == null) {
                 convertView = getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
             }
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
-            TextView viewItemTitle = (TextView) convertView.findViewById(R.id.item_title);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
+            TextView viewItemTitle = convertView.findViewById(R.id.item_title);
 
             // Display the title only version
             viewItemMainText.setVisibility(View.GONE);

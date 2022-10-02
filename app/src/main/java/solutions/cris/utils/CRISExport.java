@@ -81,6 +81,7 @@ import solutions.cris.object.Document;
 import solutions.cris.object.Image;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
+import solutions.cris.object.MACAYC18;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
 import solutions.cris.object.PdfDocument;
@@ -144,7 +145,7 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         if (fab != null) {
             fab.setVisibility(View.GONE);
         }
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         // Clear the footer
         footer.setText("");
 
@@ -174,17 +175,17 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         }
 
         mProgress = new ProgressDialog(getActivity());
-        mProgress.setMessage("Calling Google Sheets API ...");
+        mProgress.setMessage("Initiating Google Sheets API ...");
 
-        typeView = (EditText) parent.findViewById(R.id.type);
-        selectionView = (EditText) parent.findViewById(R.id.selection);
-        sortView = (EditText) parent.findViewById(R.id.sort);
-        searchView = (EditText) parent.findViewById(R.id.search);
-        startDateView = (EditText) parent.findViewById(R.id.start_date);
-        endDateView = (EditText) parent.findViewById(R.id.end_date);
-        LinearLayout checkboxLayout = (LinearLayout) parent.findViewById(R.id.checkbox_layout);
-        selectAll = (CheckBox) parent.findViewById(R.id.select_all);
-        resultView = (TextView) parent.findViewById(R.id.result);
+        typeView = parent.findViewById(R.id.type);
+        selectionView = parent.findViewById(R.id.selection);
+        sortView = parent.findViewById(R.id.sort);
+        searchView = parent.findViewById(R.id.search);
+        startDateView = parent.findViewById(R.id.start_date);
+        endDateView = parent.findViewById(R.id.end_date);
+        LinearLayout checkboxLayout = parent.findViewById(R.id.checkbox_layout);
+        selectAll = parent.findViewById(R.id.select_all);
+        resultView = parent.findViewById(R.id.result);
 
         typeView.setFocusable(false);
 
@@ -234,6 +235,7 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         addDocumentType(checkboxLayout, "Case", position++);
         addDocumentType(checkboxLayout, "Criteria Assessment Tool", position++);
         addDocumentType(checkboxLayout, "Pdf Document", position++);
+        addDocumentType(checkboxLayout, "MACA-YC18", position++);
         addDocumentType(checkboxLayout, "My Week", position++);
         addDocumentType(checkboxLayout, "Note", position++);
         addDocumentType(checkboxLayout, "Contact", position++);
@@ -244,12 +246,12 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
 
         // If there is no document selection, hide the selector
         if (!listType.equals("My Clients") && !listType.equals("All Clients")) {
-            LinearLayout checkboxlayout = (LinearLayout) parent.findViewById(R.id.checkbox_layout);
+            LinearLayout checkboxlayout = parent.findViewById(R.id.checkbox_layout);
             checkboxlayout.setVisibility(View.GONE);
         }
 
         // Save Button
-        final Button saveButton = (Button) parent.findViewById(R.id.export_button);
+        final Button saveButton = parent.findViewById(R.id.export_button);
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -260,7 +262,7 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         });
 
         // Cancel Button
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -562,7 +564,9 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
      * An asynchronous task that handles the Google Sheets API call.
      * Placing the API calls in their own task ensures the UI stays responsive.
      */
-    private class MakeRequestTask extends AsyncTask<Void, Void, String> {
+    // Build 179 Enable progress string
+    //private class MakeRequestTask extends AsyncTask<Void, Void, String> {
+    private class MakeRequestTask extends AsyncTask<Void, String, String> {
 
         private Exception mLastError = null;
         private CRISSpreadsheet crisSpreadsheet = null;
@@ -594,8 +598,10 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         @Override
         protected String doInBackground(Void... params) {
             if (clientAdapterList != null) {
+                publishProgress("Client Export...");
                 return doClientList(clientAdapterList);
             } else {
+                publishProgress("Session Export...");
                 return doSessionList(sessionAdapterList);
             }
         }
@@ -603,19 +609,23 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         private String doSessionList(ArrayList<Session> adapterList) {
             try {
                 ArrayList<ClientSession> clientDocuments;
+                publishProgress("Creating spreadsheet...");
                 crisSpreadsheet.create(User.getCurrentUser());
                 int sheetID = 1;
+                publishProgress("Exporting session details...");
                 crisSpreadsheet.addSheet("Session", sheetID);
                 crisSpreadsheet.loadSheet("Session",
                         Session.getSessionData(adapterList, getActivity()),
                         Session.getExportSheetConfiguration(sheetID));
                 sheetID++;
+                publishProgress("Exporting individual client sessions...");
                 clientDocuments = localDB.getAllClientSessions(adapterList, startDate, endDate);
                 crisSpreadsheet.addSheet("ClientSession", sheetID);
                 crisSpreadsheet.loadSheet("ClientSession",
                         ClientSession.getClientSessionData(clientDocuments),
                         ClientSession.getExportSheetConfiguration(sheetID));
                 sheetID++;
+                publishProgress("Exporting MyWeek records...");
                 ArrayList<Document> myWeekDocuments = localDB.getAllDocumentsOfType(
                         clientDocuments, Document.MyWeek);
                 crisSpreadsheet.addSheet("MyWeek", sheetID);
@@ -633,11 +643,13 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         private String doClientList(ArrayList<Client> adapterList) {
             try {
                 ArrayList<Document> clientDocuments;
+                publishProgress("Creating spreadsheet...");
                 crisSpreadsheet.create(User.getCurrentUser());
                 int sheetID = 0;
                 for (DocumentSelector document : documents) {
                     if (document.isChecked()) {
                         sheetID++;
+                        publishProgress(String.format("Exporting-%s", Document.getDocumentTypeString(document.getDocumentType())));
                         switch (document.getDocumentType()) {
                             case Document.Client:
                                 crisSpreadsheet.addSheet("Client", sheetID);
@@ -714,6 +726,13 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
                                         Image.getImageData(clientDocuments),
                                         Image.getExportSheetConfiguration(sheetID));
                                 break;
+                            case Document.MACAYC18:
+                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.MACAYC18, startDate, endDate);
+                                crisSpreadsheet.addSheet("MACA-YC18", sheetID);
+                                crisSpreadsheet.loadSheet("MACA-YC18",
+                                        MACAYC18.getMACAYC18Data(clientDocuments),
+                                        MACAYC18.getExportSheetConfiguration(sheetID));
+                                break;
                             case Document.MyWeek:
                                 clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.MyWeek, startDate, endDate);
                                 crisSpreadsheet.addSheet("MyWeek", sheetID);
@@ -753,6 +772,8 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
             }
         }
 
+        // Build 179 Removed redundant code
+        /*
         protected String doInBackgroundTest(Void... params) {
             try {
                 Spreadsheet spreadsheet = crisSpreadsheet.test();
@@ -767,10 +788,12 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
             }
         }
 
+         */
+
 
         @Override
         protected void onPreExecute() {
-            resultView.setText("");
+            resultView.setText("Starting export...");
             mProgress.show();
         }
 
@@ -779,6 +802,13 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         protected void onPostExecute(String output) {
             mProgress.hide();
             resultView.setText(output);
+        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            // Runs on UI Thread
+            //resultView.setText(values[0]);
+            mProgress.setMessage(values[0]);
         }
 
         @Override

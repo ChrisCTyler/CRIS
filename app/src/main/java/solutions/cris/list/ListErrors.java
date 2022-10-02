@@ -71,10 +71,10 @@ public class ListErrors extends CRISActivity {
             // Add the global uncaught exception handler
             Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
             setContentView(R.layout.activity_list);
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             setSupportActionBar(toolbar);
 
-            this.listView = (ListView) findViewById(R.id.list_view);
+            this.listView = findViewById(R.id.list_view);
 
             this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
@@ -85,7 +85,9 @@ public class ListErrors extends CRISActivity {
 
             LocalDB localDB = LocalDB.getInstance();
             // Load the documents for special client (ClientID=DOCUMENT) from the database
-            errors = localDB.getAllSystemErrors(200);
+            // Build 180 - Increased count from 200 to 1000 because of new rejection of
+            // failures to access website
+            errors = localDB.getAllSystemErrors(1000);
             loadAdapter();
             // Sort the list by date
             //Collections.sort(errors, SystemError.dateComparator);
@@ -112,7 +114,14 @@ public class ListErrors extends CRISActivity {
                     if (!error.getExceptionMessage().startsWith("Error in postJson") &&
                             !error.getExceptionMessage().startsWith("No database found") &&
                             !error.getExceptionMessage().startsWith("Unable to start receiver") &&
-                            !error.getExceptionMessage().startsWith("java.net.SocketTimeout")) {
+                            !error.getExceptionMessage().startsWith("java.net.SocketTimeout") &&
+                            // Build 180 - Ignore failures due to bad internet connection
+                            !error.getExceptionMessage().contains("Failed to connect to cris.solutions") &&
+                            !error.getExceptionMessage().contains("Unable to resolve host") &&
+                            // Build 184 Ignore error message with no exception string
+                            !error.getExceptionMessage().contains("thread interrupted") &&
+                            !error.getExceptionMessage().contains("connection abort") &&
+                            !error.getExceptionMessage().equals("Exception in Sync Adapter: ")) {
                         selectedErrors.add(error);
 
                     }
@@ -204,10 +213,10 @@ public class ListErrors extends CRISActivity {
                 convertView = getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
             }
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
-            TextView viewItemDate = (TextView) convertView.findViewById(R.id.item_date);
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
+            TextView viewItemDate = convertView.findViewById(R.id.item_date);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
 
             final SystemError error = selectedErrors.get(position);
 

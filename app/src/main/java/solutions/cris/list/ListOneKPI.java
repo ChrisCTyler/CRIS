@@ -109,7 +109,7 @@ public class ListOneKPI extends CRISActivity {
             setContentView(R.layout.activity_list_one_kpi);
             // Parameter passed from ListKPI menu
             kpiType = getIntent().getStringExtra(Main.EXTRA_KPI_TYPE);
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             toolbar.setTitle(getString(R.string.app_name) + " - " + kpiType);
             setSupportActionBar(toolbar);
             kpiHeaderTextView = findViewById(R.id.kpi_header_text);
@@ -124,7 +124,7 @@ public class ListOneKPI extends CRISActivity {
             new LoadData().execute();
 
             // Set up the adapter
-            listView = (ListView) findViewById(R.id.list_view);
+            listView = findViewById(R.id.list_view);
             adapter = new KPIAdapter(this, kpiItems);
         }
     }
@@ -158,16 +158,16 @@ public class ListOneKPI extends CRISActivity {
 
             if (convertView == null) {
                 convertView = getLayoutInflater().inflate(R.layout.layout_kpi_list_item, parent, false);
-                viewItemTitle = (TextView) convertView.findViewById(R.id.item_title);
-                viewArea[1] = (TextView) convertView.findViewById(R.id.item_area_1);
-                viewArea[2] = (TextView) convertView.findViewById(R.id.item_area_2);
-                viewArea[3] = (TextView) convertView.findViewById(R.id.item_area_3);
-                viewArea[4] = (TextView) convertView.findViewById(R.id.item_area_4);
-                viewArea[5] = (TextView) convertView.findViewById(R.id.item_area_5);
-                viewArea[6] = (TextView) convertView.findViewById(R.id.item_area_6);
-                viewArea[7] = (TextView) convertView.findViewById(R.id.item_area_7);
-                viewArea[8] = (TextView) convertView.findViewById(R.id.item_area_8);
-                viewArea[9] = (TextView) convertView.findViewById(R.id.item_area_9);
+                viewItemTitle = convertView.findViewById(R.id.item_title);
+                viewArea[1] = convertView.findViewById(R.id.item_area_1);
+                viewArea[2] = convertView.findViewById(R.id.item_area_2);
+                viewArea[3] = convertView.findViewById(R.id.item_area_3);
+                viewArea[4] = convertView.findViewById(R.id.item_area_4);
+                viewArea[5] = convertView.findViewById(R.id.item_area_5);
+                viewArea[6] = convertView.findViewById(R.id.item_area_6);
+                viewArea[7] = convertView.findViewById(R.id.item_area_7);
+                viewArea[8] = convertView.findViewById(R.id.item_area_8);
+                viewArea[9] = convertView.findViewById(R.id.item_area_9);
 
                 convertView.setTag(R.id.tag_view_item_title, viewItemTitle);
                 convertView.setTag(R.id.tag_view_item_area_1, viewArea[1]);
@@ -225,6 +225,9 @@ public class ListOneKPI extends CRISActivity {
                             break;
                         case "Avg. Session Attendance":
                         case "Avg. Session Attendance (Last 12 Months)":
+                            // Build 157 - Total Attendance KPI
+                        case "Total Session Attendance":
+                        case "Total Session Attendance (Last 12 Months)":
                             if (kpiMap.containsKey(key)) {
                                 int[] values = kpiMap.get(key);
                                 viewArea[areaCount++].setText(String.format("%d/%d/%d", values[0], values[1], values[2]));
@@ -280,6 +283,15 @@ public class ListOneKPI extends CRISActivity {
                     initKPIList(12);
                     doAverageAttendance(kpiType);
                     break;
+                // Build 157 - Total Attendance KPI
+                case "Total Session Attendance":
+                    initKPIList(4);
+                    doTotalAttendance(kpiType);
+                    break;
+                case "Total Session Attendance (Last 12 Months)":
+                    initKPIList(12);
+                    doTotalAttendance(kpiType);
+                    break;
                 default:
                     throw new CRISException(String.format("Unknown KPI Type: %s", kpiType));
             }
@@ -317,6 +329,13 @@ public class ListOneKPI extends CRISActivity {
                     doHeaderSetup(String.format("Regular/Ad-Hoc/Both (%d seconds)", elapsed));
                     break;
                 case "Avg. Session Attendance (Last 12 Months)":
+                    doHeaderSetup(String.format("Regular Session%%/Ad-Hoc Session%%/Both%% (%d seconds)", elapsed));
+                    break;
+                // Build 157
+                case "Total Session Attendance":
+                    doHeaderSetup(String.format("Regular/Ad-Hoc/Both (%d seconds)", elapsed));
+                    break;
+                case "Total Session Attendance (Last 12 Months)":
                     doHeaderSetup(String.format("Regular Session%%/Ad-Hoc Session%%/Both%% (%d seconds)", elapsed));
                     break;
                 default:
@@ -395,16 +414,16 @@ public class ListOneKPI extends CRISActivity {
 
             // Load the column Headers
             TextView[] viewArea = new TextView[areaMax];
-            TextView viewItemTitle = (TextView) findViewById(R.id.item_title);
-            viewArea[1] = (TextView) findViewById(R.id.item_area_1);
-            viewArea[2] = (TextView) findViewById(R.id.item_area_2);
-            viewArea[3] = (TextView) findViewById(R.id.item_area_3);
-            viewArea[4] = (TextView) findViewById(R.id.item_area_4);
-            viewArea[5] = (TextView) findViewById(R.id.item_area_5);
-            viewArea[6] = (TextView) findViewById(R.id.item_area_6);
-            viewArea[7] = (TextView) findViewById(R.id.item_area_7);
-            viewArea[8] = (TextView) findViewById(R.id.item_area_8);
-            viewArea[9] = (TextView) findViewById(R.id.item_area_9);
+            TextView viewItemTitle = findViewById(R.id.item_title);
+            viewArea[1] = findViewById(R.id.item_area_1);
+            viewArea[2] = findViewById(R.id.item_area_2);
+            viewArea[3] = findViewById(R.id.item_area_3);
+            viewArea[4] = findViewById(R.id.item_area_4);
+            viewArea[5] = findViewById(R.id.item_area_5);
+            viewArea[6] = findViewById(R.id.item_area_6);
+            viewArea[7] = findViewById(R.id.item_area_7);
+            viewArea[8] = findViewById(R.id.item_area_8);
+            viewArea[9] = findViewById(R.id.item_area_9);
             int areaCount = 1;
             for (UUID key : areaList) {
                 if (key.equals(ListItem.commissionerTotalID)) {
@@ -669,6 +688,67 @@ public class ListOneKPI extends CRISActivity {
                 if (totals[5] + totals[6] > 0) {
                     totals[2] = (totals[3] + totals[4]) * 100 / (totals[5] + totals[6]);
                 }
+                // And load the totals column kpiItem
+                kpiMap.put(ListItem.commissionerTotalID, totals);
+            }
+            // Add the Total column header to the areaList
+            areaList.add(ListItem.commissionerTotalID);
+        }
+
+        // Build 157 - Main routine for Total. Session Attendance
+        private void doTotalAttendance(String kpiType) {
+            LocalDB localDB = LocalDB.getInstance();
+            // Use the case documents to set the client Area mapping in each slot
+            loadActiveCases();
+            // Sort the Area List
+            Collections.sort(areaList);
+            // SEt the number of slots (rows) based on the kpiType
+            int slotMax = 0;
+            if (kpiType.equals("Total Session Attendance")) {
+                slotMax = 4;
+            } else if (kpiType.equals("Total Session Attendance (Last 12 Months)")) {
+                slotMax = 12;
+            } else {
+                throw new CRISException(String.format("Unexpected kpiType: %s", kpiType));
+            }
+            // Used to count the progress steps
+            int progressIncrement = 80 / (slotMax - 1);
+            // Get the total attendance for each slot in turn
+            for (int i = 0; i < slotMax; i++) {
+                CRISKPIItem kpiItem = kpiItems.get(i);
+                sessionAttendanceLoadOneSlot(kpiItem, progressIncrement, i + 1);
+            }
+            // Calculate the averages and the values for the Total column
+            for (int i = 0; i < kpiItems.size(); i++) {
+                int[] totals = {0, 0, 0, 0, 0, 0, 0};
+                CRISKPIItem item = kpiItems.get(i);
+                HashMap<UUID, int[]> kpiMap = item.getKpiMap();
+                for (UUID key : areaList) {
+                    if (kpiMap.containsKey(key)) {
+                        int[] values = kpiMap.get(key);
+                        totals[3] += values[3];
+                        totals[4] += values[4];
+                        totals[5] += values[5];
+                        totals[6] += values[6];
+                        // Do totals
+                        //values[0] = values[3] * 100 / values[5];
+                        values[0] = values[3];
+                        //values[1] = values[4] * 100 / values[6];
+                        values[1] = values[4];
+                        //values[2] = (values[3] + values[4]) * 100 / (values[5] + values[6]);
+                        values[2] = (values[3] + values[4]);
+                        kpiMap.put(key, values);
+                    }
+                }
+                // Finally calculate the averages for the total column
+
+                //totals[0] = totals[3] * 100 / totals[5];
+                totals[0] = totals[3];
+                //totals[1] = totals[4] * 100 / totals[6];
+                totals[1] = totals[4];
+                //totals[2] = (totals[3] + totals[4]) * 100 / (totals[5] + totals[6]);
+                totals[2] = (totals[3] + totals[4]);
+
                 // And load the totals column kpiItem
                 kpiMap.put(ListItem.commissionerTotalID, totals);
             }

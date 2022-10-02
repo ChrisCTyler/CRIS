@@ -62,10 +62,10 @@ public class ListSyncActivity extends CRISActivity {
             // Add the global uncaught exception handler
             Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
             setContentView(R.layout.activity_list);
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             setSupportActionBar(toolbar);
 
-            this.listView = (ListView) findViewById(R.id.list_view);
+            this.listView = findViewById(R.id.list_view);
 
             this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
@@ -76,7 +76,9 @@ public class ListSyncActivity extends CRISActivity {
 
             LocalDB localDB = LocalDB.getInstance();
             // Load the documents for special client (ClientID=DOCUMENT) from the database
-            syncActivities = localDB.getAllSyncResults(currentUser);
+            // Build 158 - Reduce sync activity list to last 100
+            //syncActivities = localDB.getAllSyncResults(currentUser);
+            syncActivities = localDB.getRecentSyncResults(currentUser, "100");
         }
     }
 
@@ -121,10 +123,10 @@ public class ListSyncActivity extends CRISActivity {
                 convertView = getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
             }
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
-            TextView viewItemDate = (TextView) convertView.findViewById(R.id.item_date);
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
+            TextView viewItemDate = convertView.findViewById(R.id.item_date);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
 
             final SyncActivity syncActivity = syncActivities.get(position);
 

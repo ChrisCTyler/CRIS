@@ -63,14 +63,14 @@ public class Note extends Document implements Serializable {
         // null note type id. In this case it can be set to Text Message
         LocalDB localDB = LocalDB.getInstance();
         if (noteTypeID == null){
-            noteType = (NoteType) localDB.getListItem("Text Message",ListType.NOTE_TYPE);
+            noteType = localDB.getListItem("Text Message", ListType.NOTE_TYPE);
             noteTypeID = noteType.getListItemID();
         } else {
             // Check that its a valid NoteTypeID
             if (!noteTypeID.equals(NoteType.responseNoteTypeID)) {
                 noteType = localDB.getListItem(noteTypeID);
                 if (noteType == null) {
-                    noteType = (NoteType) localDB.getListItem("Text Message", ListType.NOTE_TYPE);
+                    noteType = localDB.getListItem("Text Message", ListType.NOTE_TYPE);
                     noteTypeID = noteType.getListItemID();
                 }
             }
@@ -86,7 +86,7 @@ public class Note extends Document implements Serializable {
                 LocalDB localDB = LocalDB.getInstance();
                 noteType = localDB.getListItem(getNoteTypeID());
                 if (noteType == null){
-                    noteType = (NoteType) localDB.getListItem("Text Message",ListType.NOTE_TYPE);
+                    noteType = localDB.getListItem("Text Message", ListType.NOTE_TYPE);
                     noteTypeID = noteType.getListItemID();
                 }
             }
@@ -409,7 +409,9 @@ public class Note extends Document implements Serializable {
         } else {
             row.add("");
         }
-        row.add(getItemValue(getNoteType()));
+        // Build 171 Tidy up
+        //row.add(getItemValue(getNoteType()));
+        row.add(getNoteType().getItemValue());
         User author = localDB.getUser(getCreatedByID());
         if (author != null){
             row.add(author.getFullName());
@@ -430,6 +432,8 @@ public class Note extends Document implements Serializable {
 
     }
 
+    // Build 171 Tidy up
+    /*
     private String getItemValue(ListItem item){
         if (item == null){
             return "Unknown";
@@ -437,4 +441,5 @@ public class Note extends Document implements Serializable {
             return item.getItemValue();
         }
     }
+     */
 }

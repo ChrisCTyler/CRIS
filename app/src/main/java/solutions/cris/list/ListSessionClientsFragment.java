@@ -6,6 +6,7 @@ import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -53,6 +54,7 @@ import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.ClientSession;
 import solutions.cris.object.Document;
+import solutions.cris.object.ListItem;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
 import solutions.cris.object.NoteType;
@@ -95,6 +97,11 @@ public class ListSessionClientsFragment extends Fragment {
 
     private ArrayList<RegisterEntry> registerAdapterList;
     private ArrayList<ClientEntry> clientAdapterList;
+    //Build 186 - New variables Client view
+    private ArrayList<ClientEntry> displayedClientList;
+    private ArrayList<ClientEntry> hiddenClientList;
+
+
     private ListView listView;
     private View parent;
     private Session session;
@@ -115,12 +122,19 @@ public class ListSessionClientsFragment extends Fragment {
     // Used to switch between show existing invitees and get new invitees
     private boolean displayAllClients = false;
 
+    // Build 186 Cannot show and hide search so don't try
     // Build 105 - Added Search
+    //private MenuItem searchItem;
     private SearchView sv;
     private String searchText = "";
     private boolean isSearchIconified = true;
 
+    // Build 181 - Load Adapter on background thread
+    private TextView footer;
+    private Date startTime;
+    ClientEntryAdapter clientAdapter;
     private RegisterEntryAdapter registerAdapter;
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -129,6 +143,7 @@ public class ListSessionClientsFragment extends Fragment {
         setHasOptionsMenu(true);
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
+        footer = getActivity().findViewById(R.id.footer);
         return parent;
     }
 
@@ -146,10 +161,10 @@ public class ListSessionClientsFragment extends Fragment {
         localSettings = LocalSettings.getInstance(getActivity());
 
         // Initialise the list view
-        listView = (ListView) parent.findViewById(R.id.list_view);
+        listView = parent.findViewById(R.id.list_view);
         final SwipeDetector swipeDetector = new SwipeDetector();
-        this.listView.setOnTouchListener(swipeDetector);
-        this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        listView.setOnTouchListener(swipeDetector);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 if (swipeDetector.swipeDetected()) {
@@ -177,6 +192,7 @@ public class ListSessionClientsFragment extends Fragment {
                         fab.setImageResource(R.drawable.ic_fab_session);
                         displayAllClients = true;
                     }
+                    // Build 186 - Clear the search
                     onResume();
                 }
             });
@@ -186,6 +202,7 @@ public class ListSessionClientsFragment extends Fragment {
 
         // This is set true when editing myweek to prevent use of back button
         ((ListSessionClients) getActivity()).setEditMyWeek(false);
+
     }
 
     @Override
@@ -200,137 +217,24 @@ public class ListSessionClientsFragment extends Fragment {
     }
 
     private void onResumeRegister() {
+        // Build 186 Cannot show and hide search so don't try
         // Build 105 - Search visibility
-        if (searchItem != null) {
-            searchItem.setVisible(false);
-        }
-        int attendees = 0;
-        // Build 110 - Add Reserved option
-        int reserves = 0;
-        // Create the adapter
-        registerAdapterList = new ArrayList<>();
-        ArrayList<ClientSession> clientSessions = localDB.getAllClientSessions(session);
-        for (ClientSession clientSession : clientSessions) {
-            switch (selectMode) {
-                case ALL:
-                    registerAdapterList.add(new RegisterEntry(clientSession));
-                    if (clientSession.isAttended()) attendees++;
-                    if (clientSession.isReserved()) {
-                        reserves++;
-                    }
-                    break;
-                case UNCANCELLED:
-                    if (!clientSession.getCancelledFlag()) {
-                        registerAdapterList.add(new RegisterEntry(clientSession));
-                        if (clientSession.isAttended()) attendees++;
-                        if (clientSession.isReserved()) {
-                            reserves++;
-                        }
-                    }
-            }
+        //if (searchItem != null) {
+        //    searchItem.setVisible(false);
+        //}
+        // Build 181 - Load Adapter on background thread
+        new LoadRegisterAdapter().execute();
 
-        }
-        // Sort the documents
-        switch (sortMode) {
-            case FIRST_LAST:
-                Collections.sort(registerAdapterList, comparatorREFirstLast);
-                break;
-            case LAST_FIRST:
-                Collections.sort(registerAdapterList, comparatorRELastFirst);
-                break;
-            case ATTENDED:
-                Collections.sort(registerAdapterList, comparatorREAttended);
-                break;
-            case AGE:
-                Collections.sort(registerAdapterList, comparatorREAge);
-                break;
-        }
-        //RegisterEntryAdapter adapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
-        registerAdapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
-        this.listView.setAdapter(registerAdapter);
-        // Report the number of hidden documents in the footer.
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
-        if (session.getReferenceDate().before(new Date())) {
-            footer.setText(String.format(Locale.UK, "Attended: %d, DNA: %d, Reserves: %d", attendees, registerAdapterList.size() - attendees - reserves, reserves));
-        } else {
-            footer.setText(String.format(Locale.UK, "%d clients invited, %d reserves.", registerAdapterList.size() - reserves, reserves));
-        }
     }
 
     private void onResumeAllClients() {
+        // Build 186 Cannot show and hide search so don't try
         // Build 105 - Search visibility
-        searchItem.setVisible(true);
-
-        int hidden = 0;
-        // Create the adapter here because EditClient may have altered the eligibility for the
-        // current list
-        clientAdapterList = new ArrayList<>();
-
-        // Load the clients from the database
-        ArrayList<Client> clientList = localDB.getAllClients();
-        for (Client client : clientList) {
-            client.setLatestDocument(localDB.getLatestDocument(client));
-            if (client.search(searchText)) {
-                clientAdapterList.add(new ClientEntry(client));
-            } else {
-                hidden++;
-            }
-        }
-        setInvitedReservedFlags();
-        switch (sortMode) {
-            case FIRST_LAST:
-                Collections.sort(clientAdapterList, comparatorCEFirstLast);
-                break;
-            case LAST_FIRST:
-                Collections.sort(clientAdapterList, comparatorCELastFirst);
-                break;
-            case AGE:
-                Collections.sort(clientAdapterList, comparatorCEAge);
-                break;
-        }
-        ClientEntryAdapter adapter = new ClientEntryAdapter(getActivity(), clientAdapterList);
-        this.listView.setAdapter(adapter);
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
-        int displayed = clientAdapterList.size();
-        String footerText = "";
-        if (displayed > 1) {
-            footerText += String.format(Locale.UK, "%d clients shown, ", displayed);
-        } else if (displayed == 1) {
-            footerText += "1 client shown, ";
-        } else {
-            footerText += "0 clients shown, ";
-        }
-        if (hidden > 0) {
-            footerText += String.format(Locale.UK, "%d not shown.", hidden);
-        } else {
-            footerText = String.format(Locale.UK, "All clients shown (%d)", displayed);
-        }
-        footer.setText(footerText);
+        //searchItem.setVisible(true);
+        // Build 181 - Load Adapter on background thread
+        new LoadAllClientsAdapter().execute();
     }
 
-    private void setInvitedReservedFlags() {
-        for (RegisterEntry registerEntry : registerAdapterList) {
-            UUID clientID = registerEntry.getClientSession().getClientID();
-            for (ClientEntry clientEntry : clientAdapterList) {
-                if (clientEntry.getClient().getClientID().equals(clientID)) {
-                    clientEntry.setClientSession(registerEntry.getClientSession());
-                    if (registerEntry.getClientSession().getCancelledFlag()) {
-                        clientEntry.setInvited(false);
-                        clientEntry.setReserved(false);
-                    } else {
-                        if (registerEntry.getClientSession().isReserved()) {
-                            clientEntry.setInvited(false);
-                            clientEntry.setReserved(true);
-                        } else {
-                            clientEntry.setInvited(true);
-                            clientEntry.setReserved(false);
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-    }
 
     // MENU BLOCK
     private static final int MENU_EXPORT = Menu.FIRST + 1;
@@ -343,11 +247,8 @@ public class ListSessionClientsFragment extends Fragment {
     private static final int MENU_BROADCAST = Menu.FIRST + 20;
     private static final int MENU_SEND_MYWEEK_LINK = Menu.FIRST + 30;
 
-    private MenuItem searchItem;
-
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-
         //SHARE
         // Build 126 - share is only relevant in Read fragments
         MenuItem shareOption = menu.findItem(R.id.menu_item_share);
@@ -380,11 +281,14 @@ public class ListSessionClientsFragment extends Fragment {
         MenuItem sendMyWeekLinkOption = menu.add(0, MENU_SEND_MYWEEK_LINK, 20, "Send MyWeek Links");
         sendMyWeekLinkOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
+        // Build 186 Revert to standard search
+        /*
         // Build 105 Add Search at client level
-        searchItem = menu.findItem(R.id.action_search);
+        final MenuItem searchItem = menu.findItem(R.id.action_search);
         // Initial visibility is false since register is the first list displayed
         // onResumeAllClients will display the search option
-        searchItem.setVisible(false);
+        // Build 186 Cannot show and hide search so don't try
+        //searchItem.setVisible(false);
         ActionBar supportActionBar = ((ListSessionClients) getActivity()).getSupportActionBar();
         if (supportActionBar != null) {
             sv = new SearchView(supportActionBar.getThemedContext());
@@ -412,6 +316,59 @@ public class ListSessionClientsFragment extends Fragment {
                     searchText = "";
                     isSearchIconified = true;
                     onResumeAllClients();
+                    return true;  // Return true to collapse action view
+                }
+
+                @Override
+                public boolean onMenuItemActionExpand(MenuItem item) {
+                    isSearchIconified = false;
+                    return true;  // Return true to expand action view
+                }
+            });
+            MenuItemCompat.setActionView(searchItem, sv);
+            if (!isSearchIconified) {
+                searchItem.expandActionView();
+                sv.setQuery(searchText, false);
+                sv.clearFocus();
+            }
+        }
+         */
+        final MenuItem searchItem = menu.findItem(R.id.action_search);
+        ActionBar supportActionBar = ((ListSessionClients) getActivity()).getSupportActionBar();
+        if (supportActionBar != null) {
+            sv = new SearchView(supportActionBar.getThemedContext());
+            MenuItemCompat.setShowAsAction(searchItem,
+                    MenuItemCompat.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW | MenuItemCompat.SHOW_AS_ACTION_IF_ROOM);
+            sv.setIconified(isSearchIconified);
+            sv.setSubmitButtonEnabled(true);
+            sv.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    searchText = query;
+                    sv.clearFocus();
+                    if (displayAllClients) {
+                        new LoadAllClientsAdapter().execute();
+                    } else {
+                        new LoadRegisterAdapter().execute();
+                    }
+                    return true;
+                }
+
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    return false;
+                }
+            });
+            MenuItemCompat.setOnActionExpandListener(searchItem, new MenuItemCompat.OnActionExpandListener() {
+                @Override
+                public boolean onMenuItemActionCollapse(MenuItem item) {
+                    searchText = "";
+                    isSearchIconified = true;
+                    if (displayAllClients) {
+                        new LoadAllClientsAdapter().execute();
+                    } else {
+                        new LoadRegisterAdapter().execute();
+                    }
                     return true;  // Return true to collapse action view
                 }
 
@@ -513,7 +470,6 @@ public class ListSessionClientsFragment extends Fragment {
         }
     }
 
-
     private void doNoPrivilege() {
         new AlertDialog.Builder(getActivity())
                 .setTitle("No Privilege")
@@ -600,7 +556,6 @@ public class ListSessionClientsFragment extends Fragment {
                 } else {
                     return 1;
                 }
-
             }
         }
     };
@@ -645,9 +600,8 @@ public class ListSessionClientsFragment extends Fragment {
 
         RegisterEntry(ClientSession clientSession) {
             this.clientSession = clientSession;
-            note = null;
-            pdfDocument = null;
-            statusDocument = null;
+            /*
+            // Build 181 Use SQL to return only this SessionID
             // Find any associated note / pdf
             ArrayList<Document> notes = localDB.getAllDocumentsOfType(clientSession.getClientID(), Document.Note);
             for (Document document : notes) {
@@ -661,6 +615,7 @@ public class ListSessionClientsFragment extends Fragment {
                     stickyNoteFlag = true;
                 }
             }
+
             ArrayList<Document> pdfDocuments = localDB.getAllDocumentsOfType(clientSession.getClientID(), Document.PdfDocument);
             for (Document document : pdfDocuments) {
                 PdfDocument pdf = (PdfDocument) document;
@@ -685,6 +640,42 @@ public class ListSessionClientsFragment extends Fragment {
                     this.statusDocument = myWeek;
                     break;
                 }
+            }
+            */
+            // Build 181 - This mechanism is very fast but SessionID field is only set for ClientSession records
+            // pre this build. Fixed by modification to document.Save() and re-save via Fix option in SysAdmin
+            ArrayList<Document> notes = localDB.getAllDocumentsOfType(clientSession.getClientID(),
+                    Document.Note, clientSession.getSessionID());
+            for (Document document : notes) {
+                Note note = (Note) document;
+                this.note = note;
+                // Build 110 If sticky note found
+                if (note.isStickyFlag()) {
+                    stickyNoteFlag = true;
+                }
+                break;
+            }
+            ArrayList<Document> pdfDocuments = localDB.getAllDocumentsOfType(clientSession.getClientID(),
+                    Document.PdfDocument, clientSession.getSessionID());
+            for (Document document : pdfDocuments) {
+                PdfDocument pdf = (PdfDocument) document;
+                this.pdfDocument = pdf;
+                break;
+            }
+            ArrayList<Document> transportDocuments = localDB.getAllDocumentsOfType(clientSession.getClientID(),
+                    Document.Transport, clientSession.getSessionID());
+            for (Document document : transportDocuments) {
+                Transport transport = (Transport) document;
+                this.transport = transport;
+                break;
+            }
+            // Repeat the following for each sub-class of Status
+            ArrayList<Document> myWeekDocuments = localDB.getAllDocumentsOfType(clientSession.getClientID(),
+                    Document.MyWeek, clientSession.getSessionID());
+            for (Document document : myWeekDocuments) {
+                MyWeek myWeek = (MyWeek) document;
+                this.statusDocument = myWeek;
+                break;
             }
         }
 
@@ -1109,7 +1100,7 @@ public class ListSessionClientsFragment extends Fragment {
             final Status statusDocument = registerEntry.getStatusDocument();
             // Build 110 Stick Note Flag
             final boolean stickyNoteFlag = registerEntry.getStickyNoteFlag();
-            ImageView noteIcon = (ImageView) convertView.findViewById(R.id.note_icon);
+            ImageView noteIcon = convertView.findViewById(R.id.note_icon);
             noteIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1117,7 +1108,7 @@ public class ListSessionClientsFragment extends Fragment {
                 }
             });
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
             viewItemIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1125,7 +1116,7 @@ public class ListSessionClientsFragment extends Fragment {
                 }
             });
 
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
             viewItemMainText.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1133,7 +1124,7 @@ public class ListSessionClientsFragment extends Fragment {
                 }
             });
 
-            ImageView attendanceIcon = (ImageView) convertView.findViewById(R.id.attendance_icon);
+            ImageView attendanceIcon = convertView.findViewById(R.id.attendance_icon);
             attendanceIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1141,7 +1132,7 @@ public class ListSessionClientsFragment extends Fragment {
                 }
             });
 
-            ImageView statusIcon = (ImageView) convertView.findViewById(R.id.status_icon);
+            ImageView statusIcon = convertView.findViewById(R.id.status_icon);
             statusIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1156,7 +1147,7 @@ public class ListSessionClientsFragment extends Fragment {
                 }
             });
 
-            ImageView transportIcon = (ImageView) convertView.findViewById(R.id.transport_icon);
+            ImageView transportIcon = convertView.findViewById(R.id.transport_icon);
             transportIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1173,7 +1164,7 @@ public class ListSessionClientsFragment extends Fragment {
 
             // Build 105 - Removed PDF Icon, replaced by Consent Camera
 
-            ImageView pdfDocumentIcon = (ImageView) convertView.findViewById(R.id.pdf_icon);
+            ImageView pdfDocumentIcon = convertView.findViewById(R.id.pdf_icon);
             pdfDocumentIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1189,7 +1180,7 @@ public class ListSessionClientsFragment extends Fragment {
             });
 
             // Build 110 - If sticky note flag, display client record
-            ImageView flagIcon = (ImageView) convertView.findViewById(R.id.flag_icon);
+            ImageView flagIcon = convertView.findViewById(R.id.flag_icon);
             flagIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1397,7 +1388,7 @@ public class ListSessionClientsFragment extends Fragment {
                 pdfDocumentIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_pdf_document));
             }
 
-            ImageView cameraIcon = (ImageView) convertView.findViewById(R.id.camera_icon);
+            ImageView cameraIcon = convertView.findViewById(R.id.camera_icon);
             // Build 111 - Fix bug where current case is null
             if (currentCase == null) {
                 cameraIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_camera_grey));
@@ -1536,7 +1527,9 @@ public class ListSessionClientsFragment extends Fragment {
     private class ClientEntryAdapter extends ArrayAdapter<ClientEntry> {
 
         // Constructor
-        ClientEntryAdapter(Context context, List<ClientEntry> objects) {
+        // Build 186 - Force type on list
+        //ClientEntryAdapter(Context context, List<ClientEntry> objects) {
+        ClientEntryAdapter(Context context, ArrayList<ClientEntry> objects) {
             super(context, 0, objects);
         }
 
@@ -1861,7 +1854,7 @@ public class ListSessionClientsFragment extends Fragment {
             final ClientEntry clientEntry = clientAdapterList.get(position);
             Client client = clientEntry.getClient();
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
             viewItemIcon.setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View view, MotionEvent motionEvent) {
@@ -1869,7 +1862,7 @@ public class ListSessionClientsFragment extends Fragment {
                     return false;
                 }
             });
-            ImageView invitedIcon = (ImageView) convertView.findViewById(R.id.attendance_icon);
+            ImageView invitedIcon = convertView.findViewById(R.id.attendance_icon);
             invitedIcon.setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View view, MotionEvent motionEvent) {
@@ -1877,7 +1870,7 @@ public class ListSessionClientsFragment extends Fragment {
                     return false;
                 }
             });
-            ImageView reserveIcon = (ImageView) convertView.findViewById(R.id.reserve_icon);
+            ImageView reserveIcon = convertView.findViewById(R.id.reserve_icon);
             reserveIcon.setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View view, MotionEvent motionEvent) {
@@ -1885,8 +1878,8 @@ public class ListSessionClientsFragment extends Fragment {
                     return false;
                 }
             });
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
 
             // Display the client's name
             viewItemMainText.setText(client.getFullName());
@@ -2027,7 +2020,240 @@ public class ListSessionClientsFragment extends Fragment {
             }
             viewItemAdditionalText.setText(additionalText);
             viewItemAdditionalText.setTextColor(color);
+
             return convertView;
+        }
+    }
+
+    // Build 181 - Load Adapter in a backrgound thread
+    // There are two load tasks one for the Register and one for All Clients
+    private class LoadRegisterAdapter extends AsyncTask<Void, String, String> {
+
+        private ArrayList<RegisterEntry> tempAdapterList;
+
+        private int attendees;
+        private int reserves;
+        // Build 186 - Implement search in Register view
+        private int hidden;
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+            attendees = 0;
+            // Build 186 - Implement search in Register view
+            hidden = 0;
+            // Build 110 - Add Reserved option
+            reserves = 0;
+            tempAdapterList = new ArrayList<>();
+            ArrayList<ClientSession> clientSessions = localDB.getAllClientSessions(session);
+
+            for (ClientSession clientSession : clientSessions) {
+                // Build 186 Implement search in the register view
+                if (clientSession.getClient().search(searchText)) {
+                    switch (selectMode) {
+                        case ALL:
+                            tempAdapterList.add(new RegisterEntry(clientSession));
+                            if (clientSession.isAttended()) attendees++;
+                            if (clientSession.isReserved()) {
+                                reserves++;
+                            }
+                            break;
+                        case UNCANCELLED:
+                            if (!clientSession.getCancelledFlag()) {
+                                tempAdapterList.add(new RegisterEntry(clientSession));
+                                if (clientSession.isAttended()) attendees++;
+                                if (clientSession.isReserved()) {
+                                    reserves++;
+                                }
+                            }
+                    }
+                } else {
+                    hidden++;
+                }
+            }
+            // Sort the documents
+            switch (sortMode) {
+                case FIRST_LAST:
+                    Collections.sort(tempAdapterList, comparatorREFirstLast);
+                    break;
+                case LAST_FIRST:
+                    Collections.sort(tempAdapterList, comparatorRELastFirst);
+                    break;
+                case ATTENDED:
+                    Collections.sort(tempAdapterList, comparatorREAttended);
+                    break;
+                case AGE:
+                    Collections.sort(tempAdapterList, comparatorREAge);
+                    break;
+            }
+            return "";
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+            startTime = new Date();     // Used to display execution time
+            footer.setText("loading...");
+            // Clear the adapter to show reload has started
+            if (registerAdapter != null) {
+                registerAdapter.clear();
+                registerAdapter.notifyDataSetChanged();
+            }
+        }
+
+        @Override
+        protected void onPostExecute(String output) {
+            // Runs on UI Thread
+            // Reload the adapter list
+            registerAdapterList = new ArrayList<>();
+            // Build 184 A System Error is being caused by a bad clientAdapterList it is
+            // possible that addAll() has a problem with empty lists
+            if (tempAdapterList.size() > 0) {
+                registerAdapterList.addAll(tempAdapterList);
+            }
+            registerAdapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
+            listView.setAdapter(registerAdapter);
+            registerAdapter.notifyDataSetChanged();
+            // Report the number of documents in the footer.
+            String footerText;
+            if (session.getReferenceDate().before(new Date())) {
+                footerText = String.format(Locale.UK, "Attended: %d, DNA: %d, Reserves: %d", attendees, registerAdapterList.size() - attendees - reserves, reserves);
+            } else {
+                footerText = String.format(Locale.UK, "Invited: %d, Reserves: %d", registerAdapterList.size() - reserves, reserves);
+            }
+            if (hidden > 0) {
+                footerText += String.format(Locale.UK, ", Hidden: %d", hidden);
+            }
+            Date endTime = new Date();
+            long elapsed = (endTime.getTime() - startTime.getTime()) / 1000;
+            //long elapsed = (endTime.getTime() - startTime.getTime()) / 100;
+            if (elapsed > 0) {
+
+                footer.setText(String.format("%s (%d sec)", footerText, elapsed));
+            } else {
+                footer.setText(footerText);
+            }
+        }
+    }
+
+    // Build 186 - Optimised client search to make loading of ad-hoc groups easier. Entries are
+    // removed from the clientAdapterList and stored temporarily then returned when the search
+    // is closed (or repeated)
+    private class LoadAllClientsAdapter extends AsyncTask<Void, String, String> {
+
+        int hidden = 0;
+        int displayed = 0;
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+
+            // Background thread works on two background lists and only loads the clientAdapterList
+            // in  the post execute to prevent partial results being shown
+
+            // Move the hidden clients back in case of a previous search
+            displayedClientList.addAll(hiddenClientList);
+            hiddenClientList.clear();
+
+            // Load the client list if it is the first time
+            if (displayedClientList.size() == 0) {
+                // Load the clients from the database
+                ArrayList<Client> clientList = localDB.getAllClients();
+                for (Client client : clientList) {
+                    client.setLatestDocument(localDB.getLatestDocument(client));
+                    displayedClientList.add(new ClientEntry(client));
+                }
+                setInvitedReservedFlags();
+            }
+            // Move entries from displayedList to hiddenList if not in search criteria
+            if (searchText.length() > 0) {
+                // Note: Can't modify clientAdapterList whilst looping through it so add to
+                // stored on this pass and remove from clientAdapterlist on next pass
+                for (ClientEntry clientEntry : displayedClientList) {
+                    if (!clientEntry.getClient().search(searchText)) {
+                        hiddenClientList.add(clientEntry);
+                    }
+                }
+                for (ClientEntry clientEntry : hiddenClientList) {
+                    displayedClientList.remove(clientEntry);
+                }
+            }
+            displayed = displayedClientList.size();
+            hidden = hiddenClientList.size();
+            // Now sort the clientAdapterList
+            switch (sortMode) {
+                case FIRST_LAST:
+                    Collections.sort(displayedClientList, comparatorCEFirstLast);
+                    break;
+                case LAST_FIRST:
+                    Collections.sort(displayedClientList, comparatorCELastFirst);
+                    break;
+                case AGE:
+                    Collections.sort(displayedClientList, comparatorCEAge);
+                    break;
+            }
+            return "";
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+            startTime = new Date();     // Used to display execution time
+
+            // Clear the adapter to show reload has started
+            if (clientAdapterList == null) {
+                clientAdapterList = new ArrayList<>();
+                displayedClientList = new ArrayList<>();
+                hiddenClientList = new ArrayList<>();
+            }
+            // Link the client adapter to handle switch to client view
+            clientAdapterList.clear();
+            clientAdapter = new ClientEntryAdapter(getActivity(), clientAdapterList);
+            listView.setAdapter(clientAdapter);
+            clientAdapter.notifyDataSetChanged();
+            footer.setText("loading...");
+        }
+
+        @Override
+        protected void onPostExecute(String output) {
+            // Runs on UI Thread
+            // Load the actual client list
+            clientAdapterList.addAll(displayedClientList);
+            // Display the footer
+            Date endTime = new Date();
+            long elapsed = (endTime.getTime() - startTime.getTime()) / 1000;
+            if (hidden == 0) {
+                footer.setText(String.format(Locale.UK, "All Clients Displayed. (%d sec)", elapsed));
+            } else {
+                footer.setText(String.format(Locale.UK, "Displayed: %d, Hidden: %d. (%d sec)", displayed, hidden, elapsed));
+            }
+            clientAdapter.notifyDataSetChanged();
+        }
+
+        private void setInvitedReservedFlags() {
+            for (RegisterEntry registerEntry : registerAdapterList) {
+                UUID clientID = registerEntry.getClientSession().getClientID();
+                // Build 181
+                //for (ClientEntry clientEntry : clientAdapterList) {
+                for (ClientEntry clientEntry : displayedClientList) {
+                    if (clientEntry.getClient().getClientID().equals(clientID)) {
+                        clientEntry.setClientSession(registerEntry.getClientSession());
+                        if (registerEntry.getClientSession().getCancelledFlag()) {
+                            clientEntry.setInvited(false);
+                            clientEntry.setReserved(false);
+                        } else {
+                            if (registerEntry.getClientSession().isReserved()) {
+                                clientEntry.setInvited(false);
+                                clientEntry.setReserved(true);
+                            } else {
+                                clientEntry.setInvited(true);
+                                clientEntry.setReserved(false);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 }

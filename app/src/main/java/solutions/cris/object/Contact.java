@@ -1,5 +1,7 @@
 package solutions.cris.object;
 
+import android.content.res.Resources;
+
 import com.google.api.services.sheets.v4.model.CellData;
 import com.google.api.services.sheets.v4.model.CellFormat;
 import com.google.api.services.sheets.v4.model.DimensionProperties;
@@ -19,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListClientHeader;
 import solutions.cris.utils.CRISUtil;
@@ -65,6 +68,10 @@ public class Contact extends Document implements Serializable {
         contactAdditionalInformation = "";
         relationshipTypeID = null;
         relationshipType = null;
+        // Build 181 - New field, default to true on new records
+        freeSchoolMeals = true;
+        // Build 183 - New field
+        specialNeeds = false;
     }
 
     private UUID contactTypeID;
@@ -79,9 +86,13 @@ public class Contact extends Document implements Serializable {
     }
 
     public ListItem getContactType() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (contactTypeID != null && contactType == null) {
             LocalDB localDB = LocalDB.getInstance();
             contactType = localDB.getListItem(contactTypeID);
+        }
+        if (contactType == null) {
+            contactType = new ListItem(User.getCurrentUser(), ListType.CONTACT_TYPE, "Unknown", 0);
         }
         return contactType;
     }
@@ -102,9 +113,15 @@ public class Contact extends Document implements Serializable {
     }
 
     public Agency getAgency() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (agencyID != null && agency == null) {
             LocalDB localDB = LocalDB.getInstance();
-            agency =  localDB.getListItem(getAgencyID());
+            agency = localDB.getListItem(getAgencyID());
+        }
+        if (agency == null) {
+            // Build 176 Agency is a complex list item
+            //agency = new ListItem(User.getCurrentUser(),ListType.AGENCY,"Unknown",0);
+            agency = new Agency(User.getCurrentUser(), "Unknown", 0);
         }
         return (Agency) agency;
     }
@@ -125,15 +142,43 @@ public class Contact extends Document implements Serializable {
     }
 
     public School getSchool() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (schoolID != null && school == null) {
             LocalDB localDB = LocalDB.getInstance();
-            school =  localDB.getListItem(getSchoolID());
+            school = localDB.getListItem(getSchoolID());
+        }
+        if (school == null) {
+            // Build 176 School is a complex list item
+            //school = new ListItem(User.getCurrentUser(),ListType.SCHOOL,"Unknown",0);
+            school = new School(User.getCurrentUser(), "Unknown", 0);
         }
         return (School) school;
     }
 
     public void setSchool(ListItem school) {
         this.school = school;
+    }
+
+    // Build 181 - Added Free School Meals
+    private boolean freeSchoolMeals;
+
+    public boolean isFreeSchoolMeals() {
+        return freeSchoolMeals;
+    }
+
+    public void setFreeSchoolMeals(boolean freeSchoolMeals) {
+        this.freeSchoolMeals = freeSchoolMeals;
+    }
+
+    // Build 183 - Added SEND
+    private boolean specialNeeds;
+
+    public boolean isSpecialNeeds() {
+        return specialNeeds;
+    }
+
+    public void setSpecialNeeds(boolean specialNeeds) {
+        this.specialNeeds = specialNeeds;
     }
 
     private String contactName;
@@ -231,9 +276,13 @@ public class Contact extends Document implements Serializable {
     }
 
     public ListItem getRelationshipType() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (relationshipTypeID != null && relationshipType == null) {
             LocalDB localDB = LocalDB.getInstance();
             relationshipType = localDB.getListItem(relationshipTypeID);
+        }
+        if (relationshipType == null) {
+            relationshipType = new ListItem(User.getCurrentUser(), ListType.RELATIONSHIP, "Unknown", 0);
         }
         return relationshipType;
     }
@@ -242,7 +291,7 @@ public class Contact extends Document implements Serializable {
         this.relationshipType = relationshipType;
     }
 
-    public void clear(){
+    public void clear() {
         setContactType(null);
         setAgency(null);
         setSchool(null);
@@ -311,6 +360,12 @@ public class Contact extends Document implements Serializable {
         }
     }
 
+    // Build 181 - Added for new Free School Meals field
+    private String displayBoolean(boolean value) {
+        if (value) return "Yes";
+        else return "No";
+    }
+
     public String textSummary() {
         SimpleDateFormat sDate = new SimpleDateFormat("EEE dd MMM yyyy", Locale.UK);
         // Build the string
@@ -322,6 +377,12 @@ public class Contact extends Document implements Serializable {
                 summary += getSchool().getSchoolPostcode() + "\n";
                 summary += "School Contact: " + getContactName() + "\n";
                 summary += "Relationship: " + getRelationshipType().getItemValue() + "\n";
+                // Build 181
+                summary += String.format("Free School Meals: %s\n",
+                        displayBoolean(freeSchoolMeals));
+                // Build 183
+                summary += String.format("Special Educational Needs and Disabilities: %s\n",
+                        displayBoolean(specialNeeds));
                 break;
             case "Agency Contact":
                 summary += "Agency: " + getAgency().getItemValue() + "\n";
@@ -352,7 +413,7 @@ public class Contact extends Document implements Serializable {
         return summary;
     }
 
-    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
         Contact previousDocument = (Contact) localDB.getDocumentByRecordID(previousRecordID);
         Contact thisDocument = (Contact) localDB.getDocumentByRecordID(thisRecordID);
         String changes = Document.getChanges(previousDocument, thisDocument);
@@ -364,6 +425,10 @@ public class Contact extends Document implements Serializable {
                     changes += CRISUtil.getChanges(previousDocument.getSchool(), thisDocument.getSchool(), "School");
                     changes += CRISUtil.getChanges(previousDocument.getContactName(), thisDocument.getContactName(), "Contact Name");
                     changes += CRISUtil.getChanges(previousDocument.getRelationshipType(), thisDocument.getRelationshipType(), "Relationship Type");
+                    // Build 181
+                    changes += CRISUtil.getChanges(previousDocument.isFreeSchoolMeals(), thisDocument.isFreeSchoolMeals(), "Free School Meals");
+                    // Build 183
+                    changes += CRISUtil.getChanges(previousDocument.isSpecialNeeds(), thisDocument.isSpecialNeeds(), "Special Educational Needs and Disabilities");
                     break;
                 case "Agency Contact":
                     changes += CRISUtil.getChanges(previousDocument.getAgency(), thisDocument.getAgency(), "Agency");
@@ -382,7 +447,7 @@ public class Contact extends Document implements Serializable {
             changes += CRISUtil.getChanges(previousDocument.getContactEmailAddress(), thisDocument.getContactEmailAddress(), "Email Address");
             changes += CRISUtil.getChanges(previousDocument.getContactAdditionalInformation(), thisDocument.getContactAdditionalInformation(), "Additional Information");
         }
-        if (changes.length() == 0){
+        if (changes.length() == 0) {
             changes = "No changes found.\n";
         }
         changes += "-------------------------------------------------------------\n";
@@ -406,8 +471,10 @@ public class Contact extends Document implements Serializable {
         fNames.add("Name");
         fNames.add("Contact Num.");
         fNames.add("Contact Email");
+        fNames.add("Free School Meals");
         return fNames;
     }
+
 
     public static List<List<Object>> getContactData(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
@@ -415,7 +482,7 @@ public class Contact extends Document implements Serializable {
         List<List<Object>> content = new ArrayList<>();
         content.add(getExportFieldNames());
         for (Document document : documents) {
-            if (client == null || document.getClientID() != client.getClientID()){
+            if (client == null || document.getClientID() != client.getClientID()) {
                 // New client
                 client = (Client) localDB.getDocument(document.getClientID());
             }
@@ -487,10 +554,8 @@ public class Contact extends Document implements Serializable {
                 .setRepeatCell(new RepeatCellRequest()
                         .setCell(new CellData()
                                 .setUserEnteredFormat(new CellFormat()
-                                        .setTextFormat(new TextFormat()
-                                                .setFontSize(11))
-                                        .setNumberFormat(new NumberFormat()
-                                                .setType("DATE"))
+                                        .setTextFormat(new TextFormat().setFontSize(11))
+                                        .setNumberFormat(new NumberFormat().setType("DATE"))
                                 ))
                         .setFields("UserEnteredFormat")
                         .setRange(new GridRange()
@@ -522,12 +587,17 @@ public class Contact extends Document implements Serializable {
         } else {
             row.add("");
         }
-            row.add(getItemValue(getContactType()));
+        // Build 171 Tidy up
+        //row.add(getItemValue(getContactType()));
+        row.add(getContactType().getItemValue());
 
         switch (getContactType().getItemValue()) {
             case "School Contact":
-                    row.add(getItemValue(getSchool()));
-                row.add(getItemValue(getRelationshipType()));
+                // Tidy up
+                //row.add(getItemValue(getSchool()));
+                //row.add(getItemValue(getRelationshipType()));
+                row.add(getSchool().getItemValue());
+                row.add(getRelationshipType().getItemValue());
                 row.add(getContactName());
                 if (getContactContactNumber().isEmpty()) {
                     if (getSchool() != null) {
@@ -547,10 +617,17 @@ public class Contact extends Document implements Serializable {
                 } else {
                     row.add(getContactEmailAddress());
                 }
+                // Build 181
+                row.add(displayExportBoolean(freeSchoolMeals));
+                // Build 183
+                row.add(displayExportBoolean(specialNeeds));
                 break;
             case "Agency Contact":
-                row.add(getItemValue(getAgency()));
-                row.add(getItemValue(getRelationshipType()));
+                // Build 171 Tidy up
+                //row.add(getItemValue(getAgency()));
+                //row.add(getItemValue(getRelationshipType()));
+                row.add(getAgency().getItemValue());
+                row.add(getRelationshipType().getItemValue());
                 row.add(getContactName());
                 if (getContactContactNumber().isEmpty()) {
                     if (getAgency() != null) {
@@ -564,25 +641,42 @@ public class Contact extends Document implements Serializable {
                 if (getContactEmailAddress().isEmpty()) {
                     if (getAgency() != null) {
                         row.add(getAgency().getAgencyEmailAddress());
-                    }else {
+                    } else {
                         row.add("");
                     }
                 } else {
                     row.add(getContactEmailAddress());
                 }
+                //freeSchoolMeals
+                row.add("");
+                //specialNeeds
+                row.add("");
                 break;
             default:
                 row.add("");
-                row.add(getItemValue(getRelationshipType()));
+                // Build 171 Tidy up
+                //row.add(getItemValue(getRelationshipType()));
+                row.add(getRelationshipType().getItemValue());
                 row.add(getContactName());
                 row.add(String.format("'%s", getContactContactNumber()));
                 row.add(getContactEmailAddress());
+                //freeSchoolMeals
+                row.add("");
+                //specialNeeds
+                row.add("");
         }
 
         return row;
 
     }
 
+    private String displayExportBoolean(boolean value) {
+        if (value) return "True";
+        else return "False";
+    }
+
+    // Build 171 Tidy up
+    /*
     private String getItemValue(ListItem item){
         if (item == null){
             return "Unknown";
@@ -590,4 +684,6 @@ public class Contact extends Document implements Serializable {
             return item.getItemValue();
         }
     }
+
+     */
 }

@@ -21,18 +21,21 @@ import android.content.Intent;
 import android.database.sqlite.SQLiteConstraintException;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+
 import android.text.InputType;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -41,16 +44,30 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.UUID;
 
 import solutions.cris.CRISActivity;
 import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
+import solutions.cris.object.Case;
+import solutions.cris.object.Client;
+import solutions.cris.object.ClientSession;
+import solutions.cris.object.Contact;
+import solutions.cris.object.CriteriaAssessmentTool;
+import solutions.cris.object.Document;
+import solutions.cris.object.Image;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
+import solutions.cris.object.MyWeek;
+import solutions.cris.object.Note;
+import solutions.cris.object.PdfDocument;
+import solutions.cris.object.Role;
+import solutions.cris.object.Transport;
 import solutions.cris.object.User;
 import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.ExceptionHandler;
+import solutions.cris.utils.SwipeDetector;
 
 public class ListListItems extends CRISActivity {
 
@@ -61,6 +78,9 @@ public class ListListItems extends CRISActivity {
     private String listType;
     private TextView hintTextView;
     private boolean hintTextDisplayed = true;
+
+    // Build 173
+    ListItemAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,13 +94,13 @@ public class ListListItems extends CRISActivity {
             // Add the global uncaught exception handler
             Thread.setDefaultUncaughtExceptionHandler(new ExceptionHandler(this));
             setContentView(R.layout.activity_list_list_items);
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             listType = getIntent().getStringExtra(Main.EXTRA_LIST_TYPE);
             toolbar.setTitle(getString(R.string.app_name) + " - " + listType);
             setSupportActionBar(toolbar);
 
             // Set up the hint text
-            hintTextView = (TextView) findViewById(R.id.hint_text);
+            hintTextView = findViewById(R.id.hint_text);
             hintTextView.setText(getHelpText());
             // Restore value of hintDisplayed (Set to opposite, toggle to come
             if (savedInstanceState != null) {
@@ -95,9 +115,11 @@ public class ListListItems extends CRISActivity {
                 }
             });
 
+
             //listView = (ListView) findViewById(R.id.list_list_item_view);
-            listView = (ListView) findViewById(R.id.list_list_item_view);
+            listView = findViewById(R.id.list_list_item_view);
             //listView.setItemsCanFocus(true);
+
 
             localDB = LocalDB.getInstance();
             // Load the ListItems from the database
@@ -124,7 +146,7 @@ public class ListListItems extends CRISActivity {
             hintTextView.setHeight(hintTextHeight);
         }
 */
-        ListItemAdapter adapter = new ListItemAdapter(this, listItems);
+        adapter = new ListItemAdapter(this, listItems);
         this.listView.setAdapter(adapter);
     }
 
@@ -163,6 +185,7 @@ public class ListListItems extends CRISActivity {
             }
         }
     }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
@@ -225,6 +248,28 @@ public class ListListItems extends CRISActivity {
         }
     }
 
+    private void displayListItemHistory(ListItem listItem) {
+        //listViewState = listView.onSaveInstanceState();
+
+        //Loop through all instances of the document gathering data
+        String history = String.format("The current ListItem contents are:\n\n%s\n",
+                listItem.textSummary());
+        //ArrayList<UUID> recordIDs = localDB.getRecordIDs(listItem);
+        ArrayList<UUID> recordIDs = localDB.getListItemRecordIDsByValue(listItem);
+        for (int i = 0; i < recordIDs.size(); i++) {
+            boolean isEarliest = (i == recordIDs.size() - 1);
+            history += localDB.getListItemMetaData(recordIDs.get(i));
+            if (!isEarliest) {
+                history += ListItem.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i));
+            }
+        }
+        Intent intent = new Intent(this, AlertAndContinue.class);
+        intent.putExtra("title", String.format("Change History - %s", listItem.getItemValue()));
+        intent.putExtra("message", history);
+        startActivity(intent);
+
+    }
+
     private class ListItemAdapter extends ArrayAdapter<ListItem> {
 
         private int selectedItem = -1;
@@ -245,11 +290,11 @@ public class ListListItems extends CRISActivity {
             if (convertView == null) {
                 holder = new ViewHolder();
                 convertView = getLayoutInflater().inflate(R.layout.list_item_editor, parent, false);
-                holder.addItemView = (ImageView) convertView.findViewById(R.id.action_add);
-                holder.cutPasteView = (ImageView) convertView.findViewById(R.id.action_cut_paste);
-                holder.defaultIconView = (ImageView) convertView.findViewById(R.id.default_icon);
-                holder.selectIconView = (ImageView) convertView.findViewById(R.id.select_icon);
-                holder.textView = (TextView) convertView.findViewById(R.id.item_text);
+                holder.addItemView = convertView.findViewById(R.id.action_add);
+                holder.cutPasteView = convertView.findViewById(R.id.action_cut_paste);
+                holder.defaultIconView = convertView.findViewById(R.id.default_icon);
+                holder.selectIconView = convertView.findViewById(R.id.select_icon);
+                holder.textView = convertView.findViewById(R.id.item_text);
                 convertView.setTag(holder);
             } else {
                 holder = (ViewHolder) convertView.getTag();
@@ -287,11 +332,20 @@ public class ListListItems extends CRISActivity {
             String textValue = listItem.getItemValue();
             holder.textView.setText(textValue);
 
+            // Build 173 Add Diagnostics
+            holder.textView.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View view) {
+                    displayListItemHistory(listItem);
+                    return false;
+                }
+            });
             holder.textView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     // Popup a dialog
                     final ListItem listItem = (ListItem) v.getTag();
+
                     final EditText editText = new EditText(v.getContext());
 
                     String currentText = listItem.getItemValue();
@@ -299,7 +353,6 @@ public class ListListItems extends CRISActivity {
                         editText.setText(currentText);
                     }
                     editText.setInputType(InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-
 
 
                     new AlertDialog.Builder(v.getContext())
@@ -324,6 +377,7 @@ public class ListListItems extends CRISActivity {
                             })
 
                             .show();
+
 
                 }
             });

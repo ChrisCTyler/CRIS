@@ -1,0 +1,983 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView
+        android:id="@+id/edit_case_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <include layout="@layout/content_cancel_box" />
+
+            <include layout="@layout/content_dropdown_hint" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/reference_date"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/prompt_date"
+                    android:inputType="date"
+                    android:maxLines="1" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/provide_help_to_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:text="Who is it you provide help to?"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <TextView
+                    android:id="@+id/provide_help_to_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <CheckBox
+                    android:id="@+id/pht_mother"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_pht_mother"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pht_stepmother"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_pht_stepmother"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pht_father"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_pht_father"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pht_stepfather"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_pht_stepfather"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/pht_brothers"
+                        android:layout_width="50dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="@dimen/spinner_hint_margin"
+                        android:inputType="number"
+                        android:maxLines="1" />
+
+                    <TextView
+                        android:id="@+id/pht_brothers_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/prompt_maca_pht_brothers"
+                        android:textColor="@color/black"
+                        android:textSize="@dimen/text_size_hint" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/pht_sisters"
+                        android:layout_width="50dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="@dimen/spinner_hint_margin"
+                        android:inputType="number"
+                        android:maxLines="1" />
+
+                    <TextView
+                        android:id="@+id/pht_sisters_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/prompt_maca_pht_sisters"
+                        android:textColor="@color/black"
+                        android:textSize="@dimen/text_size_hint" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/pht_grandparents"
+                        android:layout_width="50dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="@dimen/spinner_hint_margin"
+                        android:inputType="number"
+                        android:maxLines="1" />
+
+                    <TextView
+                        android:id="@+id/pht_grandparents_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/prompt_maca_pht_grandparents"
+                        android:textColor="@color/black"
+                        android:textSize="@dimen/text_size_hint" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="350dp"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/pht_other_relative"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="@string/prompt_maca_pht_other_relative"
+                            android:inputType="text"
+                            android:maxLines="1" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <CheckBox
+                    android:id="@+id/pht_family_friend"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_pht_family_friend"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="350dp"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/pht_other"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="@string/prompt_maca_pht_other"
+                            android:inputType="text"
+                            android:maxLines="1" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+
+            </LinearLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/reason_need_help"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/prompt_maca_reason_need_help"
+                    android:inputType="textCapSentences|textMultiLine" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/caring_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:text="I an caring for someone..."
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <TextView
+                    android:id="@+id/caring_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <CheckBox
+                    android:id="@+id/caring_substance_misuse"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_substance_misuse"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/caring_physical_disability"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_physical_disability"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/caring_learning_disability"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_learning_disability"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/caring_life_limiting"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_life_limiting"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/caring_mental_health"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_mental_health"
+                    android:textSize="@dimen/text_size_hint" />
+
+
+                <CheckBox
+                    android:id="@+id/caring_LGBT"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_LGBT"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/caring_traveller"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_traveller"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/caring_rural"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_rural"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/caring_ethnic_minority"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_maca_caring_ethnic_minority"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <TextView
+                    android:id="@+id/caring_error_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="At least one of the above boxes must be checked"
+                    android:textColor="@color/red"
+                    android:textSize="@dimen/text_size" />
+
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/clean_own_bedroom_01_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_clean_own_bedroom_01"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/clean_own_bedroom_01_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/clean_own_bedroom_01_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/clean_other_rooms_02_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_clean_other_rooms_02"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/clean_other_rooms_02_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/clean_other_rooms_02_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/wash_dishes_03_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_wash_dishes_03"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/wash_dishes_03_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/wash_dishes_03_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/decorate_room_04_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_decorate_room_04"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/decorate_room_04_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/decorate_room_04_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/responsibility_for_shopping_05_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_responsibility_for_shopping_05"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/responsibility_for_shopping_05_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/responsibility_for_shopping_05_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/carrying_heavy_things_06_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_carrying_heavy_things_06"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/carrying_heavy_things_06_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/carrying_heavy_things_06_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/bills_banking_benefits_07_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_bills_banking_benefits_07"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/bills_banking_benefits_07_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/bills_banking_benefits_07_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/work_part_time_08_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_work_part_time_08"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/work_part_time_08_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/work_part_time_08_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/interpret_sign_other_09_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_interpret_sign_other_09"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/interpret_sign_other_09_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/interpret_sign_other_09_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/help_dress_undress_10_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_help_dress_undress_10"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/help_dress_undress_10_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/help_dress_undress_10_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/help_wash_11_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_help_wash_11"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/help_wash_11_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/help_wash_11_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/help_bath_shower_12_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_help_bath_shower_12"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/help_bath_shower_12_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/help_bath_shower_12_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/keep_person_company_13_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_keep_person_company_13"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/keep_person_company_13_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/keep_person_company_13_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/make_sure_alright_14_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_make_sure_alright_14"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/make_sure_alright_14_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/make_sure_alright_14_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/take_out_15_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_take_out_15"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/take_out_15_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/take_out_15_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/take_siblings_to_school_16_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_take_siblings_to_school_16"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/take_siblings_to_school_16_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/take_siblings_to_school_16_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/look_after_siblings_with_adult_17_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_look_after_siblings_with_adult_17"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/look_after_siblings_with_adult_17_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/look_after_siblings_with_adult_17_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/look_after_siblings_on_own_18_label_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:maxLines="1"
+                    android:text="@string/prompt_maca_look_after_siblings_on_own_18"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <Spinner
+                    android:id="@+id/look_after_siblings_on_own_18_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/look_after_siblings_on_own_18_read_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+            </LinearLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/score"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/prompt_cat_score"
+                    android:inputType="text"
+                    android:maxLines="1" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="@dimen/activity_vertical_margin"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/cancel_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/action_cancel" />
+
+                <Button
+                    android:id="@+id/save_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/action_save" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

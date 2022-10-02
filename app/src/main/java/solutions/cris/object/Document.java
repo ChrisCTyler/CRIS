@@ -51,6 +51,9 @@ public abstract class Document extends CrisObject implements Serializable, Docum
     public static final int Image = 9;
     public static final int Status = 10;
     public static final int Transport = 11;
+    // Build 179 MACA and PANOC
+    public static final int MACAYC18 = 12;
+    public static final int PANOCYC20 = 13;
     // UPDATE GetDocumentType Methods when new Document Type is added
 
     public Document(User currentUser, UUID clientID, int documentType) {
@@ -175,21 +178,21 @@ public abstract class Document extends CrisObject implements Serializable, Docum
 
         String summary = "";
 
-        if (getCancelledFlag()){
+        if (getCancelledFlag()) {
             String cancellationDate = "Unknown Date";
             if (getCancellationDate() != null &&
-                    !getCancellationDate().equals(Long.MIN_VALUE)){
+                    !getCancellationDate().equals(Long.MIN_VALUE)) {
                 cancellationDate = sDate.format(getCancellationDate());
             }
             String cancellationReason = "Reason not given";
-            if (getCancellationReason() != null){
+            if (getCancellationReason() != null) {
                 cancellationReason = getCancellationReason();
             }
             String cancelledBy = "Unknown User";
-            if (getCancelledByID() != null){
+            if (getCancelledByID() != null) {
                 LocalDB localDB = LocalDB.getInstance();
                 User user = localDB.getUser(getCancelledByID());
-                if (user != null){
+                if (user != null) {
                     cancelledBy = user.getFullName();
                 }
             }
@@ -310,7 +313,15 @@ public abstract class Document extends CrisObject implements Serializable, Docum
                 case Document.Note:
                     Note note1 = (Note) o1;
                     if (note1.getNoteTypeID().equals(NoteType.responseNoteTypeID)) {
-                        o1String = note1.getInitialNote().getNoteType().getItemValue();
+                        // Build 158 Removal of slow code in Load Document means initialNote
+                        // may not be set
+                        if (note1.getInitialNote() != null) {
+                            o1String = note1.getInitialNote().getNoteType().getItemValue();
+                        } else {
+                            // No choice
+                            o1String = note1.getNoteType().getItemValue();
+                        }
+
                     } else {
                         o1String = note1.getNoteType().getItemValue();
                     }
@@ -327,7 +338,14 @@ public abstract class Document extends CrisObject implements Serializable, Docum
                 case Document.Note:
                     Note note2 = (Note) o2;
                     if (note2.getNoteTypeID().equals(NoteType.responseNoteTypeID)) {
-                        o2String = note2.getInitialNote().getNoteType().getItemValue();
+                        // Build 158 Removal of slow code in Load Document means initialNote
+                        // may not be set
+                        if (note2.getInitialNote() != null) {
+                            o2String = note2.getInitialNote().getNoteType().getItemValue();
+                        } else {
+                            // No choice
+                            o2String = note2.getNoteType().getItemValue();
+                        }
                     } else {
                         o2String = note2.getNoteType().getItemValue();
                     }
@@ -405,6 +423,10 @@ public abstract class Document extends CrisObject implements Serializable, Docum
                 return Document.Status;
             case "Transport":
                 return Document.Transport;
+            case "MACA-YC18":
+                return Document.MACAYC18;
+            case "PANOC-YC20":
+                return Document.PANOCYC20;
             default:
                 throw new CRISException("Unexpected document type string: " + sDocumentType);
         }
@@ -437,14 +459,20 @@ public abstract class Document extends CrisObject implements Serializable, Docum
             case Document.Transport:
                 return "Transport";
             case Document.TransportRequestAssessment:
-                return "Transport Request Assesssment";
+                // Build 179 corrected spelling error
+                //return "Transport Request Assesssment";
+                return "Transport Request Assessment";
+            case Document.MACAYC18:
+                return "MACA-YC18";
+            case Document.PANOCYC20:
+                return "PANOC-YC20";
             default:
                 throw new CRISException(String.format(Locale.UK,
                         "Unexpected DocumentType: %d", documentType));
         }
     }
 
-    public static String getDocumentTypeString(int documentType){
+    public static String getDocumentTypeString(int documentType) {
         switch (documentType) {
             case Document.Case:
                 return "Case";
@@ -471,13 +499,19 @@ public abstract class Document extends CrisObject implements Serializable, Docum
             case Document.Transport:
                 return "Transport";
             case Document.TransportRequestAssessment:
-                return "Transport Request Assesssment";
+                // Build 179 corrected spelling error
+                //return "Transport Request Assesssment";
+                return "Transport Request Assessment";
+            case Document.MACAYC18:
+                return "MACA-YC18";
+            case Document.PANOCYC20:
+                return "PANOC-YC20";
             default:
-                return String.format(Locale.UK,"Unexpected DocumentType: %d", documentType);
+                return String.format(Locale.UK, "Unexpected DocumentType: %d", documentType);
         }
     }
 
-    public static String getChanges(Document previousDocument, Document thisDocument){
+    public static String getChanges(Document previousDocument, Document thisDocument) {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
         SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
         LocalSettings localSettings = LocalSettings.getInstance();

@@ -6,16 +6,21 @@ import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
+
 import androidx.annotation.NonNull;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuItemCompat;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
+
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -33,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -41,6 +47,8 @@ import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.edit.EditSession;
+import solutions.cris.exceptions.CRISException;
+import solutions.cris.object.Client;
 import solutions.cris.object.Document;
 import solutions.cris.object.Group;
 import solutions.cris.object.ListItem;
@@ -96,6 +104,9 @@ public class ListSessionsFragment extends Fragment {
     private ArrayList<Group> displayedGroups;
     private ArrayList<User> displayedSessionCoordinators;
 
+    // Build 181 - Load Adapter on background thread due to large number of sessions
+    private Date startTime;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -103,7 +114,7 @@ public class ListSessionsFragment extends Fragment {
         setHasOptionsMenu(true);
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
-        footer = (TextView) getActivity().findViewById(R.id.footer);
+        footer = getActivity().findViewById(R.id.footer);
         return parent;
     }
 
@@ -127,13 +138,13 @@ public class ListSessionsFragment extends Fragment {
         currentUser = User.getCurrentUser();
 
         // Initialise the list view
-        this.listView = (ListView) parent.findViewById(R.id.list_view);
+        this.listView = parent.findViewById(R.id.list_view);
         final SwipeDetector swipeDetector = new SwipeDetector();
         this.listView.setOnTouchListener(swipeDetector);
         this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                if (swipeDetector.swipeDetected()){
+                if (swipeDetector.swipeDetected()) {
                     displayDocumentHistory(position, swipeDetector.getAction());
                 } else {
                     doReadSession(position);
@@ -152,7 +163,6 @@ public class ListSessionsFragment extends Fragment {
         //LinearLayout mainLayout = (LinearLayout) getActivity().findViewById(R.id.main_layout);
 
 
-
         User currentUser = User.getCurrentUser();
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
         if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_CREATE_SESSIONS) ||
@@ -168,32 +178,52 @@ public class ListSessionsFragment extends Fragment {
             fab.setVisibility(View.GONE);
         }
 
-        // Load the clients from the database
-        if (sessionList == null) {
-            // Load the clients from the database
-            sessionList = localDB.getAllSessions();
-            // Load the Adapter
-            loadAdapter();
+        // Load the Adapter, on first run through
+        if (adapter == null) {
+            footerText = "";
+            // Set a new empty array list
+            ((ListActivity) getActivity()).setSessionAdapterList(new ArrayList<Session>());
+            adapter = new SessionAdapter(getActivity(), ((ListActivity) getActivity()).getSessionAdapterList());
+            new LoadAdapter().execute();
         }
+
+        // Build 181 - Load the adapter in the background
+        new LoadAdapter().execute();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-
+        // Link the list view if first time or detached
+        // Return from Cancel needs listView to be re-attached though adapter is re-used
+        if (listView.getAdapter() == null) {
+            this.listView.setAdapter(adapter);
+        }
+        if (listViewState != null) {
+            listView.onRestoreInstanceState(listViewState);
+        }
+        if (footer.getText().toString().isEmpty()) {
+            footer.setText(footerText);
+        }
         // Only need to re-load if a session has been update/created
         Session editSession = ((ListActivity) getActivity()).getSession();
         if (editSession != null) {
             // Get the session record from the database
             Session updatedSession = (Session) localDB.getDocument(editSession.getDocumentID());
-            if (((ListActivity) getActivity()).getMode() == Document.Mode.NEW){
+            if (((ListActivity) getActivity()).getMode() == Document.Mode.NEW) {
                 if (updatedSession != null) {     // New client was saved
+                    // Build 185 - Odd bug causing crash (sometimes) when the new session is
+                    // added to the existing session list so, since the load time has been
+                    // optimised and is practically negligible, reload from the database instead
+                    // by nulling the session list
                     // Add to the client list
-                    sessionList.add(updatedSession);
+                    //sessionList.add(updatedSession);
+                    sessionList = null;
                     // Clear the mode so that the session does not get added twice following subsequent read
                     ((ListActivity) getActivity()).setMode(Document.Mode.READ);
                     // Load the Adapter since display of new session needs to be checked.
-                    loadAdapter();
+                    // Build 181 - Load adapter in the background
+                    new LoadAdapter().execute();
                 }
             } else if (!updatedSession.getRecordID().equals(oldClientRecordID)) {
                 // Database record is different so update the client in the client list
@@ -206,59 +236,11 @@ public class ListSessionsFragment extends Fragment {
                     }
                 }
                 // Load the Adapter since display of updated client needs to be checked.
-                loadAdapter();
+                // Build 181 - Load adapter in the background
+                new LoadAdapter().execute();
             }
         }
-        // Return from Cancel needs listView to be re-attached though adapter is re-used
-        if (listView.getAdapter() == null) {
-            this.listView.setAdapter(adapter);
-        }
-        if (listViewState != null){
-            listView.onRestoreInstanceState(listViewState);
-        }
-        if (footer.getText().toString().isEmpty()){
-            footer.setText(footerText);
-        }
-    }
 
-    private void loadAdapter() {
-        int hidden = 0;
-        ((ListActivity) getActivity()).setSessionAdapterList(new ArrayList<Session>());
-        adapter = new SessionAdapter(getActivity(), ((ListActivity) getActivity()).getSessionAdapterList());
-
-        displayedGroups = new ArrayList<>();
-        displayedSessionCoordinators = new ArrayList<>();
-        for (Session session : sessionList) {
-            loadDisplayedGroups(session);
-            loadDisplayedSessionCoordinators(session);
-            if (mySession(session)) {
-                if (selectSession(session)) {
-                    ((ListActivity) getActivity()).getSessionAdapterList().add(session);
-                } else {
-                    hidden++;
-                }
-            }
-        }
-        // Sort the 'displayed' lists
-        Collections.sort(displayedGroups, ListItem.comparatorAZ);
-        Collections.sort(displayedSessionCoordinators, User.comparator);
-        switch (sortMode) {
-            case DATE:
-                Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorDate);
-                break;
-            case NAME:
-                Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorAZ);
-                break;
-        }
-        this.listView.setAdapter(adapter);
-        if (hidden > 1) {
-            footerText = String.format(Locale.UK, "%d sessions are not shown.", hidden);
-        } else if (hidden == 1) {
-            footerText = String.format(Locale.UK, "%d session is not shown.", hidden);
-        } else {
-            footerText = String.format("%s", getString(R.string.info_all_sessions_shown));
-        }
-        footer.setText(footerText);
     }
 
     private boolean mySession(Session session) {
@@ -384,7 +366,7 @@ public class ListSessionsFragment extends Fragment {
                 public boolean onQueryTextSubmit(String query) {
                     searchText = query;
                     sv.clearFocus();
-                    loadAdapter();
+                    new LoadAdapter().execute();
                     return true;
                 }
 
@@ -398,7 +380,7 @@ public class ListSessionsFragment extends Fragment {
                 public boolean onMenuItemActionCollapse(MenuItem item) {
                     searchText = "";
                     isSearchIconified = true;
-                    loadAdapter();
+                    new LoadAdapter().execute();
                     return true;  // Return true to collapse action view
                 }
 
@@ -423,7 +405,7 @@ public class ListSessionsFragment extends Fragment {
         switch (item.getItemId()) {
             case MENU_EXPORT:
                 ((ListActivity) getActivity()).setExportListType("My Sessions");
-                switch (selectMode){
+                switch (selectMode) {
                     case ALL:
                         ((ListActivity) getActivity()).setExportSelection("All Sessions (inc. cancelled sessions)");
                         break;
@@ -440,7 +422,7 @@ public class ListSessionsFragment extends Fragment {
                         ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", localSettings.Keyworker, selectedValue));
                         break;
                 }
-                switch (sortMode){
+                switch (sortMode) {
                     case DATE:
                         ((ListActivity) getActivity()).setExportSort("Session Date");
                         break;
@@ -448,7 +430,7 @@ public class ListSessionsFragment extends Fragment {
                         ((ListActivity) getActivity()).setExportSort("Session Name");
                         break;
                 }
-                if (searchText.isEmpty()){
+                if (searchText.isEmpty()) {
                     ((ListActivity) getActivity()).setExportSearch("No Search Used");
                 } else {
                     ((ListActivity) getActivity()).setExportSearch(searchText);
@@ -463,17 +445,20 @@ public class ListSessionsFragment extends Fragment {
 
             case MENU_SELECT_ALL_SESSIONS:
                 selectMode = SelectMode.ALL;
-                loadAdapter();
+                // Build 181 - Load adapter in the background
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_UNCANCELLED_SESSIONS:
                 selectMode = SelectMode.UNCANCELLED;
-                loadAdapter();
+                // Build 181 - Load adapter in the background
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_FUTURE_SESSIONS:
                 selectMode = SelectMode.FUTURE;
-                loadAdapter();
+                // Build 181 - Load adapter in the background
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_GROUP:
@@ -501,31 +486,6 @@ public class ListSessionsFragment extends Fragment {
         }
     }
 
-    private void doNoPrivilege() {
-        new AlertDialog.Builder(getActivity())
-                .setTitle("No Privilege")
-                .setMessage("Unfortunately, this option is not available.")
-                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                    }
-                })
-                .show();
-    }
-
-    private void loadDisplayedGroups (Session session){
-        boolean found = false;
-        for (Group group:displayedGroups){
-            if (group.getListItemID().equals(session.getGroupID())){
-                found = true;
-                break;
-            }
-        }
-        if (!found){
-            displayedGroups.add(session.getGroup());
-        }
-    }
-
     private void selectGroup() {
         // Use local settings for 'local' labels
         LocalSettings localSettings = LocalSettings.getInstance(getActivity());
@@ -544,26 +504,14 @@ public class ListSessionsFragment extends Fragment {
                 selectedID = displayedGroups.get(which).getListItemID();
                 selectedValue = displayedGroups.get(which).getItemValue();
                 selectMode = SelectMode.GROUP;
-                loadAdapter();
+                // Build 181 - Load adapter in the background
+                new LoadAdapter().execute();
             }
         });
 
         // Create the AlertDialog
         AlertDialog dialog = builder.create();
         dialog.show();
-    }
-
-    private void loadDisplayedSessionCoordinators (Session session){
-        boolean found = false;
-        for (User sessionCoordinator:displayedSessionCoordinators){
-            if (sessionCoordinator.getUserID().equals(session.getSessionCoordinatorID())){
-                found = true;
-                break;
-            }
-        }
-        if (!found){
-            displayedSessionCoordinators.add(session.getSessionCoordinator());
-        }
     }
 
     private void selectSessionCoordinator() {
@@ -584,13 +532,26 @@ public class ListSessionsFragment extends Fragment {
                 selectedID = displayedSessionCoordinators.get(which).getUserID();
                 selectedValue = displayedSessionCoordinators.get(which).getFullName();
                 selectMode = SelectMode.SESSION_COORDINATOR;
-                loadAdapter();
+                // Build 181 - Load adapter in the background
+                new LoadAdapter().execute();
             }
         });
 
         // Create the AlertDialog
         AlertDialog dialog = builder.create();
         dialog.show();
+    }
+
+    private void doNoPrivilege() {
+        new AlertDialog.Builder(getActivity())
+                .setTitle("No Privilege")
+                .setMessage("Unfortunately, this option is not available.")
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
     }
 
     private void doReadSession(int position) {
@@ -637,19 +598,18 @@ public class ListSessionsFragment extends Fragment {
         return true;
     }
 
-    private void displayDocumentHistory(int position, SwipeDetector.Action action){
+    private void displayDocumentHistory(int position, SwipeDetector.Action action) {
         Session session = adapter.getItem(position);
         listViewState = listView.onSaveInstanceState();
         //Loop through all instances of the document gathering data
         String history = "";
         ArrayList<UUID> recordIDs = localDB.getRecordIDs(session);
-        for (int i=0; i < recordIDs.size(); i++){
-            boolean isEarliest = (i == recordIDs.size()-1);
+        for (int i = 0; i < recordIDs.size(); i++) {
+            boolean isEarliest = (i == recordIDs.size() - 1);
             history += localDB.getDocumentMetaData(recordIDs.get(i), isEarliest, action);
-            if (!isEarliest){
-                history += Session.getChanges(localDB, recordIDs.get(i+1), recordIDs.get(i), action);
+            if (!isEarliest) {
+                history += Session.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
             }
-
         }
         history += String.format("\nThe current document contents are:\n\n%s\n", session.textSummary());
         Intent intent = new Intent(getActivity(), AlertAndContinue.class);
@@ -657,8 +617,6 @@ public class ListSessionsFragment extends Fragment {
         intent.putExtra("message", history);
         startActivity(intent);
     }
-
-
 
     private class SessionAdapter extends ArrayAdapter<Session> {
 
@@ -675,10 +633,10 @@ public class ListSessionsFragment extends Fragment {
                 convertView = getActivity().getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
             }
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
-            TextView viewItemDate = (TextView) convertView.findViewById(R.id.item_date);
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
+            TextView viewItemDate = convertView.findViewById(R.id.item_date);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
 
             final Session session = ((ListActivity) getActivity()).getSessionAdapterList().get(position);
 
@@ -707,4 +665,122 @@ public class ListSessionsFragment extends Fragment {
         }
     }
 
+    // Build 181 - Load Adapter in a background thread
+    private class LoadAdapter extends AsyncTask<Void, String, String> {
+
+        private ArrayList<Session> tempAdapterList;
+
+        private int hidden;
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+            // Load the sessions from the database
+            if (sessionList == null) {
+                // Load the clients from the database
+                sessionList = localDB.getAllSessions();
+            }
+            // Clear the lists of displayed Groups/Sessions
+            displayedGroups = new ArrayList<>();
+            displayedSessionCoordinators = new ArrayList<>();
+            // Create the temporary adapter list
+            tempAdapterList = new ArrayList<Session>();
+            hidden = 0;
+            for (Session session : sessionList) {
+                loadDisplayedGroups(session);
+                loadDisplayedSessionCoordinators(session);
+                if (mySession(session)) {
+                    if (selectSession(session)) {
+                        tempAdapterList.add(session);
+                    } else {
+                        hidden++;
+                    }
+                }
+            }
+            // Sort the 'displayed' lists
+            Collections.sort(displayedGroups, ListItem.comparatorAZ);
+            Collections.sort(displayedSessionCoordinators, User.comparator);
+            switch (sortMode) {
+                case DATE:
+                    // Build 181
+                    //Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorDate);
+                    Collections.sort(tempAdapterList, Session.comparatorDate);
+                    break;
+                case NAME:
+                    // Build 181
+                    //Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorAZ);
+                    Collections.sort(tempAdapterList, Session.comparatorAZ);
+                    break;
+            }
+            return "";
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+            startTime = new Date();     // Used to display execution time
+            footer.setText("loading...");
+            // Clear the adapter to show reload has started
+            adapter.clear();
+            adapter.notifyDataSetChanged();
+        }
+
+        @Override
+        protected void onPostExecute(String output) {
+            // Runs on UI Thread
+            // Set the footer text
+            if (hidden > 1) {
+                footerText = String.format(Locale.UK, "%d sessions are not shown.", hidden);
+            } else if (hidden == 1) {
+                footerText = String.format(Locale.UK, "%d session is not shown.", hidden);
+            } else {
+                footerText = String.format("%s", getString(R.string.info_all_sessions_shown));
+            }
+            Date endTime = new Date();
+            long elapsed = (endTime.getTime() - startTime.getTime()) / 1000;
+            if (elapsed > 0) {
+                footer.setText(String.format("%s (%d sec)", footerText, elapsed));
+            } else {
+                footer.setText(footerText);
+            }
+            // Reload the adapter list
+            ((ListActivity) getActivity()).setSessionAdapterList(new ArrayList<Session>());
+            for (Session session : tempAdapterList) {
+                ((ListActivity) getActivity()).getSessionAdapterList().add(session);
+            }
+            adapter = new SessionAdapter(getActivity(), ((ListActivity) getActivity()).getSessionAdapterList());
+            listView.setAdapter(adapter);
+            adapter.notifyDataSetChanged();
+        }
+
+        private void loadDisplayedGroups(Session session) {
+            boolean found = false;
+            for (Group group : displayedGroups) {
+                if (group.getListItemID().equals(session.getGroupID())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // Build 168 - Ignore 'Unknown Group'
+                Group group = session.getGroup();
+                if (group.getListItemID() != Group.unknownGroupID) {
+                    displayedGroups.add(group);
+                }
+            }
+        }
+
+        private void loadDisplayedSessionCoordinators(Session session) {
+            boolean found = false;
+            for (User sessionCoordinator : displayedSessionCoordinators) {
+                if (sessionCoordinator.getUserID().equals(session.getSessionCoordinatorID())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                displayedSessionCoordinators.add(session.getSessionCoordinator());
+            }
+        }
+    }
 }

@@ -34,7 +34,10 @@ import solutions.cris.utils.ExceptionHandler;
 
 public class ListClients extends ListActivity {
 
-    private boolean myClients;
+    // Build 160 - There are error reports where myClients becomes null. I cannot reproduce the
+    // error so don't know why, but try presetting in the declaration to see if it helps
+    //private boolean myClients;
+    private boolean myClients = true;
 
 
     @Override

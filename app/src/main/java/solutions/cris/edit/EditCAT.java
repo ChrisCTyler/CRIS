@@ -51,6 +51,7 @@ import solutions.cris.list.ListActivity;
 import solutions.cris.object.Client;
 import solutions.cris.object.CriteriaAssessmentTool;
 import solutions.cris.object.Document;
+import solutions.cris.object.MACAYC18;
 import solutions.cris.object.User;
 
 public class EditCAT extends Fragment {
@@ -122,11 +123,11 @@ public class EditCAT extends Fragment {
         fab.setVisibility(View.GONE);
 
         // Clear the footer
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         footer.setText("");
 
         // Set up the hint text
-        hintTextView = (TextView) getActivity().findViewById(R.id.hint_text);
+        hintTextView = getActivity().findViewById(R.id.hint_text);
         hintTextView.setText(getHintText());
         // Restore value of hintDisplayed (Set to opposite, toggle to come
         if (savedInstanceState != null) {
@@ -156,45 +157,45 @@ public class EditCAT extends Fragment {
 
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
-            LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
+            LinearLayout cancelBoxView = parent.findViewById(R.id.cancel_box_layout);
             cancelBoxView.setVisibility(View.VISIBLE);
-            TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
+            TextView cancelBy = parent.findViewById(R.id.cancel_by);
             String byText = "by ";
             User cancelUser = localDB.getUser(editDocument.getCancelledByID());
             byText += cancelUser.getFullName() + " on ";
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
-            TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
+            TextView cancelReason = parent.findViewById(R.id.cancel_reason);
             cancelReason.setText(String.format("Reason: %s", editDocument.getCancellationReason()));
         }
 
-        referenceDateView = (EditText) parent.findViewById(R.id.reference_date);
+        referenceDateView = parent.findViewById(R.id.reference_date);
         referenceDateView.setInputType(InputType.TYPE_NULL);
         referenceDateView.setFocusable(false);
-        homeSituationSpinner = (Spinner) parent.findViewById(R.id.home_situation_spinner);
-        childStatusSpinner = (Spinner) parent.findViewById(R.id.child_status_spinner);
-        typeOfSupportSpinner = (Spinner) parent.findViewById(R.id.type_of_support_spinner);
-        personCaredForParentView = (EditText) parent.findViewById(R.id.person_cared_for_parents);
+        homeSituationSpinner = parent.findViewById(R.id.home_situation_spinner);
+        childStatusSpinner = parent.findViewById(R.id.child_status_spinner);
+        typeOfSupportSpinner = parent.findViewById(R.id.type_of_support_spinner);
+        personCaredForParentView = parent.findViewById(R.id.person_cared_for_parents);
         // Build 139 - Added Grandparents to People Cared For
-        personCaredForGrandparentView = (EditText) parent.findViewById(R.id.person_cared_for_grandparents);
-        personCaredForSiblingView = (EditText) parent.findViewById(R.id.person_cared_for_siblings);
-        personCaredForOtherView = (EditText) parent.findViewById(R.id.person_cared_for_others);
-        tocDomestic1 = (CheckBox) parent.findViewById(R.id.toc_domestic1);
-        tocDomestic2 = (CheckBox) parent.findViewById(R.id.toc_domestic2);
-        tocPersonal = (CheckBox) parent.findViewById(R.id.toc_personal);
-        tocEmotional = (CheckBox) parent.findViewById(R.id.toc_emotional);
-        tocSupervising = (CheckBox) parent.findViewById(R.id.toc_supervising);
-        typeofConditionMentalHealthView = (EditText) parent.findViewById(R.id.type_of_condition_mental_health);
-        typeofConditionSubstanceMisuseView = (EditText) parent.findViewById(R.id.type_of_condition_substance_misuse);
-        typeofConditionAlcoholMisuseView = (EditText) parent.findViewById(R.id.type_of_condition_alcohol_misuse);
-        typeofConditionLearningDisabilityView = (EditText) parent.findViewById(R.id.type_of_condition_learning_disability);
-        typeofConditionIllHealthView = (EditText) parent.findViewById(R.id.type_of_condition_ill_health);
-        typeofConditionPhysicalDisabilityView = (EditText) parent.findViewById(R.id.type_of_condition_physical_disability);
-        typeofConditionAutismView = (EditText) parent.findViewById(R.id.type_of_condition_autism);
-        typeofConditionTerminalIllnessView = (EditText) parent.findViewById(R.id.type_of_condition_terminal_illness);
-        frequencyOfCareSpinner = (Spinner) parent.findViewById(R.id.frequency_of_care_spinner);
-        frequencyOfSocialisingSpinner = (Spinner) parent.findViewById(R.id.frequency_of_socialising_spinner);
-        scoreView = (EditText) parent.findViewById(R.id.score);
+        personCaredForGrandparentView = parent.findViewById(R.id.person_cared_for_grandparents);
+        personCaredForSiblingView = parent.findViewById(R.id.person_cared_for_siblings);
+        personCaredForOtherView = parent.findViewById(R.id.person_cared_for_others);
+        tocDomestic1 = parent.findViewById(R.id.toc_domestic1);
+        tocDomestic2 = parent.findViewById(R.id.toc_domestic2);
+        tocPersonal = parent.findViewById(R.id.toc_personal);
+        tocEmotional = parent.findViewById(R.id.toc_emotional);
+        tocSupervising = parent.findViewById(R.id.toc_supervising);
+        typeofConditionMentalHealthView = parent.findViewById(R.id.type_of_condition_mental_health);
+        typeofConditionSubstanceMisuseView = parent.findViewById(R.id.type_of_condition_substance_misuse);
+        typeofConditionAlcoholMisuseView = parent.findViewById(R.id.type_of_condition_alcohol_misuse);
+        typeofConditionLearningDisabilityView = parent.findViewById(R.id.type_of_condition_learning_disability);
+        typeofConditionIllHealthView = parent.findViewById(R.id.type_of_condition_ill_health);
+        typeofConditionPhysicalDisabilityView = parent.findViewById(R.id.type_of_condition_physical_disability);
+        typeofConditionAutismView = parent.findViewById(R.id.type_of_condition_autism);
+        typeofConditionTerminalIllnessView = parent.findViewById(R.id.type_of_condition_terminal_illness);
+        frequencyOfCareSpinner = parent.findViewById(R.id.frequency_of_care_spinner);
+        frequencyOfSocialisingSpinner = parent.findViewById(R.id.frequency_of_socialising_spinner);
+        scoreView = parent.findViewById(R.id.score);
         scoreView.setInputType(InputType.TYPE_NULL);
         scoreView.setFocusable(false);
 
@@ -567,7 +568,7 @@ public class EditCAT extends Fragment {
         });
 
         // Cancel Button
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -578,7 +579,7 @@ public class EditCAT extends Fragment {
             }
         });
         // Save Button
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -1126,7 +1127,7 @@ public class EditCAT extends Fragment {
     private String getHintText() {
         return "Once all fields have been completed, the score will be displayed. " +
                 "If you wish to add some further text, please create a separate note " +
-                "document headed: 'CAT - Further Information'. (Using a note document " +
+                "document headed: 'MACA-YC18 - Further Information'. (Using a note document " +
                 "ensures that the further information provided will be found using the " +
                 "search facility.)";
 

@@ -786,6 +786,8 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         else return "False";
     }
 
+    // Build 171 Tidy up
+    /*
     private String getItemValue(ListItem item) {
         if (item == null) {
             return "Unknown";
@@ -793,5 +795,7 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
             return item.getItemValue();
         }
     }
+
+     */
 
 }

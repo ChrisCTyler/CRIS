@@ -127,6 +127,81 @@
 
             </LinearLayout>
 
+            <LinearLayout
+                android:id="@+id/free_school_meals_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/free_school_meals_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:text="Free School Meals"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <TextView
+                    android:id="@+id/free_school_meals_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <CheckBox
+                    android:id="@+id/free_school_meals"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_free_school_meals"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/special_needs_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/special_needs_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:text="@string/prompt_special_needs"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <TextView
+                    android:id="@+id/special_needs_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <CheckBox
+                    android:id="@+id/special_needs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_special_needs"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+
+            </LinearLayout>
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">

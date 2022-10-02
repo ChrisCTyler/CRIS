@@ -49,6 +49,7 @@ import solutions.cris.list.ListActivity;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.Document;
+import solutions.cris.object.ListItem;
 import solutions.cris.object.PdfDocument;
 import solutions.cris.object.User;
 import solutions.cris.utils.CRISMenuItem;
@@ -58,7 +59,7 @@ import solutions.cris.utils.OnSwipeTouchListener;
 
 public class ReadClientHeader extends ListActivity {
 
-    public static final String CURRENT_POSITION = "solutions.cris.CurrentPosition";
+    //public static final String CURRENT_POSITION = "solutions.cris.CurrentPosition";
 
     private LocalDB localDB;
     private Menu menu;
@@ -87,13 +88,12 @@ public class ReadClientHeader extends ListActivity {
             localDB = LocalDB.getInstance();
 
             // Check whether we're recreating a previously destroyed instance
-            if (savedInstanceState != null) {
+            //if (savedInstanceState != null) {
                 // Restore value of members from saved state
-                currentPosition = savedInstanceState.getInt(CURRENT_POSITION);
-            } else {
-                currentPosition = 0;
-            }
-            swipeValue = 0;
+            //    currentPosition = savedInstanceState.getInt(CURRENT_POSITION);
+            //} else {
+            //    currentPosition = 0;
+            //}
 
             setMode(Document.Mode.READ);
             menuItem = (CRISMenuItem) getIntent().getSerializableExtra(Main.EXTRA_UNREAD_MENU_ITEM);
@@ -106,7 +106,7 @@ public class ReadClientHeader extends ListActivity {
             loadHeader(getClient());
 
             // Swipe Left and Right
-            LinearLayout mainLayout = (LinearLayout) findViewById(R.id.main_layout);
+            LinearLayout mainLayout = findViewById(R.id.main_layout);
 
             mainLayout.setOnTouchListener(new OnSwipeTouchListener(this) {
                 @Override
@@ -127,32 +127,32 @@ public class ReadClientHeader extends ListActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // Build 146 - Re-written the swipe handler to reload the set/getDocument since a change
-        // to the EditNote fragment had set the Document to null. This code now re-instates the
-        // document, even if it hasn't changed.
-        // Handle the swipe value
-        if (swipeValue != 0) {
-            currentPosition += swipeValue;
-            if (currentPosition < 0 || currentPosition >= menuItem.getDocumentList().size()) {
-                // Leave currentPosition unchanged
-                currentPosition -= swipeValue;
-                swipeValue = 0;
-            }
-        }
+        // If the menuitem doclist is empty (swipe of the final document in the list) exit
         ArrayList<Document> docList = menuItem.getDocumentList();
-        Document nextDocument = docList.get(currentPosition);
-        if (nextDocument == null) {
-            finish();
-        } else {
-            //setDocument(menuItem.getDocumentList().get(currentPosition));
-            setDocument(nextDocument);
-            if (getDocument().getDocumentType() != Document.PdfDocument) {
-                swipeValue = 0;
-            } else {
-                finish();
+        if (docList.size() > 0) {
+            currentPosition += swipeValue;
+            if (currentPosition < 0) {
+                currentPosition = 0;
             }
+            if (currentPosition >= docList.size()) {
+                currentPosition = docList.size() - 1;
+            }
+            Document nextDocument = docList.get(currentPosition);
+            if (nextDocument == null) {
+                finish();
+            } else {
+                setDocument(nextDocument);
+                // If this is a PDF leave swiped to act on the next document, if there is one
+                if (getDocument().getDocumentType() != Document.PdfDocument) {
+                    swipeValue = 0;
+                } else {
+                    finish();
+                }
+            }
+            doReadDocument();
+        } else {
+            finish();
         }
-        doReadDocument();
     }
 
     // MENU BLOCK
@@ -188,6 +188,7 @@ public class ReadClientHeader extends ListActivity {
         }
     }
 
+    /*
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
         // Save the state
@@ -195,6 +196,8 @@ public class ReadClientHeader extends ListActivity {
         // Always call the superclass so it can save the view hierarchy state
         super.onSaveInstanceState(savedInstanceState);
     }
+
+     */
 
     private void doReadDocument() {
         Document thisDocument = getDocument();
@@ -284,24 +287,24 @@ public class ReadClientHeader extends ListActivity {
 
         LocalSettings localSettings = LocalSettings.getInstance(this);
 
-        ImageView headerIcon = (ImageView) findViewById(R.id.header_icon);
-        TextView firstNamesView = (TextView) findViewById(R.id.header_first_names);
-        TextView lastNameView = (TextView) findViewById(R.id.header_last_name);
-        TextView dateOfBirthView = (TextView) findViewById(R.id.header_date_of_birth);
-        TextView addressView = (TextView) findViewById(R.id.header_address);
-        TextView postcodeView = (TextView) findViewById(R.id.header_postcode);
-        TextView contactNumberView = (TextView) findViewById(R.id.header_contact_number);
-        TextView contactNumber2View = (TextView) findViewById(R.id.header_contact_number2);
-        TextView emailView = (TextView) findViewById(R.id.header_email_address);
-        TextView genderView = (TextView) findViewById(R.id.header_gender);
-        TextView groupView = (TextView) findViewById(R.id.header_group);
-        TextView groupLabel = (TextView) findViewById(R.id.header_label_group);
-        TextView tierView = (TextView) findViewById(R.id.header_tier);
-        TextView tierLabel = (TextView) findViewById(R.id.header_label_tier);
-        TextView keyworkerView = (TextView) findViewById(R.id.header_keyworker);
-        TextView keyworkerLabel = (TextView) findViewById(R.id.header_label_keyworker);
-        TextView toolLabel = (TextView) findViewById(R.id.header_label_tool);
-        TextView following = (TextView) findViewById(R.id.header_following);
+        ImageView headerIcon = findViewById(R.id.header_icon);
+        TextView firstNamesView = findViewById(R.id.header_first_names);
+        TextView lastNameView = findViewById(R.id.header_last_name);
+        TextView dateOfBirthView = findViewById(R.id.header_date_of_birth);
+        TextView addressView = findViewById(R.id.header_address);
+        TextView postcodeView = findViewById(R.id.header_postcode);
+        TextView contactNumberView = findViewById(R.id.header_contact_number);
+        TextView contactNumber2View = findViewById(R.id.header_contact_number2);
+        TextView emailView = findViewById(R.id.header_email_address);
+        TextView genderView = findViewById(R.id.header_gender);
+        TextView groupView = findViewById(R.id.header_group);
+        TextView groupLabel = findViewById(R.id.header_label_group);
+        TextView tierView = findViewById(R.id.header_tier);
+        TextView tierLabel = findViewById(R.id.header_label_tier);
+        TextView keyworkerView = findViewById(R.id.header_keyworker);
+        TextView keyworkerLabel = findViewById(R.id.header_label_keyworker);
+        TextView toolLabel = findViewById(R.id.header_label_tool);
+        TextView following = findViewById(R.id.header_following);
 
         if (client.getCurrentCase() == null) {
             headerIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_client_grey));
@@ -327,14 +330,39 @@ public class ReadClientHeader extends ListActivity {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
         dateOfBirthView.setText(String.format(Locale.UK,
                 "%s (%d)", sDate.format(client.getDateOfBirth()), age));
-        addressView.setText(client.getAddress());
+        // Build 188 - Address is now non-mandatory
+        //addressView.setText(client.getAddress(), null);
+        if (client.getAddress().length() == 0) {
+            addressView.setText("Not Specified", null);
+        } else {
+            addressView.setText(client.getAddress(), null);
+        }
         postcodeView.setText(client.getPostcode());
-        contactNumberView.setText(client.getContactNumber());
+        // Build 188 - Contact Number is now non-mandatory
+        //contactNumberView.setText(client.getContactNumber());
+        if (client.getContactNumber().length() == 0) {
+            contactNumberView.setText("Not Specified", null);
+        } else {
+            contactNumberView.setText(client.getContactNumber(), null);
+        }
         if (client.getContactNumber2() != null) {
             contactNumber2View.setText(client.getContactNumber2());
         }
-        emailView.setText(client.getEmailAddress());
-        genderView.setText(client.getGender().getItemValue());
+        // Build 188 - Email Address is now non-mandatory
+        //emailView.setText(client.getEmailAddress());
+        if (client.getEmailAddress().length() == 0) {
+            emailView.setText("Not Specified", null);
+        } else {
+            emailView.setText(client.getEmailAddress(), null);
+        }
+        //genderView.setText(client.getGender().getItemValue());
+        // Build 170 - Instance of null gender found so handle the possibility
+        ListItem gender = client.getGender();
+        if (gender == null) {
+            genderView.setText("Unknown");
+        } else {
+            genderView.setText(gender.getItemValue());
+        }
 
         groupLabel.setText(String.format("%s: ", localSettings.Group));
         tierLabel.setText(String.format("%s: ", localSettings.Tier));
@@ -377,24 +405,24 @@ public class ReadClientHeader extends ListActivity {
         following.setVisibility(View.GONE);
 
         // ClientSessions are unknown so hide Attendance/MyWeek indicators
-        ImageView headerAttendance5 = (ImageView) findViewById(R.id.header_attendance_5);
-        ImageView headerMyWeek5 = (ImageView) findViewById(R.id.header_myweek_5);
+        ImageView headerAttendance5 = findViewById(R.id.header_attendance_5);
+        ImageView headerMyWeek5 = findViewById(R.id.header_myweek_5);
         headerAttendance5.setVisibility(View.GONE);
         headerMyWeek5.setVisibility(View.GONE);
-        ImageView headerAttendance4 = (ImageView) findViewById(R.id.header_attendance_4);
-        ImageView headerMyWeek4 = (ImageView) findViewById(R.id.header_myweek_4);
+        ImageView headerAttendance4 = findViewById(R.id.header_attendance_4);
+        ImageView headerMyWeek4 = findViewById(R.id.header_myweek_4);
         headerAttendance4.setVisibility(View.GONE);
         headerMyWeek4.setVisibility(View.GONE);
-        ImageView headerAttendance3 = (ImageView) findViewById(R.id.header_attendance_3);
-        ImageView headerMyWeek3 = (ImageView) findViewById(R.id.header_myweek_3);
+        ImageView headerAttendance3 = findViewById(R.id.header_attendance_3);
+        ImageView headerMyWeek3 = findViewById(R.id.header_myweek_3);
         headerAttendance3.setVisibility(View.GONE);
         headerMyWeek3.setVisibility(View.GONE);
-        ImageView headerAttendance2 = (ImageView) findViewById(R.id.header_attendance_2);
-        ImageView headerMyWeek2 = (ImageView) findViewById(R.id.header_myweek_2);
+        ImageView headerAttendance2 = findViewById(R.id.header_attendance_2);
+        ImageView headerMyWeek2 = findViewById(R.id.header_myweek_2);
         headerAttendance2.setVisibility(View.GONE);
         headerMyWeek2.setVisibility(View.GONE);
-        ImageView headerAttendance1 = (ImageView) findViewById(R.id.header_attendance_1);
-        ImageView headerMyWeek1 = (ImageView) findViewById(R.id.header_myweek_1);
+        ImageView headerAttendance1 = findViewById(R.id.header_attendance_1);
+        ImageView headerMyWeek1 = findViewById(R.id.header_myweek_1);
         headerAttendance1.setVisibility(View.GONE);
         headerMyWeek1.setVisibility(View.GONE);
     }

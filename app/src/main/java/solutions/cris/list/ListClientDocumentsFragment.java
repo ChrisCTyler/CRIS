@@ -14,6 +14,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.MatrixCursor;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.BaseColumns;
@@ -63,6 +64,7 @@ import solutions.cris.edit.EditCAT;
 import solutions.cris.edit.EditCase;
 import solutions.cris.edit.EditClient;
 import solutions.cris.edit.EditContact;
+import solutions.cris.edit.EditMACAYC18;
 import solutions.cris.edit.EditMyWeek;
 import solutions.cris.edit.EditNote;
 import solutions.cris.edit.EditTransport;
@@ -76,6 +78,7 @@ import solutions.cris.object.Document;
 import solutions.cris.object.Image;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
+import solutions.cris.object.MACAYC18;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
 import solutions.cris.object.NoteType;
@@ -88,6 +91,7 @@ import solutions.cris.read.ReadCase;
 import solutions.cris.read.ReadClient;
 import solutions.cris.read.ReadContact;
 import solutions.cris.read.ReadImage;
+import solutions.cris.read.ReadMACAYC18;
 import solutions.cris.read.ReadMyWeek;
 import solutions.cris.read.ReadTransport;
 import solutions.cris.utils.AlertAndContinue;
@@ -144,6 +148,8 @@ public class ListClientDocumentsFragment extends Fragment {
     private String searchText = "";
     private String selectedDocumentType;
     private ArrayList<String> documentTypes = new ArrayList<>();
+    private ArrayList<Document> documentList;
+    private UUID oldDocumentRecordID;
 
     private boolean isSearchIconified = true;
     private String[] hashTags;
@@ -175,6 +181,8 @@ public class ListClientDocumentsFragment extends Fragment {
     private int sessionsDNA;
     private DocumentAdapter adapter;
     private String footerText;
+    private Toolbar toolbar;
+    private Date startTime;
 
     private MenuItem shareOption;
 
@@ -189,7 +197,7 @@ public class ListClientDocumentsFragment extends Fragment {
         setHasOptionsMenu(true);
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
-        footer = (TextView) getActivity().findViewById(R.id.footer);
+        footer = getActivity().findViewById(R.id.footer);
         return parent;
     }
 
@@ -197,7 +205,7 @@ public class ListClientDocumentsFragment extends Fragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        Toolbar toolbar = ((ListActivity) getActivity()).getToolbar();
+        toolbar = ((ListActivity) getActivity()).getToolbar();
         toolbar.setTitle(getString(R.string.app_name));
         client = ((ListActivity) getActivity()).getClient();
         localDB = LocalDB.getInstance();
@@ -213,7 +221,7 @@ public class ListClientDocumentsFragment extends Fragment {
         checkNoteTypesExist();
 
         // Initialise the list view
-        this.listView = (ListView) parent.findViewById(R.id.list_view);
+        this.listView = parent.findViewById(R.id.list_view);
         final SwipeDetector swipeDetector = new SwipeDetector();
         this.listView.setOnTouchListener(swipeDetector);
         this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -262,6 +270,80 @@ public class ListClientDocumentsFragment extends Fragment {
                 from,
                 to,
                 CursorAdapter.FLAG_REGISTER_CONTENT_OBSERVER);
+
+        // Load the header. This may be changed in the async PostExecute, but displays the client
+        // details whilst the documents are loading
+        ((ListClientHeader) getActivity()).loadHeader(client);
+        // Initialise the adapter
+        if (adapterList == null) {
+            footerText = "";
+            adapterList = new ArrayList<>();
+            adapter = new DocumentAdapter(getActivity(), adapterList);
+            this.listView.setAdapter(adapter);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // Link the list view if first time or detached
+        if (this.listView.getAdapter() == null) {
+            this.listView.setAdapter(adapter);
+        }
+
+        if (documentList == null) {
+            //First time through
+            new LoadAdapter().execute();
+        } else {
+            // Build 160 - If mode is not read, check for changes
+            if (((ListActivity) getActivity()).getMode() != Document.Mode.READ) {
+                // Only need to re-load if the client's documents has been updated/added
+                Document editDocument = ((ListActivity) getActivity()).getDocument();
+                if (editDocument != null) {
+                    // Get the client record from the database
+                    Document updatedDocument = localDB.getDocument(editDocument.getDocumentID());
+                    // New record needs to be added to the client list and adapter re-loaded
+                    if (((ListActivity) getActivity()).getMode() == Document.Mode.NEW) {
+                        if (updatedDocument != null) {     // New client was saved
+                            // Add to the client list
+                            documentList.add(updatedDocument);
+                            // Load the Adapter since display of new client needs to be checked.
+                            new LoadAdapter().execute();
+                        }
+                    }
+                    // Otherwise, check if document has been updated (recordID will be different)
+                    else if (!updatedDocument.getRecordID().equals(oldDocumentRecordID)) {
+                        // Database record is different so update the document in the document list
+                        // Note: this may be direct edit, or indirect edit via ListClientHeader
+                        for (Document document : documentList) {
+                            if (document.getDocumentID().equals(editDocument.getDocumentID())) {
+                                int index = documentList.indexOf(document);
+                                documentList.set(index, updatedDocument);
+                                break;
+                            }
+                        }
+                        // Load the Adapter since display of updated client needs to be checked.
+                        new LoadAdapter().execute();
+                    }
+
+                }
+            }
+        }
+
+        // Clear the document for next time
+        ((ListActivity) getActivity()).setDocument(null);
+
+        if (listViewState != null) {
+            listView.onRestoreInstanceState(listViewState);
+            listViewState = null;
+            // Clear and timings from the footer
+            footer.setText(footerText);
+        }
+        // Build 110 - Set the share action text based on the currently selected documents
+        if (shareOption != null) {
+            createShareActionProvider(shareOption);
+        }
     }
 
     private void checkNoteTypesExist() {
@@ -277,114 +359,6 @@ public class ListClientDocumentsFragment extends Fragment {
         if (textListItem == null) {
             textListItem = new NoteType(User.getCurrentUser(), "Text Message", newItemOrder++);
             textListItem.save(true);
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        // V2.0 Optimisation. Only reload if New or Edit (not read)
-        if (!((ListActivity) getActivity()).getMode().equals(Document.Mode.READ)) {
-            ((ListActivity) getActivity()).setMode(Document.Mode.READ);
-            // Clear until next New/Edit
-            ((ListActivity) getActivity()).setDocument(null);
-            // Build 144 - Reload the client in case an EdirClient has been done
-            client = ((ListActivity) getActivity()).getClient();
-            int hidden = 0;
-            int clientSessionPos = 4;
-            // Create the adapter
-            adapterList = new ArrayList<>();
-            // Load the documents for the client from the database.
-
-            ArrayList<Document> documents = loadDocuments();
-            // Sort the documents into reverse chronological order (with stickiness)
-            Collections.sort(documents, Document.comparatorDate);
-            // Clear the list of document types
-            documentTypes.clear();
-            // Get a pointer to the Fragment-wide variable and clear the contents
-            ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
-            for (int i = 0; i < 5; i++) {
-                clientSessions[i] = null;
-            }
-            // Initialise the associated documents flags
-            currentCaseFound = false;
-            startCaseFound = false;
-            currentToolFound = false;
-            currentAgencyFound = false;
-            currentSchoolFound = false;
-            assocDocumentChanged = false;
-            transportBooked = 0;
-            transportUsed = 0;
-            firstSession = new Date(Long.MIN_VALUE);
-            firstAttendedSession = new Date(Long.MIN_VALUE);
-            sessionsOffered = 0;
-            sessionsAttended = 0;
-            sessionsCancelled = 0;
-            sessionsDNA = 0;
-            // Loop through the documents (in reverse chronological order)
-            for (Document document : documents) {
-                // Add document to document type list if new type
-                addToDocumentTypes(document);
-                // Check whether the current document is an 'associated' document
-                testForAssociatedDocument(document);
-                clientSessionPos = testForClientSession(clientSessionPos, document);
-                if (selectDocument(document)) {
-                    adapterList.add(document);
-                } else {
-                    hidden++;
-                }
-            }
-            // Build 143 - Website MyWeek can be added before or after the Reference Date
-            // of the Client Session so need separate loop through documents
-            // See testForMyWeeks()
-            for (Document document : documents) {
-                testForMyWeeks(document);
-            }
-            // If there'e been a change, save the client record
-            checkClientChanges();
-            // Sort the Document Types array
-            Collections.sort(documentTypes);
-            // Sort the list into Type order if necessary
-            switch (sortMode) {
-                case DATE:
-                    // AdapterList was loaded in date order so no sort necessary
-                    Collections.sort(adapterList, Document.comparatorDate);
-                    break;
-                case TYPE:
-                    Collections.sort(adapterList, Document.comparatorType);
-                    break;
-            }
-            adapter = new DocumentAdapter(getActivity(), adapterList);
-            this.listView.setAdapter(adapter);
-            // Report the number of hidden documents in the footer.
-
-            if (hidden > 1) {
-                footerText = String.format(Locale.UK, "%d documents are not shown.", hidden);
-            } else if (hidden == 1) {
-                footerText = String.format(Locale.UK, "%d document is not shown.", hidden);
-            } else {
-                footerText = String.format("%s", getString(R.string.info_all_documents_shown));
-            }
-            footer.setText(footerText);
-            // Refresh the client using the client record from the database to pick up changes
-            client = (Client) localDB.getDocument(client.getDocumentID());
-            // Refresh the header to reflect any changes
-            ((ListClientHeader) getActivity()).loadHeader(client);
-        } else {
-            // Reload requires view contents to be re-loaded with saved content
-            if (this.listView.getAdapter() == null) {
-                this.listView.setAdapter(adapter);
-            }
-            if (listViewState != null) {
-                listView.onRestoreInstanceState(listViewState);
-            }
-            if (footer.getText().toString().isEmpty()) {
-                footer.setText(footerText);
-            }
-        }
-        // Build 110 - Set the share action text based on the currently selected documents
-        if (shareOption != null) {
-            createShareActionProvider(shareOption);
         }
     }
 
@@ -477,22 +451,24 @@ public class ListClientDocumentsFragment extends Fragment {
         } else {
             switch (document.getDocumentType()) {
                 case Document.Case:
-                    return ((Case) document).search(searchText);
+                    return document.search(searchText);
                 case Document.Client:
-                    return ((Client) document).search(searchText);
+                    return document.search(searchText);
                 case Document.Contact:
-                    return ((Contact) document).search(searchText);
+                    return document.search(searchText);
                 case Document.Image:
-                    return ((Image) document).search(searchText);
+                    return document.search(searchText);
                 case Document.Note:
-                    Note note = (Note) document;
-                    if (note.getInitialNote() != null) {
-                        return (((Note) document).getInitialNote()).search(searchText);
-                    } else {
-                        return ((Note) document).search(searchText);
-                    }
+                    // Build 158 Simplify search
+                    return document.search(searchText);
+                //Note note = (Note) document;
+                //if (note.getInitialNote() != null) {
+                //    return (((Note) document).getInitialNote()).search(searchText);
+                //} else {
+                //    return ((Note) document).search(searchText);
+                // }
                 case Document.PdfDocument:
-                    return ((PdfDocument) document).search(searchText);
+                    return document.search(searchText);
                 default:
                     return false;
             }
@@ -534,7 +510,7 @@ public class ListClientDocumentsFragment extends Fragment {
             for (int i = 0; i < 5; i++) {
                 if (clientSessions[i] != null && clientSessions[i].getSessionID().equals(myWeek.getSessionID())) {
                     // Build 150 - Don't set score for cancelled MyWeeks
-                    if (myWeek.getCancelledFlag()){
+                    if (myWeek.getCancelledFlag()) {
                         clientSessions[i].setStatus(0);
                     } else {
                         clientSessions[i].setStatus((int) myWeek.getScore());
@@ -620,7 +596,7 @@ public class ListClientDocumentsFragment extends Fragment {
                 // Build 144 - Reload the client in the Activity Root to avoid a constraint error
                 // if the client document is then edited via EditClient
                 ((ListActivity) getActivity()).setClient(client);
-            } catch (Exception ex){
+            } catch (Exception ex) {
                 //ignore
             }
         }
@@ -710,6 +686,19 @@ public class ListClientDocumentsFragment extends Fragment {
                 if (!currentToolFound && !document.getCancelledFlag()) {
                     currentToolFound = true;
                     CriteriaAssessmentTool thisTool = (CriteriaAssessmentTool) document;
+                    if (client.getCurrentToolID() == null ||
+                            !client.getCurrentToolID().equals(document.getDocumentID())) {
+                        client.setCurrentToolID(thisTool.getDocumentID());
+                        client.setCurrentTool(thisTool);
+                        assocDocumentChanged = true;
+                    }
+                }
+                break;
+
+            case Document.MACAYC18:
+                if (!currentToolFound && !document.getCancelledFlag()) {
+                    currentToolFound = true;
+                    MACAYC18 thisTool = (MACAYC18) document;
                     if (client.getCurrentToolID() == null ||
                             !client.getCurrentToolID().equals(document.getDocumentID())) {
                         client.setCurrentToolID(thisTool.getDocumentID());
@@ -812,8 +801,10 @@ public class ListClientDocumentsFragment extends Fragment {
                 public boolean onQueryTextSubmit(String query) {
                     searchText = query;
                     sv.clearFocus();
-                    ((ListActivity) getActivity()).setMode(Document.Mode.EDIT);
-                    onResume();
+                    //((ListActivity) getActivity()).setMode(Document.Mode.EDIT);
+                    //onResume();
+                    // Build 158
+                    new LoadAdapter().execute();
                     return true;
                 }
 
@@ -826,7 +817,7 @@ public class ListClientDocumentsFragment extends Fragment {
             sv.setSuggestionsAdapter(mAdapter);
 
             // Search threshold is 2 characters by default
-            AutoCompleteTextView searchAutoCompleteTextView = (AutoCompleteTextView) sv.findViewById(R.id.search_src_text);
+            AutoCompleteTextView searchAutoCompleteTextView = sv.findViewById(R.id.search_src_text);
             searchAutoCompleteTextView.setThreshold(1);
 
             sv.setOnSuggestionListener(new SearchView.OnSuggestionListener() {
@@ -848,8 +839,10 @@ public class ListClientDocumentsFragment extends Fragment {
                 public boolean onMenuItemActionCollapse(MenuItem item) {
                     searchText = "";
                     isSearchIconified = true;
-                    ((ListActivity) getActivity()).setMode(Document.Mode.EDIT);
-                    onResume();
+                    //((ListActivity) getActivity()).setMode(Document.Mode.EDIT);
+                    //onResume();
+                    // Build 158
+                    new LoadAdapter().execute();
                     return true;  // Return true to collapse action view
                 }
 
@@ -912,6 +905,7 @@ public class ListClientDocumentsFragment extends Fragment {
                 ((ListActivity) getActivity()).setExportSearch(" ");
                 ((ListActivity) getActivity()).setClientAdapterList(new ArrayList<Client>());
                 ((ListActivity) getActivity()).getClientAdapterList().add(client);
+                listViewState = listView.onSaveInstanceState();
                 FragmentManager fragmentManager = getFragmentManager();
                 FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
                 Fragment fragment = new CRISExport();
@@ -922,15 +916,19 @@ public class ListClientDocumentsFragment extends Fragment {
             case MENU_SELECT_ALL:
                 selectMode = SelectMode.ALL;
                 // V2.0 Set mode to NEW (not READ) to force the data re-load
-                ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
-                onResume();
+                //((ListActivity) getActivity()).setMode(Document.Mode.NEW);
+                //onResume();
+                // Build 158
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_UNCANCELLED:
                 selectMode = SelectMode.UNCANCELLED;
                 // V2.0 Set mode to NEW (not READ) to force the data re-load
-                ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
-                onResume();
+                //((ListActivity) getActivity()).setMode(Document.Mode.NEW);
+                //onResume();
+                // Build 158
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_CONTACTS:
@@ -942,8 +940,10 @@ public class ListClientDocumentsFragment extends Fragment {
 
                 }
                 // V2.0 Set mode to NEW (not READ) to force the data re-load
-                ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
-                onResume();
+                //((ListActivity) getActivity()).setMode(Document.Mode.NEW);
+                //onResume();
+                // Build 158
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_TYPE:
@@ -1025,7 +1025,7 @@ public class ListClientDocumentsFragment extends Fragment {
         Intent emailIntent = new Intent(Intent.ACTION_SEND);
         emailIntent.setType("text/plain");
 
-        SharedPreferences prefs = ((ListActivity) getActivity()).getSharedPreferences(
+        SharedPreferences prefs = getActivity().getSharedPreferences(
                 getString(R.string.shared_preference_file), Context.MODE_PRIVATE);
         String organisation = "CRIS";
         if (prefs.contains(getString(R.string.pref_organisation))) {
@@ -1052,14 +1052,14 @@ public class ListClientDocumentsFragment extends Fragment {
 
     private void trySendMyweekLinkText() {
         // First we need to check whether the user has granted the SMS permission
-        if (ContextCompat.checkSelfPermission(((ListActivity) getActivity()), Manifest.permission.SEND_SMS)
+        if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.SEND_SMS)
                 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(((ListActivity) getActivity()),
+            ActivityCompat.requestPermissions(getActivity(),
                     new String[]{Manifest.permission.SEND_SMS},
                     Main.REQUEST_PERMISSION_SEND_SMS);
-        } else if (ContextCompat.checkSelfPermission(((ListActivity) getActivity()), Manifest.permission.READ_PHONE_STATE)
+        } else if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.READ_PHONE_STATE)
                 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(((ListActivity) getActivity()),
+            ActivityCompat.requestPermissions(getActivity(),
                     new String[]{Manifest.permission.READ_PHONE_STATE},
                     Main.REQUEST_PERMISSION_SEND_SMS);
         } else {
@@ -1082,7 +1082,7 @@ public class ListClientDocumentsFragment extends Fragment {
             String test = configValues.toString();
             deviceHasSMS = true;
         }
-        SharedPreferences prefs = ((ListActivity) getActivity()).getSharedPreferences(
+        SharedPreferences prefs = getActivity().getSharedPreferences(
                 getString(R.string.shared_preference_file), Context.MODE_PRIVATE);
         String organisation = "CRIS";
         if (prefs.contains(getString(R.string.pref_organisation))) {
@@ -1104,12 +1104,12 @@ public class ListClientDocumentsFragment extends Fragment {
             noteAdded = false;
             if (deviceHasSMS) {
                 try {
-                    PendingIntent piSend = PendingIntent.getBroadcast(((ListActivity) getContext()), 0, new Intent("Action1"), 0);
+                    PendingIntent piSend = PendingIntent.getBroadcast(getContext(), 0, new Intent("Action1"), 0);
                     ArrayList<PendingIntent> piSendArray = new ArrayList<>();
                     for (Integer i = 0; i < dividedMessage.size(); i++) {
                         piSendArray.add(piSend);
                     }
-                    ((ListActivity) getActivity()).registerReceiver(new BroadcastReceiver() {
+                    getActivity().registerReceiver(new BroadcastReceiver() {
 
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -1195,67 +1195,65 @@ public class ListClientDocumentsFragment extends Fragment {
 
     private ArrayList<Document> loadDocuments() {
         ArrayList<Document> documents = localDB.getAllDocuments(client.getClientID());
-        // Search for Notes and handle the note/responses
+        // Build 158 - The following code has become too slow due to large numbers of notes
+        // so re-written to avoid database lookups
+        // Loop through documents looking for top-level Notes then handle the note/responses
         for (Document document : documents) {
             if (document.getDocumentType() == Document.Note) {
                 Note initialNote = (Note) document;
                 if (!initialNote.getNoteTypeID().equals(NoteType.responseNoteTypeID)) {
-                    ArrayList<Note> responses = localDB.getAllResponses(initialNote);
-                    // Only interested in Notes with responses
-                    if (responses.size() > 0) {
-                        // Set fields in response to match initial note
-                        Note response = null;
-                        for (Note dbResponse : responses) {
-                            // Find the member of documents equal to this response
-                            for (Document responseDoc : documents) {
-                                if (responseDoc.getDocumentID().equals(dbResponse.getDocumentID())) {
-                                    response = (Note) responseDoc;
-                                    break;
-                                }
-                            }
-                            // Now update the fields
-                            if (response != null) {
-                                response.setStickyFlag(initialNote.isStickyFlag());
-                                response.setStickyDate(initialNote.getStickyDate());
-                                response.setCancelledFlag(initialNote.getCancelledFlag());
-                                response.setCancellationReason(initialNote.getCancellationReason());
-                                response.setCancellationDate(initialNote.getCancellationDate());
-                                response.setCancelledByID(initialNote.getCancelledByID());
-                                // Load NoteType from the initial Note so that sort by type works
-                                NoteType responseNoteType = (NoteType) localDB.getListItem(initialNote.getNoteTypeID());
-                                // Set the icon to the appropriate response type
-                                NoteType initialNoteType = (NoteType) initialNote.getNoteType();
-                                switch (initialNoteType.getNoteIcon()) {
+                    // Found a top-level note, now find it's responses
+                    String responseContent = "";
+                    for (Document responseDoc : documents) {
+                        // Responses have an identical reference date
+                        if (responseDoc.getDocumentType() == Document.Note &&
+                                responseDoc.getReferenceDate().equals(initialNote.getReferenceDate())) {
+                            // Ignore the top-level document
+                            if (!responseDoc.getDocumentID().equals(initialNote.getDocumentID())) {
+                                {
+                                    // Found one so update the fields
+                                    Note response = (Note) responseDoc;
+                                    response.setStickyFlag(initialNote.isStickyFlag());
+                                    response.setStickyDate(initialNote.getStickyDate());
+                                    response.setCancelledFlag(initialNote.getCancelledFlag());
+                                    response.setCancellationReason(initialNote.getCancellationReason());
+                                    response.setCancellationDate(initialNote.getCancellationDate());
+                                    response.setCancelledByID(initialNote.getCancelledByID());
+                                    // Load NoteType from the initial Note so that sort by type works
+                                    NoteType responseNoteType = (NoteType) localDB.getListItem(initialNote.getNoteTypeID());
+                                    // Set the icon to the appropriate response type
+                                    NoteType initialNoteType = (NoteType) initialNote.getNoteType();
+                                    switch (initialNoteType.getNoteIcon()) {
 
-                                    case NoteType.ICON_COLOUR_RED:
-                                        responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_RED);
-                                        break;
-                                    case NoteType.ICON_COLOUR_AMBER:
-                                        responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_AMBER);
-                                        break;
-                                    case NoteType.ICON_COLOUR_GREEN:
-                                        responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_GREEN);
-                                        break;
-                                    default:
-                                        responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_BLUE);
-                                        break;
-                                }
-                                response.setInitialNote(initialNote);
-                                response.setNoteType(responseNoteType);
+                                        case NoteType.ICON_COLOUR_RED:
+                                            responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_RED);
+                                            break;
+                                        case NoteType.ICON_COLOUR_AMBER:
+                                            responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_AMBER);
+                                            break;
+                                        case NoteType.ICON_COLOUR_GREEN:
+                                            responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_GREEN);
+                                            break;
+                                        default:
+                                            responseNoteType.setNoteIcon(NoteType.ICON_COLOUR_RESPONSE_BLUE);
+                                            break;
+                                    }
+                                    response.setInitialNote(initialNote);
+                                    response.setNoteType(responseNoteType);
 
-                                // Load the response into the initial note's responseContent
-                                User author = localDB.getUser(response.getCreatedByID());
-                                String content = "";
-                                if (initialNote.getResponseContent() != null) {
-                                    content += initialNote.getResponseContent();
+
+                                    // Load the response into the initial note's responseContent
+                                    User author = localDB.getUser(response.getCreatedByID());
+                                    responseContent += String.format("\n\n--- On %s, %s responded: ---\n\n%s",
+                                            sDateTime.format(response.getCreationDate()),
+                                            author.getFullName(),
+                                            response.getContent());
                                 }
-                                content += String.format("\n\n--- On %s, %s responded: ---\n\n%s",
-                                        sDateTime.format(response.getCreationDate()),
-                                        author.getFullName(),
-                                        response.getContent());
-                                initialNote.setResponseContent(content);
                             }
                         }
+                    }
+                    if (responseContent.length() > 0) {
+                        initialNote.setResponseContent(responseContent);
                     }
                 }
             }
@@ -1289,6 +1287,18 @@ public class ListClientDocumentsFragment extends Fragment {
                 .show();
     }
 
+    private void doNotAvailable() {
+        new AlertDialog.Builder(getActivity())
+                .setTitle("Not Yet Available.")
+                .setMessage("Unfortunately, this option is not yet available.")
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
+    }
+
     private void doUnexpectedMissingDocument() {
         new AlertDialog.Builder(getActivity())
                 .setTitle("Unexpected Problem")
@@ -1302,6 +1312,7 @@ public class ListClientDocumentsFragment extends Fragment {
                 })
                 .show();
     }
+
     private void doClientSession() {
         new AlertDialog.Builder(getActivity())
                 .setTitle("Client Sessions")
@@ -1376,10 +1387,17 @@ public class ListClientDocumentsFragment extends Fragment {
             // Build 151 - Just in case anything has updated the document
             // in the database (making the adapter version out-of-date)
             // reload it
-            document = localDB.getDocument(document.getDocumentID());
+            // Build 158 - This destroys to responseContent for top-level notes so only
+            // use new document if different
+            Document newDocument = localDB.getDocument(document.getDocumentID());
+            if (!newDocument.getRecordID().equals(document.getRecordID())) {
+                document = newDocument;
+            }
             // Build 151 -Double check that there is a document
             if (document != null) {
                 ((ListActivity) getActivity()).setDocument(document);
+                // Build 158 Save this recordID to enable check for change to client
+                oldDocumentRecordID = document.getRecordID();
                 localDB.read(document, currentUser);
                 FragmentManager fragmentManager = getFragmentManager();
                 FragmentTransaction fragmentTransaction;
@@ -1420,6 +1438,14 @@ public class ListClientDocumentsFragment extends Fragment {
                     case Document.Image:
                         fragmentTransaction = fragmentManager.beginTransaction();
                         fragment = new ReadImage();
+                        fragmentTransaction.replace(R.id.content, fragment);
+                        fragmentTransaction.addToBackStack(null);
+                        fragmentTransaction.commit();
+                        break;
+                    case Document.MACAYC18:
+
+                        fragmentTransaction = fragmentManager.beginTransaction();
+                        fragment = new ReadMACAYC18();
                         fragmentTransaction.replace(R.id.content, fragment);
                         fragmentTransaction.addToBackStack(null);
                         fragmentTransaction.commit();
@@ -1518,6 +1544,8 @@ public class ListClientDocumentsFragment extends Fragment {
                     // Build 151 -Double check that there is a document
                     if (document != null) {
                         ((ListActivity) getActivity()).setDocument(document);
+                        // Build 158 Save this recordID to enable check for change to client
+                        oldDocumentRecordID = document.getRecordID();
                         FragmentManager fragmentManager = getFragmentManager();
                         FragmentTransaction fragmentTransaction;
                         Fragment fragment;
@@ -1555,6 +1583,13 @@ public class ListClientDocumentsFragment extends Fragment {
                                 break;
                             case Document.Image:
                                 ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.EDIT, Document.Image);
+                                break;
+                            case Document.MACAYC18:
+                                fragmentTransaction = fragmentManager.beginTransaction();
+                                fragment = new EditMACAYC18();
+                                fragmentTransaction.replace(R.id.content, fragment);
+                                fragmentTransaction.addToBackStack(null);
+                                fragmentTransaction.commit();
                                 break;
                             case Document.MyWeek:
                                 fragmentTransaction = fragmentManager.beginTransaction();
@@ -1673,6 +1708,15 @@ public class ListClientDocumentsFragment extends Fragment {
                             ((ListActivity) getActivity()).setDocument(new Image(currentUser, client.getClientID()));
                             ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.NEW, Document.Image);
                             break;
+                        case Document.MACAYC18:
+                            fragmentTransaction = fragmentManager.beginTransaction();
+                            fragment = new EditMACAYC18();
+                            ((ListActivity) getActivity()).setDocument(
+                                    new MACAYC18(currentUser, client.getClientID()));
+                            fragmentTransaction.replace(R.id.content, fragment);
+                            fragmentTransaction.addToBackStack(null);
+                            fragmentTransaction.commit();
+                            break;
                         case Document.Note:
                             fragmentTransaction = fragmentManager.beginTransaction();
                             fragment = new EditNote();
@@ -1782,6 +1826,8 @@ public class ListClientDocumentsFragment extends Fragment {
                         case Document.Image:
                             history += Image.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
                             break;
+                        case Document.MACAYC18:
+                            history += MACAYC18.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
                         case Document.MyWeek:
                             history += MyWeek.getChanges(localDB, recordIDs.get(i + 1), recordIDs.get(i), action);
                             break;
@@ -1868,8 +1914,10 @@ public class ListClientDocumentsFragment extends Fragment {
                 selectMode = SelectMode.TYPE;
                 selectedDocumentType = documentType;
                 // V2.0 Set mode to NEW (not READ) to force the data re-load
-                ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
-                onResume();
+                //((ListActivity) getActivity()).setMode(Document.Mode.NEW);
+                //onResume();
+                // Build 158
+                new LoadAdapter().execute();
             }
         });
 
@@ -1893,10 +1941,10 @@ public class ListClientDocumentsFragment extends Fragment {
                 convertView = getActivity().getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
             }
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
-            TextView viewItemDate = (TextView) convertView.findViewById(R.id.item_date);
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
+            TextView viewItemDate = convertView.findViewById(R.id.item_date);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
 
             final Document document = adapterList.get(position);
 
@@ -2070,6 +2118,9 @@ public class ListClientDocumentsFragment extends Fragment {
                 case Document.CriteriaAssessmentTool:
                     viewItemIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_criteria_assesmnt_tool));
                     break;
+                case Document.MACAYC18:
+                    viewItemIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_criteria_assesmnt_tool));
+                    break;
                 case Document.MyWeek:
                     MyWeek myWeekDocument = (MyWeek) document;
                     switch ((int) myWeekDocument.getScore()) {
@@ -2119,5 +2170,130 @@ public class ListClientDocumentsFragment extends Fragment {
         }
     }
 
+    private class LoadAdapter extends AsyncTask<Void, Integer, String> {
 
+        private ArrayList<Document> tempAdapterList;
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+            String output = "";
+            int hidden = 0;
+
+            tempAdapterList = new ArrayList<>();
+
+            // Build 144 - Reload the client in case an EditClient has been done
+            client = ((ListActivity) getActivity()).getClient();
+            int clientSessionPos = 4;
+            // Create the adapter
+            //adapterList = new ArrayList<>();
+            // Load the documents for the client from the database.
+            if (documentList == null) {
+                documentList = loadDocuments();
+            }
+            // Sort the documents into reverse chronological order (with stickiness)
+            Collections.sort(documentList, Document.comparatorDate);
+            // Clear the list of document types
+            documentTypes.clear();
+            // Get a pointer to the Fragment-wide variable and clear the contents
+            ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
+            for (int i = 0; i < 5; i++) {
+                clientSessions[i] = null;
+            }
+            // Initialise the associated documents flags
+            currentCaseFound = false;
+            startCaseFound = false;
+            currentToolFound = false;
+            currentAgencyFound = false;
+            currentSchoolFound = false;
+            assocDocumentChanged = false;
+            transportBooked = 0;
+            transportUsed = 0;
+            firstSession = new Date(Long.MIN_VALUE);
+            firstAttendedSession = new Date(Long.MIN_VALUE);
+            sessionsOffered = 0;
+            sessionsAttended = 0;
+            sessionsCancelled = 0;
+            sessionsDNA = 0;
+            // Loop through the documents (in reverse chronological order)
+            for (Document document : documentList) {
+                // Add document to document type list if new type
+                addToDocumentTypes(document);
+                // Check whether the current document is an 'associated' document
+                testForAssociatedDocument(document);
+                clientSessionPos = testForClientSession(clientSessionPos, document);
+                if (selectDocument(document)) {
+                    tempAdapterList.add(document);
+                } else {
+                    hidden++;
+                }
+            }
+            // Build 143 - Website MyWeek can be added before or after the Reference Date
+            // of the Client Session so need separate loop through documents
+            // See testForMyWeeks()
+            for (Document document : documentList) {
+                testForMyWeeks(document);
+            }
+            // If there'e been a change, save the client record
+            checkClientChanges();
+            // Sort the Document Types array
+            Collections.sort(documentTypes);
+            // Sort the list into Type order if necessary
+            switch (sortMode) {
+                case DATE:
+                    // AdapterList was loaded in date order so no sort necessary
+                    Collections.sort(tempAdapterList, Document.comparatorDate);
+                    break;
+                case TYPE:
+                    Collections.sort(tempAdapterList, Document.comparatorType);
+                    break;
+            }
+            //adapter = new DocumentAdapter(getActivity(), adapterList);
+            //this.listView.setAdapter(adapter);
+            // Report the number of hidden documents in the footer.
+
+            if (hidden > 1) {
+                output = String.format(Locale.UK, "%d documents are not shown.", hidden);
+            } else if (hidden == 1) {
+                output = String.format(Locale.UK, "%d document is not shown.", hidden);
+            } else {
+                output = String.format("%s", getString(R.string.info_all_documents_shown));
+            }
+            return output;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+            startTime = new Date();     // Used to display execution time
+            footer.setText("loading...");
+            // Clear the adapter to show reload has started
+            adapter.clear();
+            adapter.notifyDataSetChanged();
+        }
+
+        @Override
+        protected void onPostExecute(String output) {
+            // Runs on UI Thread
+            // Set the footer text
+            footerText = output;
+            Date endTime = new Date();
+            long elapsed = (endTime.getTime() - startTime.getTime()) / 1000;
+            if (elapsed > 0) {
+                footer.setText(String.format("%s (%d sec)", footerText, elapsed));
+            } else {
+                footer.setText(footerText);
+            }
+            // Refresh the client using the client record from the database to pick up changes
+            client = (Client) localDB.getDocument(client.getDocumentID());
+            // Refresh the header to reflect any changes
+            ((ListClientHeader) getActivity()).loadHeader(client);
+            // Reload the adapter list
+            for (Document document : tempAdapterList) {
+                adapter.add(document);
+            }
+            adapter.notifyDataSetChanged();
+
+        }
+    }
 }

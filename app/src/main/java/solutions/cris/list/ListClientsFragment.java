@@ -14,6 +14,7 @@ package solutions.cris.list;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
@@ -21,16 +22,21 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
+
 import androidx.annotation.NonNull;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuItemCompat;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
+
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -47,6 +53,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -90,9 +97,12 @@ public class ListClientsFragment extends Fragment {
     ArrayList<Client> clientList;
     private ClientAdapter adapter;
     private String footerText;
-
+    private Toolbar toolbar;
     private Parcelable listViewState;
     private UUID oldClientRecordID;
+    private Date startTime;
+    // Build 160
+    boolean myClients = true;
 
     // Build 110 - Added School, Agency
     private enum SelectMode {ALL, OPEN, FOLLOWED, GROUP, KEYWORKER, COMMISSIONER, OVERDUE, SCHOOL, AGENCY}
@@ -106,7 +116,7 @@ public class ListClientsFragment extends Fragment {
         setHasOptionsMenu(true);
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
-        footer = (TextView) getActivity().findViewById(R.id.footer);
+        footer = getActivity().findViewById(R.id.footer);
         return parent;
     }
 
@@ -114,8 +124,14 @@ public class ListClientsFragment extends Fragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        Toolbar toolbar = ((ListActivity) getActivity()).getToolbar();
-        if (((ListClients) getActivity()).isMyClients()) {
+        try {
+            myClients = ((ListClients) getActivity()).isMyClients();
+        } catch (Exception ex) {
+            myClients = true;
+        }
+
+        toolbar = ((ListActivity) getActivity()).getToolbar();
+        if (myClients) {
             toolbar.setTitle(getString(R.string.app_name) + " - My Clients");
         } else {
             toolbar.setTitle(getString(R.string.app_name) + " - All Clients");
@@ -130,13 +146,13 @@ public class ListClientsFragment extends Fragment {
         // Initialise the list view
         // Build 116 22 May 2019 Add handler for incoming text via share
         final String shareText = ((ListClients) getActivity()).getShareText();
-        this.listView = (ListView) parent.findViewById(R.id.list_view);
+        this.listView = parent.findViewById(R.id.list_view);
         this.listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 // Build 116 22 May 2019 Add handler for incoming text via share
                 String shareText = ((ListActivity) getActivity()).getShareText();
-                if (shareText != null && shareText.length() > 0){
+                if (shareText != null && shareText.length() > 0) {
                     doCreateShareNote(position);
                 } else {
                     doReadClient(position);
@@ -152,7 +168,8 @@ public class ListClientsFragment extends Fragment {
 
         User currentUser = User.getCurrentUser();
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
-        boolean myClients = ((ListClients) getActivity()).isMyClients();
+        // Build 160
+        //boolean myClients = ((ListClients) getActivity()).isMyClients();
         if (!myClients &&
                 currentUser.getRole().hasPrivilege(Role.PRIVILEGE_CREATE_NEW_CLIENTS)) {
             fab.setVisibility(View.VISIBLE);
@@ -172,17 +189,27 @@ public class ListClientsFragment extends Fragment {
             });
         }
 
-        // Load the clients from the database
-        if (clientList == null) {
-            clientList = localDB.getAllClients();
-            // Load the Adapter
-            loadAdapter();
+        // Load the Adapter, on first run through
+        if (adapter == null) {
+            footerText = "";
+            // Set a new empty array list
+            ((ListActivity) getActivity()).setClientAdapterList(new ArrayList<Client>());
+            // Create the adapter
+            adapter = new ClientAdapter(getActivity(), ((ListActivity) getActivity()).getClientAdapterList());
+            new LoadAdapter().execute();
         }
+
     }
 
     @Override
     public void onResume() {
         super.onResume();
+
+        // Link the list view if first time or detached
+        if (listView.getAdapter() == null) {
+            listView.setAdapter(adapter);
+        }
+
         // Only need to re-load if a client has been update/created
         // Note: get/setDocument is used rather than get/setClient for consistency
         // since EditClient is possible from both list of clients and list of documents
@@ -197,7 +224,7 @@ public class ListClientsFragment extends Fragment {
                     // Add to the client list
                     clientList.add(updatedClient);
                     // Load the Adapter since display of new client needs to be checked.
-                    loadAdapter();
+                    new LoadAdapter().execute();
                 }
             }
             // Otherwise, check if document has been updated (recordID will be different)
@@ -212,117 +239,27 @@ public class ListClientsFragment extends Fragment {
                     }
                 }
                 // Load the Adapter since display of updated client needs to be checked.
-                loadAdapter();
+                new LoadAdapter().execute();
             }
+            // Clear the document for next time
+            ((ListActivity) getActivity()).setDocument(null);
         }
-        // Return from Cancel needs listView to be re-attached though adapter is re-used
-        if (listView.getAdapter() == null) {
-            listView.setAdapter(adapter);
-        }
-        if (listViewState != null){
+
+
+        if (listViewState != null) {
             listView.onRestoreInstanceState(listViewState);
-        }
-        if (footer.getText().toString().isEmpty()){
+            listViewState = null;
+            // Clear and timings from the footer
             footer.setText(footerText);
         }
-
-        /*
-        Client editClient = (Client) ((ListActivity) getActivity()).getDocument();
-        if (editClient != null) {
-            // Get the client record from the database
-            Client updatedClient = (Client) localDB.getDocument(editClient.getDocumentID());
-            if (((ListActivity) getActivity()).getMode() == Document.Mode.NEW) {
-                if (updatedClient != null) {     // New client was saved
-                    // Add to the client list
-                    clientList.add(updatedClient);
-                    // Load the Adapter since display of new client needs to be checked.
-                    loadAdapter();
-                }
-            } else if (!editClient.getRecordID().equals(updatedClient.getRecordID())) {
-                // Database record is different so update the client in the client list
-                // Note: this may be direct edit, or indirect edit via ListClientHeader
-                for (Client client : clientList) {
-                    if (client.getDocumentID().equals(editClient.getDocumentID())) {
-                        int index = clientList.indexOf(client);
-                        clientList.set(index, updatedClient);
-                        break;
-                    }
-                }
-                // Load the Adapter since display of updated client needs to be checked.
-                loadAdapter();
-            }
-        }
-        // Return from Cancel needs listView to be re-attached though adapter is re-used
-        if (listView.getAdapter() == null) {
-            listView.setAdapter(adapter);
-            if (listViewState != null){
-                listView.onRestoreInstanceState(listViewState);
-            }
-        }
-        if (footer.getText().toString().isEmpty()){
-            footer.setText(footerText);
-        }
-        */
-    }
-
-    private void loadAdapter(){
-        int hidden = 0;
-        ((ListActivity) getActivity()).setClientAdapterList(new ArrayList<Client>());
-        adapter = new ClientAdapter(getActivity(),((ListActivity) getActivity()).getClientAdapterList() );
-
-        for (Client client : clientList) {
-            client.setLatestDocument(localDB.getLatestDocument(client));
-            if (selectClient(client)) {
-                ((ListActivity) getActivity()).getClientAdapterList().add(client);
-            } else {
-                hidden++;
-            }
-        }
-        switch (sortMode) {
-            case FIRST_LAST:
-                Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorFirstLast);
-                break;
-            case LAST_FIRST:
-                Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorLastFirst);
-                break;
-            case GROUP:
-                Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorGroup);
-                break;
-            case KEYWORKER:
-                Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorKeyworker);
-                break;
-            case STATUS:
-                Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorStatus);
-                break;
-            case CASE_START:
-                Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorCaseStart);
-                break;
-            case AGE:
-                Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorAge);
-                break;
-        }
-        this.listView.setAdapter(adapter);
-        int displayed = ((ListActivity) getActivity()).getClientAdapterList().size();
-        if (displayed > 1){
-            footerText = String.format(Locale.UK, "%d clients shown, ", displayed);
-        } else if (displayed == 1){
-            footerText = "1 client shown, ";
-        } else {
-            footerText = "0 clients shown, ";
-        }
-        if (hidden > 0) {
-            footerText += String.format(Locale.UK, "%d not shown.", hidden);
-        } else {
-            footerText = String.format(Locale.UK, "All clients shown (%d)", displayed);
-        }
-        footer.setText(footerText);
     }
 
     private boolean selectClient(Client client) {
         boolean selected = client.search(searchText);
         // Test MyClient
         if (selected) {
-            boolean myClients = ((ListClients) getActivity()).isMyClients();
+            // Build 160
+            //boolean myClients = ((ListClients) getActivity()).isMyClients();
             if (myClients) {
                 // Check for any reason why this is my client
                 selected = false;
@@ -406,7 +343,7 @@ public class ListClientsFragment extends Fragment {
                     UUID clientID = null;
                     if (client.getCurrentCase() != null) {
                         Case currentCase = client.getCurrentCase();
-                        if (currentCase.getKeyWorkerID() != null&&
+                        if (currentCase.getKeyWorkerID() != null &&
                                 !currentCase.getCaseType().equals("Close")) {
                             clientID = currentCase.getKeyWorkerID();
                         }
@@ -420,7 +357,7 @@ public class ListClientsFragment extends Fragment {
                     clientID = null;
                     if (client.getCurrentCase() != null) {
                         Case currentCase = client.getCurrentCase();
-                        if (currentCase.getCommissionerID() != null&&
+                        if (currentCase.getCommissionerID() != null &&
                                 !currentCase.getCaseType().equals("Close")) {
                             clientID = currentCase.getCommissionerID();
                         }
@@ -448,21 +385,24 @@ public class ListClientsFragment extends Fragment {
                 case SCHOOL:
                     if (client.getCurrentSchoolID() == null) {
                         selected = false;
-                    }
-                    else {
+                    } else {
                         Contact contactDocument = client.getCurrentSchool();
                         if (contactDocument == null) {
                             selected = false;
                         }
-                        else {
+                        // Build 162 - This fixes a very odd bug where SchoolID was null in a
+                        // Contact Document attached via client.getCurrentSchoolID
+                        else if (contactDocument.getSchoolID() == null) {
+                            selected = false;
+                        } else {
                             // Build 136 - Only show school with end date later than today
                             Date now = new Date();
                             if (contactDocument.getEndDate() != null &&
                                     contactDocument.getEndDate().getTime() != Long.MIN_VALUE &&
-                                    contactDocument.getEndDate().before(now)){
+                                    contactDocument.getEndDate().before(now)) {
                                 selected = false;
                             }
-                            if (!contactDocument.getSchoolID().equals(selectedID)){
+                            if (!contactDocument.getSchoolID().equals(selectedID)) {
                                 selected = false;
                             }
                         }
@@ -471,21 +411,23 @@ public class ListClientsFragment extends Fragment {
                 case AGENCY:
                     if (client.getCurrentAgencyID() == null) {
                         selected = false;
-                    }
-                    else {
+                    } else {
                         Contact contactDocument = client.getCurrentAgency();
                         if (contactDocument == null) {
                             selected = false;
-                        }
-                        else {
+                        } // Build 162 - This fixes a very odd bug where AgencyID was null in a
+                        // Contact Document attached via client.getCurrentAgencyID
+                        else if (contactDocument.getAgencyID() == null) {
+                            selected = false;
+                        } else {
                             // Build 136 - Only show agency with end date later than today
                             Date now = new Date();
                             if (contactDocument.getEndDate() != null &&
                                     contactDocument.getEndDate().getTime() != Long.MIN_VALUE &&
-                                    contactDocument.getEndDate().before(now)){
+                                    contactDocument.getEndDate().before(now)) {
                                 selected = false;
                             }
-                            if (!contactDocument.getAgencyID().equals(selectedID)){
+                            if (!contactDocument.getAgencyID().equals(selectedID)) {
                                 selected = false;
                             }
                         }
@@ -554,14 +496,8 @@ public class ListClientsFragment extends Fragment {
 
         // Build 151 - Spurious crash seen when getActivity returned null
         //boolean myClients = ((ListClients) getActivity()).isMyClients();
-        boolean myClients = false;
-        try{
-            myClients = ((ListClients) getActivity()).isMyClients();
-        } catch (Exception ex){
-            // Try to recover by exiting
-            FragmentManager fragmentManager = getFragmentManager();
-            fragmentManager.popBackStack();
-        }
+        // Build 160
+        //boolean myClients = ((ListClients) getActivity()).isMyClients();
         if (myClients || currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_CLIENTS)) {
             MenuItem selectOverdueOption = menu.add(0, MENU_SELECT_OVERDUE, 7, "Show Clients Overdue for Update");
             selectOverdueOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -582,8 +518,8 @@ public class ListClientsFragment extends Fragment {
             MenuItem selectAgencyOption = menu.add(0, MENU_SELECT_AGENCY, 12, "Show One Agency");
             selectAgencyOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-            MenuItem sortGroupOption = menu.add(0, MENU_SORT_GROUP, 24, "Sort by " + localSettings.Group);
-            sortGroupOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+            //MenuItem sortGroupOption = menu.add(0, MENU_SORT_GROUP, 24, "Sort by " + localSettings.Group);
+            //sortGroupOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
             MenuItem sortKeyworkerOption = menu.add(0, MENU_SORT_KEYWORKER, 25, "Sort by " + localSettings.Keyworker);
             sortKeyworkerOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -606,7 +542,7 @@ public class ListClientsFragment extends Fragment {
                 public boolean onQueryTextSubmit(String query) {
                     searchText = query;
                     sv.clearFocus();
-                    loadAdapter();
+                    new LoadAdapter().execute();
                     return true;
                 }
 
@@ -620,7 +556,7 @@ public class ListClientsFragment extends Fragment {
                 public boolean onMenuItemActionCollapse(MenuItem item) {
                     searchText = "";
                     isSearchIconified = true;
-                    loadAdapter();
+                    new LoadAdapter().execute();
                     return true;  // Return true to collapse action view
                 }
 
@@ -644,12 +580,12 @@ public class ListClientsFragment extends Fragment {
         final LocalSettings localSettings = LocalSettings.getInstance(getActivity());
         switch (item.getItemId()) {
             case MENU_EXPORT:
-                if (((ListClients) getActivity()).isMyClients()) {
+                if (myClients) {
                     ((ListActivity) getActivity()).setExportListType("My Clients");
                 } else {
                     ((ListActivity) getActivity()).setExportListType("All Clients");
                 }
-                switch (selectMode){
+                switch (selectMode) {
                     case ALL:
                         ((ListActivity) getActivity()).setExportSelection("All Clients (inc. closed cases)");
                         break;
@@ -674,7 +610,7 @@ public class ListClientsFragment extends Fragment {
                     default:
                         ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", selectMode.toString(), selectedValue));
                 }
-                switch (sortMode){
+                switch (sortMode) {
                     case FIRST_LAST:
                         ((ListActivity) getActivity()).setExportSort("FirstNames/Lastname");
                         break;
@@ -696,7 +632,7 @@ public class ListClientsFragment extends Fragment {
                     case STATUS:
                         ((ListActivity) getActivity()).setExportSort("Status");
                 }
-                if (searchText.isEmpty()){
+                if (searchText.isEmpty()) {
                     ((ListActivity) getActivity()).setExportSearch("No Search Used");
                 } else {
                     ((ListActivity) getActivity()).setExportSearch(searchText);
@@ -712,22 +648,26 @@ public class ListClientsFragment extends Fragment {
 
             case MENU_SELECT_ALL_CLIENTS:
                 selectMode = SelectMode.ALL;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_OPEN_CLIENTS:
                 selectMode = SelectMode.OPEN;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_FOLLOWED_CLIENTS:
                 selectMode = SelectMode.FOLLOWED;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_OVERDUE:
                 selectMode = SelectMode.OVERDUE;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_GROUP:
@@ -797,10 +737,11 @@ public class ListClientsFragment extends Fragment {
             case MENU_BROADCAST:
                 // Load Broadcast Client List from the selected clients
                 ArrayList<Client> broadcastClientList = new ArrayList<>();
-                for (Client client: ((ListActivity) getActivity()).getClientAdapterList()){
+                for (Client client : ((ListActivity) getActivity()).getClientAdapterList()) {
                     broadcastClientList.add(client);
                 }
-                ((ListActivity)getActivity()).setBroadcastClientList(broadcastClientList);
+                ((ListActivity) getActivity()).setBroadcastClientList(broadcastClientList);
+                listViewState = listView.onSaveInstanceState();
                 // Start the Broadcast fragment
                 fragmentManager = getFragmentManager();
                 fragmentTransaction = fragmentManager.beginTransaction();
@@ -808,17 +749,6 @@ public class ListClientsFragment extends Fragment {
                 fragmentTransaction.replace(R.id.content, fragment);
                 fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
-                /*
-                new AlertDialog.Builder(getActivity())
-                        .setTitle("Not Implemented Yet")
-                        .setMessage("Unfortunately, this option is not yet available.")
-                        .setPositiveButton("Return", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                            }
-                        })
-                        .show();
-                */
                 return true;
             default:
                 return false;
@@ -868,7 +798,8 @@ public class ListClientsFragment extends Fragment {
                 selectedID = groups.getListItems().get(which).getListItemID();
                 selectedValue = groups.getListItems().get(which).getItemValue();
                 selectMode = SelectMode.GROUP;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
             }
         });
 
@@ -892,7 +823,8 @@ public class ListClientsFragment extends Fragment {
                 selectedID = groups.getListItems().get(which).getListItemID();
                 selectedValue = groups.getListItems().get(which).getItemValue();
                 selectMode = SelectMode.COMMISSIONER;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
             }
         });
 
@@ -916,7 +848,8 @@ public class ListClientsFragment extends Fragment {
                 selectedID = schools.getListItems().get(which).getListItemID();
                 selectedValue = schools.getListItems().get(which).getItemValue();
                 selectMode = SelectMode.SCHOOL;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
             }
         });
 
@@ -940,7 +873,8 @@ public class ListClientsFragment extends Fragment {
                 selectedID = agencies.getListItems().get(which).getListItemID();
                 selectedValue = agencies.getListItems().get(which).getItemValue();
                 selectMode = SelectMode.AGENCY;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
             }
         });
 
@@ -974,7 +908,8 @@ public class ListClientsFragment extends Fragment {
                 selectedID = keyworkersPickList.getUsers().get(which).getUserID();
                 selectedValue = keyworkersPickList.getUsers().get(which).getFullName();
                 selectMode = SelectMode.KEYWORKER;
-                loadAdapter();
+                //loadAdapter();
+                new LoadAdapter().execute();
             }
         });
 
@@ -984,14 +919,14 @@ public class ListClientsFragment extends Fragment {
     }
 
     // Build 116 22 May 2019 Add handler for incoming text via share
-    private void doCreateShareNote(int position){
+    private void doCreateShareNote(int position) {
         ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
         String shareText = ((ListClients) getActivity()).getShareText();
         boolean hasPrivelege = false;
-        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_CREATE_NOTES)){
+        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_CREATE_NOTES)) {
             hasPrivelege = true;
         }
-        if (((ListClients) getActivity()).isMyClients()) {
+        if (myClients) {
             if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_MY_CLIENTS)) {
                 hasPrivelege = true;
             }
@@ -1000,7 +935,7 @@ public class ListClientsFragment extends Fragment {
                 hasPrivelege = true;
             }
         }
-        if (hasPrivelege){
+        if (hasPrivelege) {
             // 3/3/2017 Odd crash (Graeme Edwards) seems to have returned null so test
             if (adapter.getItem(position) != null) {
                 // V2.0 Set the 'document' in case the client is modified in the document view
@@ -1016,8 +951,7 @@ public class ListClientsFragment extends Fragment {
                 fragmentTransaction.replace(R.id.content, fragment);
                 fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
-            }
-            else {
+            } else {
                 doNoClient();
             }
         } else {
@@ -1026,7 +960,8 @@ public class ListClientsFragment extends Fragment {
     }
 
     private void doReadClient(int position) {
-        boolean myClients = ((ListClients) getActivity()).isMyClients();
+        // Build 160
+        //boolean myClients = ((ListClients) getActivity()).isMyClients();
         if ((myClients && currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_MY_CLIENTS)) ||
                 (!myClients && currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_CLIENTS))) {
             // 3/3/2017 Odd crash (Graeme Edwards) seems to have returned null so test
@@ -1044,8 +979,7 @@ public class ListClientsFragment extends Fragment {
                 // Client is serializable so can pass as extra to List Activity
                 intent.putExtra(Main.EXTRA_DOCUMENT, client);
                 startActivity(intent);
-            }
-            else {
+            } else {
                 doNoClient();
             }
         } else {
@@ -1054,7 +988,8 @@ public class ListClientsFragment extends Fragment {
     }
 
     private boolean doEditClient(int position) {
-        boolean myClients = ((ListClients) getActivity()).isMyClients();
+        // Build 160
+        //boolean myClients = ((ListClients) getActivity()).isMyClients();
         if ((myClients && currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_MY_CLIENTS)) ||
                 (!myClients && currentUser.getRole().hasPrivilege(Role.PRIVILEGE_WRITE_ALL_CLIENTS))) {
             ((ListActivity) getActivity()).setMode(Document.Mode.EDIT);
@@ -1079,8 +1014,7 @@ public class ListClientsFragment extends Fragment {
                 fragmentTransaction.replace(R.id.content, fragment);
                 fragmentTransaction.addToBackStack(null);
                 fragmentTransaction.commit();
-            }
-            else {
+            } else {
                 doNoClient();
             }
         } else {
@@ -1093,6 +1027,8 @@ public class ListClientsFragment extends Fragment {
     private boolean doNewClient() {
         ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
         ((ListActivity) getActivity()).setDocument(new Client(currentUser));
+        // Build 160 - Save te listviewstate in case of cancel
+        listViewState = listView.onSaveInstanceState();
         FragmentManager fragmentManager = getFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         Fragment fragment = new EditClient();
@@ -1125,7 +1061,7 @@ public class ListClientsFragment extends Fragment {
         final private Drawable clientGrey = ContextCompat.getDrawable(getActivity(), R.drawable.ic_client_grey);
         final private Drawable clientAll = ContextCompat.getDrawable(getActivity(), R.drawable.ic_client_all);
         final private int textGrey = ContextCompat.getColor(getActivity(), R.color.text_grey);
-        final  private int textRed = ContextCompat.getColor(getActivity(), R.color.red);
+        final private int textRed = ContextCompat.getColor(getActivity(), R.color.red);
 
         // Constructor
         ClientAdapter(Context context, List<Client> objects) {
@@ -1142,13 +1078,13 @@ public class ListClientsFragment extends Fragment {
             final TextView viewItemAdditionalText;
             if (convertView == null) {
                 convertView = getActivity().getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
-                viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
+                viewItemIcon = convertView.findViewById(R.id.item_icon);
                 convertView.setTag(R.id.tag_view_item_icon, viewItemIcon);
-                viewItemDate = (TextView) convertView.findViewById(R.id.item_date);
+                viewItemDate = convertView.findViewById(R.id.item_date);
                 convertView.setTag(R.id.tag_view_item_date, viewItemDate);
-                viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
+                viewItemMainText = convertView.findViewById(R.id.item_main_text);
                 convertView.setTag(R.id.tag_main_text, viewItemMainText);
-                viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
+                viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
                 convertView.setTag(R.id.tag_additional_text, viewItemAdditionalText);
             } else {
                 viewItemIcon = (ImageView) convertView.getTag(R.id.tag_view_item_icon);
@@ -1168,7 +1104,8 @@ public class ListClientsFragment extends Fragment {
 
             // Rest of information displayed depends on privilege and sort type
             // (privilege takes preference).
-            boolean myClients = ((ListClients) getActivity()).isMyClients();
+            // Build 160
+            //boolean myClients = ((ListClients) getActivity()).isMyClients();
             int color = textGrey;
             // Additional text depends on sort/select
             String additionalText = "";
@@ -1233,7 +1170,7 @@ public class ListClientsFragment extends Fragment {
                             break;
                         case CASE_START:
                             String startText = "New case.";
-                            if (client.getStartCase() != null){
+                            if (client.getStartCase() != null) {
                                 startText = "Case start: " + sDate.format(client.getStartCase().getReferenceDate());
                             }
                             additionalText = String.format("%s , %s",
@@ -1279,6 +1216,117 @@ public class ListClientsFragment extends Fragment {
             viewItemAdditionalText.setTextColor(color);
 
             return convertView;
+        }
+    }
+
+    private class LoadAdapter extends AsyncTask<Void, String, String> {
+
+        private ArrayList<Client> tempAdapterList;
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+            String output = "";
+            int hidden = 0;
+
+            // Load the clients from the database if first time
+            if (clientList == null) {
+                clientList = localDB.getAllClients();
+            }
+
+            // Get a collection of ClientIS and Latest document date
+            HashMap<UUID, Date> latestDates = localDB.getLatestDocumentDates();
+
+            tempAdapterList = new ArrayList<Client>();
+            for (Client client : clientList) {
+                // Build 158 - Move code int0 if statement to remove spurious calls
+                //client.setLatestDocument(localDB.getLatestDocument(client));
+                if (selectClient(client)) {
+                    // Build 160 - Use alternative SQL to speed up load by loading all of
+                    // the latest dates into a collection in one sql call
+                    //client.setLatestDocument(localDB.getLatestDocument(client));
+                    if (latestDates.containsKey(client.getDocumentID())) {
+                        client.setLatestDocument(latestDates.get(client.getDocumentID()));
+                    } else {
+                        client.setLatestDocument(client.getCreationDate());
+                    }
+
+                    tempAdapterList.add(client);
+                } else {
+                    hidden++;
+                }
+            }
+
+            switch (sortMode) {
+                case FIRST_LAST:
+                    //Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorFirstLast);
+                    Collections.sort(tempAdapterList, Client.comparatorFirstLast);
+                    break;
+                case LAST_FIRST:
+                    Collections.sort(tempAdapterList, Client.comparatorLastFirst);
+                    break;
+                case GROUP:
+                    Collections.sort(tempAdapterList, Client.comparatorGroup);
+                    break;
+                case KEYWORKER:
+                    Collections.sort(tempAdapterList, Client.comparatorKeyworker);
+                    break;
+                case STATUS:
+                    Collections.sort(tempAdapterList, Client.comparatorStatus);
+                    break;
+                case CASE_START:
+                    Collections.sort(tempAdapterList, Client.comparatorCaseStart);
+                    break;
+                case AGE:
+                    Collections.sort(tempAdapterList, Client.comparatorAge);
+                    break;
+            }
+
+            // Generate the footer text
+            int displayed = tempAdapterList.size();
+            if (displayed > 1) {
+                output = String.format(Locale.UK, "%d clients shown, ", displayed);
+            } else if (displayed == 1) {
+                output = "1 client shown, ";
+            } else {
+                output = "0 clients shown, ";
+            }
+            if (hidden > 0) {
+                output += String.format(Locale.UK, "%d not shown.", hidden);
+            } else {
+                output = String.format(Locale.UK, "All clients shown (%d)", displayed);
+            }
+            return output;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+            startTime = new Date();     // Used to display execution time
+            footer.setText("loading...");
+            // Clear the adapter to show reload has started
+            adapter.clear();
+            adapter.notifyDataSetChanged();
+        }
+
+        @Override
+        protected void onPostExecute(String output) {
+            // Runs on UI Thread
+            // Set the footer text
+            footerText = output;
+            Date endTime = new Date();
+            long elapsed = (endTime.getTime() - startTime.getTime()) / 1000;
+            if (elapsed > 0) {
+                footer.setText(String.format("%s (%d sec)", footerText, elapsed));
+            } else {
+                footer.setText(footerText);
+            }
+            // Reload the adapter list
+            for (Client client : tempAdapterList) {
+                adapter.add(client);
+            }
+            adapter.notifyDataSetChanged();
+
         }
     }
 }

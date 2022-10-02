@@ -9,6 +9,7 @@ import java.util.UUID;
 import solutions.cris.db.LocalDB;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -118,16 +119,24 @@ public class ListItem extends CrisObject implements Serializable {
     public String textSummary(){
         String summary = "List Type: " + listType.toString() + "\n";
         summary += "Item Value: " + itemValue + "\n";
-        summary += "Item Order: " + Integer.toString(itemOrder) + "\n";
-        summary += "Is Default: " + Boolean.toString(isDefault) + "\n";
-        summary += "Is Displayed: " + Boolean.toString(isDisplayed) + "\n";
+        summary += "Item Order: " + itemOrder + "\n";
+        summary += "Is Default: " + isDefault + "\n";
+        summary += "Is Displayed: " + isDisplayed + "\n";
         return summary;
     }
 
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID) {
+        ListItem previousItem = localDB.getListItemByRecordID(previousRecordID);
+        ListItem thisItem = localDB.getListItemByRecordID(thisRecordID);
+        String changes = ListItem.getChanges(previousItem, thisItem);
+        if (changes.length() == 0) {
+            changes = "No changes found.\n";
+        }
+        changes += "-------------------------------------------------------------\n";
+        return changes;
+    }
+
     public static String getChanges(ListItem previousDocument, ListItem thisDocument){
-        SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
-        SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
-        LocalSettings localSettings = LocalSettings.getInstance();
         String changes = "";
         changes += CRISUtil.getChanges(previousDocument.getItemValue(), thisDocument.getItemValue(), "Value");
         changes += CRISUtil.getChanges(previousDocument.getItemOrder(), thisDocument.getItemOrder(), "Order");
@@ -135,4 +144,5 @@ public class ListItem extends CrisObject implements Serializable {
         changes += CRISUtil.getChanges(previousDocument.isDisplayed(), thisDocument.isDisplayed(), "Displayed Flag");
         return changes;
     }
+
 }

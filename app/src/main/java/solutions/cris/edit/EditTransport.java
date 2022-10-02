@@ -127,7 +127,7 @@ public class EditTransport extends Fragment {
 
         Toolbar toolbar = ((ListActivity) getActivity()).getToolbar();
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         currentUser = ((ListActivity) getActivity()).getCurrentUser();
         editDocument = (Transport) ((ListActivity) getActivity()).getDocument();
         client = ((ListActivity) getActivity()).getClient();
@@ -152,41 +152,41 @@ public class EditTransport extends Fragment {
 
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
-            LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
+            LinearLayout cancelBoxView = parent.findViewById(R.id.cancel_box_layout);
             cancelBoxView.setVisibility(View.VISIBLE);
-            TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
+            TextView cancelBy = parent.findViewById(R.id.cancel_by);
             String byText = "by ";
             User cancelUser = localDB.getUser(editDocument.getCancelledByID());
             byText += cancelUser.getFullName() + " on ";
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
-            TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
+            TextView cancelReason = parent.findViewById(R.id.cancel_reason);
             cancelReason.setText(String.format("Reason: %s", editDocument.getCancellationReason()));
         }
 
-        transportSpinner = (Spinner) parent.findViewById(R.id.transport_spinner);
-        transportContactNumberView = (TextView) parent.findViewById(R.id.transport_contact_number);
-        transportEmailView = (TextView) parent.findViewById(R.id.transport_email);
-        backgroundInformationView = (TextView) parent.findViewById(R.id.background_information);
-        transportBooked = (CheckBox) parent.findViewById(R.id.booked);
-        outboundRequired = (CheckBox) parent.findViewById(R.id.outbound_required);
-        outboundDateTimeLayout = (LinearLayout) parent.findViewById(R.id.outbound_datetime_layout);
-        outboundDateView = (EditText) parent.findViewById(R.id.outbound_date);
-        outboundTimeView = (EditText) parent.findViewById(R.id.outbound_time);
-        outboundUsed = (CheckBox) parent.findViewById(R.id.outbound_used);
-        returnRequired = (CheckBox) parent.findViewById(R.id.return_required);
-        returnDateTimeLayout = (LinearLayout) parent.findViewById(R.id.return_datetime_layout);
-        returnDateView = (EditText) parent.findViewById(R.id.return_date);
-        returnTimeView = (EditText) parent.findViewById(R.id.return_time);
-        returnUsed = (CheckBox) parent.findViewById(R.id.return_used);
-        fromAddressView = (EditText) parent.findViewById(R.id.from_address);
-        fromPostcodeView = (EditText) parent.findViewById(R.id.from_postcode);
-        toAddressView = (EditText) parent.findViewById(R.id.to_address);
-        toPostcodeView = (EditText) parent.findViewById(R.id.to_postcode);
-        additionalInformationView = (EditText) parent.findViewById(R.id.additional_information);
+        transportSpinner = parent.findViewById(R.id.transport_spinner);
+        transportContactNumberView = parent.findViewById(R.id.transport_contact_number);
+        transportEmailView = parent.findViewById(R.id.transport_email);
+        backgroundInformationView = parent.findViewById(R.id.background_information);
+        transportBooked = parent.findViewById(R.id.booked);
+        outboundRequired = parent.findViewById(R.id.outbound_required);
+        outboundDateTimeLayout = parent.findViewById(R.id.outbound_datetime_layout);
+        outboundDateView = parent.findViewById(R.id.outbound_date);
+        outboundTimeView = parent.findViewById(R.id.outbound_time);
+        outboundUsed = parent.findViewById(R.id.outbound_used);
+        returnRequired = parent.findViewById(R.id.return_required);
+        returnDateTimeLayout = parent.findViewById(R.id.return_datetime_layout);
+        returnDateView = parent.findViewById(R.id.return_date);
+        returnTimeView = parent.findViewById(R.id.return_time);
+        returnUsed = parent.findViewById(R.id.return_used);
+        fromAddressView = parent.findViewById(R.id.from_address);
+        fromPostcodeView = parent.findViewById(R.id.from_postcode);
+        toAddressView = parent.findViewById(R.id.to_address);
+        toPostcodeView = parent.findViewById(R.id.to_postcode);
+        additionalInformationView = parent.findViewById(R.id.additional_information);
 
         // Set up the hint text
-        toHintTextView = (TextView) parent.findViewById(R.id.to_hint_text);
+        toHintTextView = parent.findViewById(R.id.to_hint_text);
         toHintTextView.setText("Longpress the To Address field to use the client's address as the address to return to.");
         // Restore value of hintDisplayed (Set to opposite, toggle to come
         if (savedInstanceState != null) {
@@ -200,7 +200,7 @@ public class EditTransport extends Fragment {
             }
         });
 
-        fromHintTextView = (TextView) parent.findViewById(R.id.from_hint_text);
+        fromHintTextView = parent.findViewById(R.id.from_hint_text);
         fromHintTextView.setText("Longpress the From Address field to use the client's address as the address to start from.");
         // Restore value of hintDisplayed (Set to opposite, toggle to come
         if (savedInstanceState != null) {
@@ -337,7 +337,7 @@ public class EditTransport extends Fragment {
         });
 
         // Cancel Button
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -348,7 +348,7 @@ public class EditTransport extends Fragment {
             }
         });
         // Save Button
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -361,7 +361,10 @@ public class EditTransport extends Fragment {
         });
 
         // Preset the editable fields (If called from Session Register, lots of information is already available)
-        transportSpinner.setSelection(transportPickList.getPosition(editDocument.getTransportOrganisation()));
+        // Build 171 - Handle unexpected null ListItem ID
+        if (!editDocument.getTransportOrganisation().getItemValue().equals("Unknown")) {
+            transportSpinner.setSelection(transportPickList.getPosition(editDocument.getTransportOrganisation()));
+        }
         transportBooked.setChecked(editDocument.isBooked());
         fromAddressView.setText(editDocument.getFromAddress());
         fromPostcodeView.setText(editDocument.getFromPostcode());

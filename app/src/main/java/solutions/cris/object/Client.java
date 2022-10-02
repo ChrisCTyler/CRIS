@@ -176,8 +176,13 @@ public class Client extends Document implements Serializable {
 
     private String address;
 
+    // Build 188 - Address is now non-mandatory
     public String getAddress() {
-        return address;
+        if (address == null) {
+            return "";
+        } else {
+            return address;
+        }
     }
 
     public void setAddress(String address) {
@@ -186,8 +191,13 @@ public class Client extends Document implements Serializable {
 
     private String postcode;
 
+    // Build 188 - Postcode is now non-mandatory
     public String getPostcode() {
-        return postcode;
+        if (postcode == null) {
+            return "";
+        } else {
+            return postcode;
+        }
     }
 
     public void setPostcode(String postcode) {
@@ -197,7 +207,11 @@ public class Client extends Document implements Serializable {
     private String contactNumber;
 
     public String getContactNumber() {
-        return contactNumber;
+        if (contactNumber == null) {
+            return "";
+        } else {
+            return contactNumber;
+        }
     }
 
     public void setContactNumber(String contactNumber) {
@@ -244,6 +258,10 @@ public class Client extends Document implements Serializable {
             LocalDB localDB = LocalDB.getInstance();
             gender = localDB.getListItem(genderID);
         }
+        // Build 171 - Handle the unexpected null ListItem ID case
+        if (gender == null) {
+            gender = new ListItem(User.getCurrentUser(), ListType.GENDER, "Unknown", 0);
+        }
         return gender;
     }
 
@@ -263,9 +281,13 @@ public class Client extends Document implements Serializable {
     }
 
     public ListItem getEthnicity() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (ethnicityID != null && ethnicity == null) {
             LocalDB localDB = LocalDB.getInstance();
             ethnicity = localDB.getListItem(ethnicityID);
+        }
+        if (ethnicity == null) {
+            ethnicity = new ListItem(User.getCurrentUser(), ListType.ETHNICITY, "Unknown", 0);
         }
         return ethnicity;
     }
@@ -879,8 +901,8 @@ public class Client extends Document implements Serializable {
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
                                 // Build 139 - Adding Year Group to Export shifts column to right
-                                .setStartColumnIndex(21)
-                                .setEndColumnIndex(22)
+                                .setStartColumnIndex(19)
+                                .setEndColumnIndex(20)
                                 .setStartRowIndex(1))));
         // 23rd column is a date (CaseClosedate)
         requests.add(new Request()
@@ -896,8 +918,8 @@ public class Client extends Document implements Serializable {
                         .setRange(new GridRange()
                                 .setSheetId(sheetID)
                                 // Build 139 - Adding Year Group to Export shifts column to right
-                                .setStartColumnIndex(24)
-                                .setEndColumnIndex(25)
+                                .setStartColumnIndex(22)
+                                .setEndColumnIndex(23)
                                 .setStartRowIndex(1))));
         return requests;
     }
@@ -929,9 +951,19 @@ public class Client extends Document implements Serializable {
         }
         // Current Tool
         Document tool = getCurrentTool();
+
         if (tool != null) {
-            CriteriaAssessmentTool cat = (CriteriaAssessmentTool) tool;
-            row.add(cat.getScoreText());
+            // Build 187 - Add MACA as possible tool
+            switch (tool.getDocumentType()) {
+                case Document.CriteriaAssessmentTool:
+                    CriteriaAssessmentTool cat = (CriteriaAssessmentTool) tool;
+                    row.add(cat.getScoreText());
+                    break;
+                case Document.MACAYC18:
+                    MACAYC18 macayc18 = (MACAYC18) tool;
+                    row.add(macayc18.getScoreText());
+            }
+
         } else {
             row.add("");    // Current Tool
         }
@@ -1048,12 +1080,13 @@ public class Client extends Document implements Serializable {
                     getEmailAddress(),
                     getGender().getItemValue(), getEthnicity().getItemValue());
             found = text.toLowerCase().contains(searchText.toLowerCase());
-            if (!found) {
+            // Build 158 - Removed currentcase search to speed up search (about 4x)
+            //if (!found) {
                 // So that search works as expected in ListClients
-                if (currentCase != null) {
-                    found = currentCase.search(searchText);
-                }
-            }
+            //if (currentCase != null) {
+            //    found = currentCase.search(searchText);
+            //}
+            //}
             return found;
         }
     }

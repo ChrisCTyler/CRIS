@@ -27,6 +27,7 @@ import java.util.Locale;
 import solutions.cris.R;
 import solutions.cris.list.ListActivity;
 import solutions.cris.object.Client;
+import solutions.cris.object.ListItem;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -69,7 +70,7 @@ public class ReadClient extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
         Toolbar toolbar = ((ListActivity) getActivity()).getToolbar();
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         // Hide the FAB (if ListClientHeader)
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
         if (fab != null) {
@@ -83,20 +84,20 @@ public class ReadClient extends Fragment {
         toolbar.setTitle(getString(R.string.app_name) + " - Client");
 
         // Set up the form.
-        EditText firstNamesView = (EditText) parent.findViewById(R.id.first_names);
-        EditText lastNameView = (EditText) parent.findViewById(R.id.last_name);
-        EditText dateOfBirthView = (EditText) parent.findViewById(R.id.date_of_birth);
-        EditText addressView = (EditText) parent.findViewById(R.id.address);
-        EditText postcodeView = (EditText) parent.findViewById(R.id.postcode);
-        contactNumberView = (EditText) parent.findViewById(R.id.contact_number);
-        contactNumber2View = (EditText) parent.findViewById(R.id.contact_number2);
-        emailView = (EditText) parent.findViewById(R.id.email);
-        Spinner genderView = (Spinner) parent.findViewById(R.id.gender_spinner);
-        TextView genderTextView = (TextView) parent.findViewById(R.id.gender_read_text);
-        Spinner ethnicityView = (Spinner) parent.findViewById(R.id.ethnicity_spinner);
-        TextView ethnicityTextView = (TextView) parent.findViewById(R.id.ethnicity_read_text);
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        EditText firstNamesView = parent.findViewById(R.id.first_names);
+        EditText lastNameView = parent.findViewById(R.id.last_name);
+        EditText dateOfBirthView = parent.findViewById(R.id.date_of_birth);
+        EditText addressView = parent.findViewById(R.id.address);
+        EditText postcodeView = parent.findViewById(R.id.postcode);
+        contactNumberView = parent.findViewById(R.id.contact_number);
+        contactNumber2View = parent.findViewById(R.id.contact_number2);
+        emailView = parent.findViewById(R.id.email);
+        Spinner genderView = parent.findViewById(R.id.gender_spinner);
+        TextView genderTextView = parent.findViewById(R.id.gender_read_text);
+        Spinner ethnicityView = parent.findViewById(R.id.ethnicity_spinner);
+        TextView ethnicityTextView = parent.findViewById(R.id.ethnicity_read_text);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
 
         // Set the fields to non-editable
         firstNamesView.setInputType(InputType.TYPE_NULL);
@@ -138,7 +139,11 @@ public class ReadClient extends Fragment {
             contactNumber2View.setText(editClient.getContactNumber2());
         }
         emailView.setText(editClient.getEmailAddress(), null);
-        genderTextView.setText(editClient.getGender().getItemValue());
+        // Build 170 - Instance of null gender found so handle the possibility
+        ListItem gender = editClient.getGender();
+        if (gender != null) {
+            genderTextView.setText(gender.getItemValue());
+        }
         ethnicityTextView.setText(editClient.getEthnicity().getItemValue());
 
         // Add email Intent

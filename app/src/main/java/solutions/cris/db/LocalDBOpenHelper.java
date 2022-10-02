@@ -1,14 +1,18 @@
 package solutions.cris.db;
 
 import android.content.Context;
+import android.content.Intent;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.os.AsyncTask;
 
 import java.util.ArrayList;
+import java.util.UUID;
 
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
 import solutions.cris.object.User;
+import solutions.cris.utils.AlertAndContinue;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -32,12 +36,18 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
     // Version 2: Added ReferenceDate column to Document
     // Version 3: Added Commissioner list items and Follow table
     // Build 140 - Version 23 added index on DocumentType, HistoryDate,ReferenceDate
-    private static final int VERSION = 23;
+    // Build 178 - Run the fitItemID code on upgrade(version = 28)
+    private static final int VERSION = 29;
     private String organisation;
     private int oldVersion = 0;
     private int newVersion = 0;
 
     int getOldVersion() {return oldVersion;}
+
+    public void setOldVersion(int oldVersion) {
+        this.oldVersion = oldVersion;
+    }
+
     int getNewVersion() {return newVersion;}
 
     // Constructor calls parent constructor
@@ -188,6 +198,11 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
                 //list.add(new ListItem(user, ListType.NOTE_TYPE, "Email", 1));
                 //list.add(new ListItem(user, ListType.NOTE_TYPE, "Phone Message", 1));
                 break;
+            case 29:
+                // Build 179 MACA and PANOC
+                list.add(new ListItem(user, ListType.DOCUMENT_TYPE, "MACA-YC18", 9));
+                list.add(new ListItem(user, ListType.DOCUMENT_TYPE, "PANOC-YC20", 10));
+                break;
         }
 
         return list;
@@ -333,7 +348,12 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
             case 23:
                 sqlList.add("CREATE INDEX DocumentDocumentTypeHistoryDateReferenceDate ON Document(DocumentType, HistoryDate, ReferenceDate);");
                 break;
-
+            case 24:
+                sqlList.add("CREATE INDEX FollowUserIDCancelled ON Follow(UserID, Cancelled);");
+                break;
+            case 25:
+                sqlList.add("CREATE INDEX DocumentClientIDReferenceDate ON Document(ClientID, ReferenceDate);");
+                break;
         }
         return sqlList;
     }

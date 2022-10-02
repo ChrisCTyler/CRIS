@@ -23,6 +23,7 @@ import androidx.core.view.MenuItemCompat;
 import androidx.appcompat.widget.ShareActionProvider;
 import androidx.appcompat.widget.Toolbar;
 import android.text.InputType;
+import android.text.Layout;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -30,6 +31,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -71,7 +73,7 @@ public class ReadContact extends Fragment {
         super.onActivityCreated(savedInstanceState);
 
 
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         // Hide the FAB
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
         if (fab != null) {
@@ -90,43 +92,52 @@ public class ReadContact extends Fragment {
 
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
-            LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
+            LinearLayout cancelBoxView = parent.findViewById(R.id.cancel_box_layout);
             cancelBoxView.setVisibility(View.VISIBLE);
-            TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
+            TextView cancelBy = parent.findViewById(R.id.cancel_by);
             String byText = "by ";
             User cancelUser = localDB.getUser(editDocument.getCancelledByID());
             byText += cancelUser.getFullName() + " on ";
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
-            TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
+            TextView cancelReason = parent.findViewById(R.id.cancel_reason);
             cancelReason.setText(String.format("Reason: %s",editDocument.getCancellationReason()));
         }
 
-        Spinner contactTypeSpinner = (Spinner) parent.findViewById(R.id.contact_type_spinner);
-        TextView contactTypeTextView = (TextView) parent.findViewById(R.id.contact_type_read_text);
-        Spinner agencySpinner = (Spinner) parent.findViewById(R.id.agency_spinner);
-        TextView agencyTextView = (TextView) parent.findViewById(R.id.agency_read_text);
-        LinearLayout agencyLayout = (LinearLayout) parent.findViewById(R.id.agency_layout);
-        Spinner schoolSpinner = (Spinner) parent.findViewById(R.id.school_spinner);
-        TextView schoolTextView = (TextView) parent.findViewById(R.id.school_read_text);
-        LinearLayout schoolLayout = (LinearLayout) parent.findViewById(R.id.school_layout);
-        TextView backgroundInformationView = (TextView) parent.findViewById(R.id.background_information);
-        LinearLayout backgroundLayout = (LinearLayout) parent.findViewById(R.id.background_layout);
-        LinearLayout addressLayout = (LinearLayout) parent.findViewById(R.id.address_layout);
-        EditText nameView = (EditText) parent.findViewById(R.id.name);
-        EditText addressView = (EditText) parent.findViewById(R.id.address);
-        EditText postcodeView = (EditText) parent.findViewById(R.id.postcode);
-        final EditText contactNumberView = (EditText) parent.findViewById(R.id.contact_number);
-        final EditText emailAddressView = (EditText) parent.findViewById(R.id.email_address);
-        EditText startDateView = (EditText) parent.findViewById(R.id.start_date);
-        EditText endDateView = (EditText) parent.findViewById(R.id.end_date);
-        EditText additionalInformationView = (EditText) parent.findViewById(R.id.additional_information);
-        Spinner relationshipSpinner = (Spinner) parent.findViewById(R.id.relationship_spinner);
-        TextView relationshipTextView = (TextView) parent.findViewById(R.id.relationship_read_text);
-        TextView hintTextView = (TextView) parent.findViewById(R.id.hint_text);
-        ImageView hintIconView = (ImageView) parent.findViewById(R.id.hint_open_close);
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        Spinner contactTypeSpinner = parent.findViewById(R.id.contact_type_spinner);
+        TextView contactTypeTextView = parent.findViewById(R.id.contact_type_read_text);
+        Spinner agencySpinner = parent.findViewById(R.id.agency_spinner);
+        TextView agencyTextView = parent.findViewById(R.id.agency_read_text);
+        LinearLayout agencyLayout = parent.findViewById(R.id.agency_layout);
+        Spinner schoolSpinner = parent.findViewById(R.id.school_spinner);
+        TextView schoolTextView = parent.findViewById(R.id.school_read_text);
+        LinearLayout schoolLayout = parent.findViewById(R.id.school_layout);
+        TextView backgroundInformationView = parent.findViewById(R.id.background_information);
+        LinearLayout backgroundLayout = parent.findViewById(R.id.background_layout);
+        LinearLayout addressLayout = parent.findViewById(R.id.address_layout);
+        EditText nameView = parent.findViewById(R.id.name);
+        EditText addressView = parent.findViewById(R.id.address);
+        EditText postcodeView = parent.findViewById(R.id.postcode);
+        final EditText contactNumberView = parent.findViewById(R.id.contact_number);
+        final EditText emailAddressView = parent.findViewById(R.id.email_address);
+        EditText startDateView = parent.findViewById(R.id.start_date);
+        EditText endDateView = parent.findViewById(R.id.end_date);
+        EditText additionalInformationView = parent.findViewById(R.id.additional_information);
+        Spinner relationshipSpinner = parent.findViewById(R.id.relationship_spinner);
+        TextView relationshipTextView = parent.findViewById(R.id.relationship_read_text);
+        // Build 181 FSM
+        LinearLayout freeSchoolMealsLayoutView = parent.findViewById(R.id.free_school_meals_layout);
+        TextView freeSchoolMealsTextView = parent.findViewById(R.id.free_school_meals_text);
+        CheckBox freeSchoolMeals = parent.findViewById(R.id.free_school_meals);
+        // Build 183 - SEND
+        LinearLayout specialNeedsLayoutView = parent.findViewById(R.id.special_needs_layout);
+        TextView specialNeedsTextView = parent.findViewById(R.id.special_needs_text);
+        CheckBox specialNeeds = parent.findViewById(R.id.special_needs);
+
+        TextView hintTextView = parent.findViewById(R.id.hint_text);
+        ImageView hintIconView = parent.findViewById(R.id.hint_open_close);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
 
         contactTypeSpinner.setVisibility(View.GONE);
         contactTypeTextView.setVisibility(View.VISIBLE);
@@ -138,6 +149,17 @@ public class ReadContact extends Fragment {
         schoolSpinner.setVisibility(View.GONE);
         schoolTextView.setVisibility(View.VISIBLE);
         schoolTextView.setFocusable(false);
+
+        // Build 181
+        freeSchoolMealsLayoutView.setVisibility(View.GONE);
+        freeSchoolMeals.setVisibility(View.GONE);
+        freeSchoolMealsTextView.setVisibility(View.VISIBLE);
+        freeSchoolMealsTextView.setFocusable(false);
+        // Build 183
+        specialNeedsLayoutView.setVisibility(View.GONE);
+        specialNeeds.setVisibility(View.GONE);
+        specialNeedsTextView.setVisibility(View.VISIBLE);
+        specialNeedsTextView.setFocusable(false);
 
         nameView.setInputType(InputType.TYPE_NULL);
         nameView.setFocusable(false);
@@ -194,9 +216,29 @@ public class ReadContact extends Fragment {
                 }
                 addressLayout.setVisibility(View.GONE);
                 schoolTextView.setText(editDocument.getSchool().getItemValue());
+                // Build 181
+                freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
+                freeSchoolMealsTextView.setVisibility(View.VISIBLE);
+                if (editDocument.isFreeSchoolMeals()) {
+                    freeSchoolMealsTextView.setText("Yes");
+                } else {
+                    freeSchoolMealsTextView.setText("No");
+                }
+                // Build 183
+                specialNeedsLayoutView.setVisibility(View.VISIBLE);
+                specialNeedsTextView.setVisibility(View.VISIBLE);
+                if (editDocument.isSpecialNeeds()) {
+                    specialNeedsTextView.setText("Yes");
+                } else {
+                    specialNeedsTextView.setText("No");
+                }
                 break;
             default:
                 schoolLayout.setVisibility(View.GONE);
+                // Build 181
+                freeSchoolMealsLayoutView.setVisibility(View.GONE);
+                // Build 183
+                specialNeedsLayoutView.setVisibility(View.GONE);
                 agencyLayout.setVisibility(View.GONE);
                 backgroundLayout.setVisibility(View.GONE);
                 addressLayout.setVisibility(View.VISIBLE);

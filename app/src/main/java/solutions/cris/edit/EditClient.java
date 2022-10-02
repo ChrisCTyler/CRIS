@@ -116,22 +116,22 @@ public class EditClient extends Fragment {
         fab.setVisibility(View.GONE);
 
         // Clear the footer
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         footer.setText("");
 
         localDB = LocalDB.getInstance();
 
         // Set up the form.
-        firstNamesView = (EditText) parent.findViewById(R.id.first_names);
-        lastNameView = (EditText) parent.findViewById(R.id.last_name);
-        dateOfBirthView = (EditText) parent.findViewById(R.id.date_of_birth);
-        addressView = (EditText) parent.findViewById(R.id.address);
-        postcodeView = (EditText) parent.findViewById(R.id.postcode);
-        contactNumberView = (EditText) parent.findViewById(R.id.contact_number);
-        contactNumber2View = (EditText) parent.findViewById(R.id.contact_number2);
-        emailView = (EditText) parent.findViewById(R.id.email);
-        genderView = (Spinner) parent.findViewById(R.id.gender_spinner);
-        ethnicityView = (Spinner) parent.findViewById(R.id.ethnicity_spinner);
+        firstNamesView = parent.findViewById(R.id.first_names);
+        lastNameView = parent.findViewById(R.id.last_name);
+        dateOfBirthView = parent.findViewById(R.id.date_of_birth);
+        addressView = parent.findViewById(R.id.address);
+        postcodeView = parent.findViewById(R.id.postcode);
+        contactNumberView = parent.findViewById(R.id.contact_number);
+        contactNumber2View = parent.findViewById(R.id.contact_number2);
+        emailView = parent.findViewById(R.id.email);
+        genderView = parent.findViewById(R.id.gender_spinner);
+        ethnicityView = parent.findViewById(R.id.ethnicity_spinner);
 
         // Initialise the Gender Spinner
         genderPickList = new PickList(localDB, ListType.GENDER);
@@ -157,7 +157,7 @@ public class EditClient extends Fragment {
         });
 
         // Cancel Button
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -169,7 +169,7 @@ public class EditClient extends Fragment {
             }
         });
         // Save Button
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -197,12 +197,23 @@ public class EditClient extends Fragment {
                 contactNumber2View.setText(editClient.getContactNumber2());
             }
             emailView.setText(editClient.getEmailAddress(), null);
-            int position = genderPickList.getOptions().indexOf(editClient.getGender().getItemValue());
-            genderView.setSelection(position);
-            position = ethnicityPicklist.getOptions().indexOf(editClient.getEthnicity().getItemValue());
-            ethnicityView.setSelection(position);
+            // Build 170 - Instance of null gender found so handle the possibility
+            // int position = genderPickList.getOptions().indexOf(editClient.getGender().getItemValue());
+            int position = 0;
+            ListItem gender = editClient.getGender();
+            // Build 171 - Handle unexpected null ListItem ID
+            //if (gender != null) {
+            if (!gender.getItemValue().equals("Unknown")) {
+                position = genderPickList.getOptions().indexOf(gender.getItemValue());
+                genderView.setSelection(position);
+            }
+            // Build 171 - Handle unexpected null ListItem ID
+            ListItem ethnicity = editClient.getEthnicity();
+            if (!ethnicity.getItemValue().equals("Unknown")) {
+                position = ethnicityPicklist.getOptions().indexOf(editClient.getEthnicity().getItemValue());
+                ethnicityView.setSelection(position);
+            }
         }
-
     }
 
     @Override
@@ -283,6 +294,8 @@ public class EditClient extends Fragment {
         }
 
         // Address
+        // Build 188 - Address is now non-mandatory
+        /*
         String sAddress = addressView.getText().toString().trim();
         if (TextUtils.isEmpty(sAddress)) {
             addressView.setError(getString(R.string.error_field_required));
@@ -291,8 +304,12 @@ public class EditClient extends Fragment {
         } else {
             editClient.setAddress(sAddress);
         }
+        */
+        editClient.setAddress(addressView.getText().toString().trim());
 
         // Postcode
+        // Build 188 - Postcode is now non-mandatory
+        /*
         String sPostcode = postcodeView.getText().toString().trim();
         if (TextUtils.isEmpty(sPostcode)) {
             postcodeView.setError(getString(R.string.error_field_required));
@@ -301,8 +318,12 @@ public class EditClient extends Fragment {
         } else {
             editClient.setPostcode(sPostcode);
         }
+        */
+        editClient.setPostcode(postcodeView.getText().toString().trim());
 
         // ContactNumber
+        // Build 188 - Contact Number is now non-mandatory
+        /*
         String sContactNumber = contactNumberView.getText().toString().trim();
         if (TextUtils.isEmpty(sContactNumber)) {
             contactNumberView.setError(getString(R.string.error_field_required));
@@ -311,17 +332,31 @@ public class EditClient extends Fragment {
         } else {
             editClient.setContactNumber(contactNumberView.getText().toString().trim());
         }
+        */
+        editClient.setContactNumber(contactNumberView.getText().toString().trim());
 
         // Contact Number2
         editClient.setContactNumber2(contactNumber2View.getText().toString().trim());
 
         // Email
+        // Build 188 - EmailAddress is now non-mandatory
+        /*
         String sEmail = emailView.getText().toString().trim().toLowerCase();
         if (TextUtils.isEmpty(sEmail)) {
             emailView.setError(getString(R.string.error_field_required));
             focusView = emailView;
             success = false;
         } else if (!isEmailValid(sEmail)) {
+            emailView.setError(getString(R.string.error_invalid_email));
+            focusView = emailView;
+            success = false;
+        } else {
+            editClient.setEmailAddress(sEmail);
+        }
+        */
+        // Still need to check for a valid email address if one is specified
+        String sEmail = emailView.getText().toString().trim().toLowerCase();
+        if (!TextUtils.isEmpty(sEmail) && !isEmailValid(sEmail)) {
             emailView.setError(getString(R.string.error_invalid_email));
             focusView = emailView;
             success = false;

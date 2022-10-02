@@ -131,7 +131,7 @@ public class EditNote extends Fragment {
         // Build 116 22 May 2019 Add handler for incoming text via share
         shareText = ((ListActivity) getActivity()).getShareText();
         toolbar = ((ListActivity) getActivity()).getToolbar();
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         currentUser = ((ListActivity) getActivity()).getCurrentUser();
         editDocument = (Note) ((ListActivity) getActivity()).getDocument();
         // Build 119 2 May 2019 Introduced an error where note could be created with a
@@ -143,7 +143,9 @@ public class EditNote extends Fragment {
         }
         // Now clear the document in the parent activity so that it is not checked
         // against the old Client document
-        ((ListActivity) getActivity()).setDocument(null);
+        // Build 158 - If note is edited or a response added we need to check
+        // in ListClientDocumentFragments
+        //((ListActivity) getActivity()).setDocument(null);
         fab = ((ListActivity) getActivity()).getFab();
         mode = ((ListActivity) getActivity()).getMode();
         client = ((ListActivity) getActivity()).getClient();
@@ -153,8 +155,8 @@ public class EditNote extends Fragment {
         //footer.setText(R.string.action_swipe_left_for_unread);
 
         // Set up the hint text
-        stickyHintTextView = (TextView) parent.findViewById(R.id.hint_text);
-        hintBox = (LinearLayout) parent.findViewById(R.id.hint_box);
+        stickyHintTextView = parent.findViewById(R.id.hint_text);
+        hintBox = parent.findViewById(R.id.hint_box);
         stickyHintTextView.setText(getHintText());
         stickyHintTextDisplayed = toggleHint(stickyHintTextView, stickyHintTextDisplayed);
         stickyHintTextView.setOnClickListener(new View.OnClickListener() {
@@ -166,7 +168,7 @@ public class EditNote extends Fragment {
 
         // ContentHintText
         // Build 153 - Disable the Hashtag facility
-        LinearLayout contentHintBox = (LinearLayout) parent.findViewById(R.id.content_hint_box);
+        LinearLayout contentHintBox = parent.findViewById(R.id.content_hint_box);
         contentHintBox.setVisibility(View.GONE);
         //contentHintTextView = (TextView) parent.findViewById(R.id.content_hint_text);
         //contentHintTextView.setText(getContentHintText());
@@ -178,20 +180,20 @@ public class EditNote extends Fragment {
         //   }
         //});
 
-        noteTypeSpinner = (Spinner) parent.findViewById(R.id.note_type_spinner);
-        noteTypeTextView = (TextView) parent.findViewById(R.id.note_type_read_text);
-        authorView = (EditText) parent.findViewById(R.id.text_author);
+        noteTypeSpinner = parent.findViewById(R.id.note_type_spinner);
+        noteTypeTextView = parent.findViewById(R.id.note_type_read_text);
+        authorView = parent.findViewById(R.id.text_author);
         authorView.setInputType(InputType.TYPE_NULL);
         authorView.setFocusable(false);
-        creationDateView = (EditText) parent.findViewById(R.id.text_creation_date);
+        creationDateView = parent.findViewById(R.id.text_creation_date);
         creationDateView.setInputType(InputType.TYPE_NULL);
         creationDateView.setFocusable(false);
-        stickyFlagView = (CheckBox) parent.findViewById(R.id.sticky_flag);
-        stickyDateView = (EditText) parent.findViewById(R.id.sticky_date);
-        contentView = (EditText) parent.findViewById(R.id.note_content);
-        responseView = (EditText) parent.findViewById(R.id.note_response);
-        cancelButton = (Button) parent.findViewById(R.id.cancel_button);
-        saveButton = (Button) parent.findViewById(R.id.save_button);
+        stickyFlagView = parent.findViewById(R.id.sticky_flag);
+        stickyDateView = parent.findViewById(R.id.sticky_date);
+        contentView = parent.findViewById(R.id.note_content);
+        responseView = parent.findViewById(R.id.note_response);
+        cancelButton = parent.findViewById(R.id.cancel_button);
+        saveButton = parent.findViewById(R.id.save_button);
     }
 
     @Override
@@ -274,7 +276,7 @@ public class EditNote extends Fragment {
                     @Override
                     public void onClick(View view) {
                         if (shareText.length() > 0) {
-                            ((ListActivity) getActivity()).finish();
+                            getActivity().finish();
                         } else {
                             FragmentManager fragmentManager = getFragmentManager();
                             fragmentManager.popBackStack();
@@ -289,8 +291,13 @@ public class EditNote extends Fragment {
                         if (validate()) {
                             editDocument.save(true, author);
                             if (shareText.length() > 0) {
-                                ((ListActivity) getActivity()).finish();
+                                getActivity().finish();
                             } else {
+                                // Build 160 - Added for completeness. Code was working
+                                // before but by accident because belt and braces check in
+                                // ListClientDocumentsFragment.onResume() tests for unsaved document
+                                // Cancel so no need to update list of documents
+                                ((ListActivity) getActivity()).setMode(Document.Mode.READ);
                                 FragmentManager fragmentManager = getFragmentManager();
                                 fragmentManager.popBackStack();
                             }
@@ -633,15 +640,15 @@ public class EditNote extends Fragment {
 
     private void doCancelBox() {
         if (editDocument.getCancelledFlag()) {
-            LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
+            LinearLayout cancelBoxView = parent.findViewById(R.id.cancel_box_layout);
             cancelBoxView.setVisibility(View.VISIBLE);
-            TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
+            TextView cancelBy = parent.findViewById(R.id.cancel_by);
             String byText = "by ";
             User cancelUser = localDB.getUser(editDocument.getCancelledByID());
             byText += cancelUser.getFullName() + " on ";
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
-            TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
+            TextView cancelReason = parent.findViewById(R.id.cancel_reason);
             cancelReason.setText(String.format("Reason: %s", editDocument.getCancellationReason()));
         }
     }
@@ -805,9 +812,19 @@ public class EditNote extends Fragment {
         newNote.setSummary(String.format("%s - %s ",
                 author.getFullName(),
                 lines[0]));
+        // Build 158 - The code to link response information to the parent has becomme too slow
+        // in ListClientDocumentFragment.LoadDocuments(). So do what we can here!
+        newNote.setStickyFlag(editDocument.isStickyFlag());
+        newNote.setStickyDate(editDocument.getStickyDate());
+        newNote.setInitialNote(editDocument);
         localDB.save(newNote, true, User.getCurrentUser());
         NoteType responseNoteType = new NoteType(NoteType.responseNoteTypeID);
         newNote.setNoteType(responseNoteType);
+
+        // Build 158 - This is a special case because a new document has been created during
+        // an edit, so ListActivity settings must be changed
+        ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
+        ((ListActivity) getActivity()).setDocument(newNote);
         return true;
     }
 

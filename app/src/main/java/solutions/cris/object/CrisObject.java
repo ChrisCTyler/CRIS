@@ -56,6 +56,10 @@ public abstract class CrisObject implements Serializable{
     // Build 139 -Added KPIs (public because CRISKPIItem declared in Utils not Object
     public static final long SVUID_CRIS_KPI_ITEM = 1234502501L;
     static final long SVUID_RAW_DOCUMENT = 1234502601L;
+    // Build 179 - MACA and PANOC
+    static final long SVUID_MACA_YC18 = 1234502701L;
+    static final long SVUID_PANOC_YC20 = 1234502801L;
+
 
     private static final long serialVersionUID = SVUID_CRIS_OBJECT;
 
@@ -69,7 +73,8 @@ public abstract class CrisObject implements Serializable{
 
     // This is a special case to enable the Unknown/FirstTime to be instantiated
     public CrisObject(UUID userID) {
-        if (userID != User.firstTimeUser && userID != User.unknownUser) {
+        if (userID != User.firstTimeUser && userID != User.unknownUser &&
+                userID != User.theClientUser) {
             throw new CRISException("Attempt to instatiate User with Invalid UUID");
         }
         else {

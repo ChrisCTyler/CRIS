@@ -168,6 +168,7 @@ public class MyWeek extends Status implements Serializable {
         fNames.add("School/Col.");
         fNames.add("Friendship");
         fNames.add("Home");
+        fNames.add("CreatedBy");
         return fNames;
     }
 
@@ -273,11 +274,14 @@ public class MyWeek extends Status implements Serializable {
         row.add(schoolScore);
         row.add(friendshipScore);
         row.add(homeScore);
-
+        User createdBy = localDB.getUser(getCreatedByID());
+        row.add(createdBy.getFullName());
         return row;
 
     }
 
+    // Build 171 Tidy up
+    /*
     private String getItemValue(ListItem item){
         if (item == null){
             return "Unknown";
@@ -285,4 +289,6 @@ public class MyWeek extends Status implements Serializable {
             return item.getItemValue();
         }
     }
+
+     */
 }

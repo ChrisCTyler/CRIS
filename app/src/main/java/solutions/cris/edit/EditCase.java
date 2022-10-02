@@ -150,11 +150,11 @@ public class EditCase extends Fragment {
         fab.setVisibility(View.GONE);
 
         // Clear the footer
-        TextView footer = (TextView) getActivity().findViewById(R.id.footer);
+        TextView footer = getActivity().findViewById(R.id.footer);
         footer.setText("");
 
         // Set up the hint text
-        hintTextView = (TextView) getActivity().findViewById(R.id.hint_text);
+        hintTextView = getActivity().findViewById(R.id.hint_text);
         hintTextView.setText(getHintText());
         // Restore value of hintDisplayed (Set to opposite, toggle to come
         if (savedInstanceState != null) {
@@ -176,60 +176,60 @@ public class EditCase extends Fragment {
 
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
-            LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
+            LinearLayout cancelBoxView = parent.findViewById(R.id.cancel_box_layout);
             cancelBoxView.setVisibility(View.VISIBLE);
-            TextView cancelBy = (TextView) parent.findViewById(R.id.cancel_by);
+            TextView cancelBy = parent.findViewById(R.id.cancel_by);
             String byText = "by ";
             User cancelUser = localDB.getUser(editDocument.getCancelledByID());
             byText += cancelUser.getFullName() + " on ";
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
-            TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
+            TextView cancelReason = parent.findViewById(R.id.cancel_reason);
             cancelReason.setText(String.format("Reason: %s", editDocument.getCancellationReason()));
         }
 
-        caseTypeSpinner = (Spinner) parent.findViewById(R.id.case_type_spinner);
-        referenceDateView = (EditText) parent.findViewById(R.id.reference_date);
-        clientRedIcon = (ImageView) parent.findViewById(R.id.client_red_icon);
-        clientAmberIcon = (ImageView) parent.findViewById(R.id.client_amber_icon);
-        clientGreenIcon = (ImageView) parent.findViewById(R.id.client_green_icon);
-        caseSummaryView = (EditText) parent.findViewById(R.id.case_summary);
-        overdueThresholdView = (EditText) parent.findViewById(R.id.overdue_threshold);
-        tierSpinner = (Spinner) parent.findViewById(R.id.tier_spinner);
-        groupSpinner = (Spinner) parent.findViewById(R.id.group_spinner);
+        caseTypeSpinner = parent.findViewById(R.id.case_type_spinner);
+        referenceDateView = parent.findViewById(R.id.reference_date);
+        clientRedIcon = parent.findViewById(R.id.client_red_icon);
+        clientAmberIcon = parent.findViewById(R.id.client_amber_icon);
+        clientGreenIcon = parent.findViewById(R.id.client_green_icon);
+        caseSummaryView = parent.findViewById(R.id.case_summary);
+        overdueThresholdView = parent.findViewById(R.id.overdue_threshold);
+        tierSpinner = parent.findViewById(R.id.tier_spinner);
+        groupSpinner = parent.findViewById(R.id.group_spinner);
         // Build 139 - Second Group
-        group2Spinner = (Spinner) parent.findViewById(R.id.group2_spinner);
-        keyworkerSpinner = (Spinner) parent.findViewById(R.id.keyworker_spinner);
-        coworker1Spinner = (Spinner) parent.findViewById(R.id.coworker1_spinner);
-        coworker2Spinner = (Spinner) parent.findViewById(R.id.coworker2_spinner);
-        commissionerSpinner = (Spinner) parent.findViewById(R.id.comissioner_spinner);
-        transportRequiredSpinner = (Spinner) parent.findViewById(R.id.transport_required_spinner);
-        specialInstructionsView = (EditText) parent.findViewById(R.id.specialInstructions);
+        group2Spinner = parent.findViewById(R.id.group2_spinner);
+        keyworkerSpinner = parent.findViewById(R.id.keyworker_spinner);
+        coworker1Spinner = parent.findViewById(R.id.coworker1_spinner);
+        coworker2Spinner = parent.findViewById(R.id.coworker2_spinner);
+        commissionerSpinner = parent.findViewById(R.id.comissioner_spinner);
+        transportRequiredSpinner = parent.findViewById(R.id.transport_required_spinner);
+        specialInstructionsView = parent.findViewById(R.id.specialInstructions);
         // Build 105
-        photographyConsentCheckbox = (CheckBox) parent.findViewById(R.id.photography_consent_flag);
-        doNotInviteCheckbox = (CheckBox) parent.findViewById(R.id.do_not_invite_flag);
+        photographyConsentCheckbox = parent.findViewById(R.id.photography_consent_flag);
+        doNotInviteCheckbox = parent.findViewById(R.id.do_not_invite_flag);
         // Build 139 - Second Group
-        doNotInvite2Checkbox = (CheckBox) parent.findViewById(R.id.do_not_invite2_flag);
+        doNotInvite2Checkbox = parent.findViewById(R.id.do_not_invite2_flag);
 
         // Set the 'local' labels
         final LocalSettings localSettings = LocalSettings.getInstance(getActivity());
-        TextView tierLabel = (TextView) parent.findViewById(R.id.tier_label_text);
+        TextView tierLabel = parent.findViewById(R.id.tier_label_text);
         tierLabel.setText(localSettings.Tier);
-        TextView groupLabel = (TextView) parent.findViewById(R.id.group_label_text);
+        TextView groupLabel = parent.findViewById(R.id.group_label_text);
         groupLabel.setText(localSettings.Group);
         // Build 139 - Second Group
-        TextView group2Label = (TextView) parent.findViewById(R.id.group2_label_text);
+        TextView group2Label = parent.findViewById(R.id.group2_label_text);
         group2Label.setText(localSettings.Group + "2");
-        TextView keyworkerLabel = (TextView) parent.findViewById(R.id.keyworker_label_text);
+        TextView keyworkerLabel = parent.findViewById(R.id.keyworker_label_text);
         keyworkerLabel.setText(localSettings.Keyworker);
-        TextView coworker1Label = (TextView) parent.findViewById(R.id.coworker1_label_text);
+        TextView coworker1Label = parent.findViewById(R.id.coworker1_label_text);
         coworker1Label.setText(localSettings.Coworker1);
-        TextView coworker2Label = (TextView) parent.findViewById(R.id.coworker2_label_text);
+        TextView coworker2Label = parent.findViewById(R.id.coworker2_label_text);
         coworker2Label.setText(localSettings.Coworker2);
-        final TextView commissionerLabel = (TextView) parent.findViewById(R.id.commissioner_label_text);
+        final TextView commissionerLabel = parent.findViewById(R.id.commissioner_label_text);
         commissionerLabel.setText(localSettings.Commisioner);
         // Build 105
-        TextView photographyConsentLabel = (TextView) parent.findViewById(R.id.photography_consent_label_text);
+        TextView photographyConsentLabel = parent.findViewById(R.id.photography_consent_label_text);
 
         // Initialise the status icons
         clientRedIcon.setOnClickListener(new View.OnClickListener() {
@@ -387,7 +387,7 @@ public class EditCase extends Fragment {
         transportRequiredSpinner.setAdapter(transportRequiredAdapter);
 
         // Cancel Button
-        Button cancelButton = (Button) parent.findViewById(R.id.cancel_button);
+        Button cancelButton = parent.findViewById(R.id.cancel_button);
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -398,7 +398,7 @@ public class EditCase extends Fragment {
             }
         });
         // Save Button
-        Button saveButton = (Button) parent.findViewById(R.id.save_button);
+        Button saveButton = parent.findViewById(R.id.save_button);
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -676,7 +676,10 @@ public class EditCase extends Fragment {
                 }
             } else {
                 // Edit Mode
-                caseTypeSpinner.setSelection(caseTypeAdapter.getPosition(editDocument.getCaseType()));
+                // Build 171 - Handle unexpected null ListItem ID
+                if (!editDocument.getCaseType().equals("Unknown")) {
+                    caseTypeSpinner.setSelection(caseTypeAdapter.getPosition(editDocument.getCaseType()));
+                }
                 referenceDateView.setText(sDate.format(editDocument.getReferenceDate()));
                 caseSummaryView.setText((editDocument.getCaseSummary()));
                 photographyConsentCheckbox.setChecked(editDocument.isPhotographyConsentFlag());

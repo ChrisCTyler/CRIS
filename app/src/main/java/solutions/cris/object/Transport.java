@@ -69,9 +69,15 @@ public class Transport extends Document implements Serializable {
     }
     public void setTransportOrganisationID(UUID transportOrganisationID) {this.transportOrganisationID = transportOrganisationID;}
     public TransportOrganisation getTransportOrganisation() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (transportOrganisationID != null && transportOrganisation == null) {
             LocalDB localDB = LocalDB.getInstance();
             transportOrganisation = localDB.getListItem(transportOrganisationID);
+        }
+        if (transportOrganisation == null) {
+            // Build 176 Transport_Organisation is a complex list item
+            //transportOrganisation = new ListItem(User.getCurrentUser(),ListType.TRANSPORT_ORGANISATION,"Unknown",0);
+            transportOrganisation = new TransportOrganisation(User.getCurrentUser(), "Unknown", 0);
         }
         return (TransportOrganisation) transportOrganisation;
     }
@@ -440,7 +446,9 @@ public class Transport extends Document implements Serializable {
         // Build 139 - Add Year Group to Export
         row.add(client.getYearGroup());
         row.add(client.getPostcode());
-        row.add(getItemValue(getTransportOrganisation()));
+        // Build 171 Tidy up
+        //row.add(getItemValue(getTransportOrganisation()));
+        row.add(getTransportOrganisation().getItemValue());
         if (isBooked()){
             row.add("True");
         } else {
@@ -487,6 +495,8 @@ public class Transport extends Document implements Serializable {
 
     }
 
+    // Build 171 Tidy up
+    /*
     private String getItemValue(ListItem item){
         if (item == null){
             return "Unknown";
@@ -494,6 +504,8 @@ public class Transport extends Document implements Serializable {
             return item.getItemValue();
         }
     }
+
+     */
 
     private static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();

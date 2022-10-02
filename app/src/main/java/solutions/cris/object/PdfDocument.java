@@ -72,11 +72,16 @@ public class PdfDocument extends Document implements Serializable {
     // PdfType
     private ListItem pdfType;
     public ListItem getPdfType() {
+        // Build 171 - Handle the unexpected null ListItemID case
         if (pdfTypeID != null && pdfType == null) {
             LocalDB localDB = LocalDB.getInstance();
             pdfType = localDB.getListItem(pdfTypeID);
         }
+        if (pdfType == null) {
+            pdfType = new ListItem(User.getCurrentUser(), ListType.CLIENT_PDF_TYPE, "Unknown", 0);
+        }
         return pdfType;}
+
     public void setPdfType(ListItem pdfType) {this.pdfType = pdfType;}
 
     //BlobID
@@ -347,12 +352,16 @@ public class PdfDocument extends Document implements Serializable {
         } else {
             row.add("");
         }
-        row.add(getItemValue(getPdfType()));
+        // Build 171 Tidy up
+        //row.add(getItemValue(getPdfType()));
+        row.add(getPdfType().getItemValue());
         row.add(getSummary());
         return row;
 
     }
 
+    // Build 171 - Tidy up
+    /*
     private String getItemValue(ListItem item){
         if (item == null){
             return "Unknown";
@@ -360,6 +369,8 @@ public class PdfDocument extends Document implements Serializable {
             return item.getItemValue();
         }
     }
+
+     */
 
     public static List<List<Object>> getPdfDocumentData(ArrayList<Document> documents, ArrayList<Client> adapterList) {
         List<List<Object>> content = new ArrayList<>();

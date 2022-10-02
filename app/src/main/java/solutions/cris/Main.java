@@ -74,6 +74,7 @@ import solutions.cris.list.ListLibrary;
 import solutions.cris.list.ListSessions;
 import solutions.cris.list.ListSyncActivity;
 import solutions.cris.list.ListSysAdmin;
+import solutions.cris.list.ListUnreadDocuments;
 import solutions.cris.list.ListUsers;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
@@ -94,6 +95,7 @@ import solutions.cris.read.ReadClientHeader;
 import solutions.cris.sync.SyncManager;
 //import solutions.cris.utils.CRISDeviceAdmin;
 import solutions.cris.sync.WebConnection;
+import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISKPIItem;
 import solutions.cris.utils.CRISMenuItem;
 import solutions.cris.utils.CRISUtil;
@@ -138,6 +140,12 @@ public class Main extends CRISActivity {
     private SyncManager syncManager;
     // Build 116 22 May 2019 Add handler for incoming text via share
     private String shareText;
+    // build 179
+    boolean inProgress = false;
+    // Build 181
+    private Date startTime;
+    private ListView listView;
+    private boolean doCheckUpgrade;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -159,6 +167,15 @@ public class Main extends CRISActivity {
         setContentView(R.layout.activity_list);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        // Build 181
+        doCheckUpgrade = true;
+        // Initialise the main menu. Firstly setup the List view listeners
+        listView = findViewById(R.id.list_view);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                doListClick(view, position);
+            }
+        });
 
         // Create new static instance of Sync Manager
         syncManager = SyncManager.getSyncManager(this);
@@ -174,8 +191,18 @@ public class Main extends CRISActivity {
     protected void onResume() {
         super.onResume();
 
+        long diagElapsed = -1;
+
+        // Build 181
+        startTime = new Date();
+        // Create the /CRIS directory if necessary
+        checkCRISDirectoryExists();
+
         // Build 150 - Added Notification Channel
         createNotificationChannel();
+
+        // Initialise the list of Static Menu Items
+        menuItems = new ArrayList<>();
 
         // If we are not logged in, this call will return null
         currentUser = User.getCurrentUser();
@@ -192,8 +219,24 @@ public class Main extends CRISActivity {
             localDB = LocalDB.getInstance();
             // Okay to check for database upgrade here because AESEncryption has been initialised
             // This will create and new PickList entries
-            localDB.checkDBUpgrade(currentUser);
+            // Build 178 - On upgrade to version 28, run the fixListItem code
+            // Note: checkDBUpgrade now returns the current version if an upgrade occurred
+            //localDB.checkDBUpgrade(currentUser);
 
+            // Build 181
+            if (doCheckUpgrade) {
+                doCheckUpgrade = false;
+                int version = localDB.checkDBUpgrade(currentUser);
+                // Build 179 - Remove so that this is not run every time
+                //if (version == 28) {
+                //    new FixItemListIdentifiers().execute();
+                //}
+                Date diagTime = new Date();
+                diagElapsed = (diagTime.getTime() - startTime.getTime()) / 100;
+            }
+            // Build 181
+            //Date diagTime = new Date();
+            //long diagElapsed = (diagTime.getTime() - startTime.getTime()) / 1000;
             // Check for password expiry as long as successful sync has occurred
             boolean passwordExpired = false;
             if ((currentUser.getRoleID() != Role.noPrivilegeID) &&
@@ -223,21 +266,14 @@ public class Main extends CRISActivity {
                     }
                     finish();
                 } else {
-                    // Initialise the main menu. Firstly setup the List view listeners
-                    ListView listView = findViewById(R.id.list_view);
-                    listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                            doListClick(view, position);
-                        }
-                    });
-                    listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-                        @Override
-                        public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                            return doListLongClick(view);
-                        }
-                    });
-                    // Initialise the list of Static Menu Items
-                    menuItems = new ArrayList<>();
+                    // Build 181 - Moved View Sync History to menu
+                    //listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+                    //    @Override
+                    //    public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                    //        return doListLongClick(view);
+                    //    }
+                    //});
+
                     menuItems.add(0, getSyncMenuItem());
                     // Build 138 - Add partial Initialisation - Check if still initialising
                     SyncActivity syncActivity = localDB.getLatestSyncActivity(currentUser);
@@ -247,6 +283,7 @@ public class Main extends CRISActivity {
                             // If the database is being initialised from the web the current user's role will
                             // be NoPriv in which case don't offer any menu items
                             if (currentUser.getRoleID() != Role.noPrivilegeID) {
+                                menuItems.add(new CRISMenuItem("My Unread Documents", "", R.drawable.ic_star_red, null));
                                 menuItems.add(new CRISMenuItem("My Clients", "", R.drawable.ic_group_red, null));
                                 menuItems.add(new CRISMenuItem("My Sessions", "", R.drawable.ic_sessions, null));
                                 menuItems.add(new CRISMenuItem("All Clients", "", R.drawable.ic_group_green, null));
@@ -258,27 +295,33 @@ public class Main extends CRISActivity {
                                 if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_SYSTEM_ADMINISTRATOR)) {
                                     menuItems.add(new CRISMenuItem("System Administration", "", R.drawable.ic_system_administration, null));
                                 }
-                                // Build 110 - Updated copyright date
-                                //menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2016, cris.solutions", BuildConfig.VERSION_NAME), "",
-                                menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2018, cris.solutions", BuildConfig.VERSION_NAME), "",
-                                        R.drawable.ic_cris_grey, null));
+                                // Build 158 - Moved GetUnreadDocuments to seperate list because it has become too slow
+                                // to run here
                                 // Load the unread documents
-                                getUnreadDocuments();
+                                // getUnreadDocuments();
+
                             }
                         }
                     }
-
-                    Collections.sort(menuItems, CRISMenuItem.comparatorAZ);
-                    // Create the Main menu
-                    adapter = new MainMenuAdapter(this, menuItems);
-                    // Display in the List View
-                    listView.setAdapter(adapter);
-
-                    // Create the /CRIS directory if necessary
-                    checkCRISDirectoryExists();
                 }
             }
         }
+
+        Date endTime = new Date();
+        long elapsed = (endTime.getTime() - startTime.getTime()) / 100;
+        // Build 110 - Updated copyright date
+        //menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2016, cris.solutions", BuildConfig.VERSION_NAME), "",
+        //menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2022, cris.solutions (%d-%d secs)",BuildConfig.VERSION_NAME,diagElapsed,elapsed),
+        //        "", R.drawable.ic_cris_grey, null));
+        menuItems.add(new CRISMenuItem(String.format("CRIS v%s, \u00A9 2022, cris.solutions", BuildConfig.VERSION_NAME),
+                "", R.drawable.ic_cris_grey, null));
+        // Display the menu
+        Collections.sort(menuItems, CRISMenuItem.comparatorAZ);
+        // Create the Main menu
+        adapter = new MainMenuAdapter(this, menuItems);
+        // Display in the List View
+        listView.setAdapter(adapter);
+
     }
 
     private void createNotificationChannel() {
@@ -303,6 +346,10 @@ public class Main extends CRISActivity {
         switch (title) {
             case "Sync":
                 manualSync();
+                break;
+            case "My Unread Documents":
+                intent = new Intent(view.getContext(), ListUnreadDocuments.class);
+                startActivity(intent);
                 break;
             case "My Clients":
                 if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_ACCESS_MY_CLIENTS)) {
@@ -346,12 +393,14 @@ public class Main extends CRISActivity {
                 startActivity(intent);
                 break;
             default:
-                if (!title.startsWith("CRIS")) {
-                    doReadDocument(position);
-                }
+                // Build 158 Unread Documents removed
+                //if (!title.startsWith("CRIS")) {
+                //    doReadDocument(position);
+                //}
         }
     }
 
+    // Build 181 - Moved to menu option to avoid accidental manual sync when trying to select
     private boolean doListLongClick(View view) {
         String title = ((CRISMenuItem) view.getTag()).getTitle();
         switch (title) {
@@ -383,13 +432,30 @@ public class Main extends CRISActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
+            // Build 181 Resync Options
+            case R.id.action_view_sync_history:
+                Intent intent = new Intent(this, ListSyncActivity.class);
+                startActivity(intent);
+                return true;
+
+            case R.id.action_resync_30:
+                manualReSync(30);
+                return true;
+
+            case R.id.action_resync_60:
+                manualReSync(60);
+                return true;
+
+            case R.id.action_resync_90:
+                manualReSync(90);
+                return true;
 
             case R.id.show_changes:
                 showChanges();
                 return true;
 
             case R.id.action_change_password:
-                Intent intent = new Intent(this, ChangePassword.class);
+                intent = new Intent(this, ChangePassword.class);
                 intent.putExtra(Main.EXTRA_PASSWORD_EXPIRED, false);
                 startActivity(intent);
                 return true;
@@ -404,6 +470,19 @@ public class Main extends CRISActivity {
                 }
                 return true;
 
+            // Build 178 - Run automatically on upgrade
+            // Build 179 restore to menu option
+            case R.id.fix_listitems:
+                if (inProgress) {
+                    inProgressMessage();
+                } else {
+                    inProgress = true;
+                    // Carry out the process in the background
+                    new FixItemListIdentifiers().execute();
+                }
+                return true;
+
+
             // Not used, kept for future testing/debugging
             //case MENU_SYNC_WEBSITE_MYWEEKS:
             //    // Load the data in the background
@@ -416,6 +495,7 @@ public class Main extends CRISActivity {
                 return super.onOptionsItemSelected(item);
         }
     }
+
 
     // Not used, kept for future testing/debugging
     /*
@@ -487,10 +567,62 @@ public class Main extends CRISActivity {
                 .show();
     }
 
+    private void inProgressMessage() {
+        new AlertDialog.Builder(this)
+                .setTitle("In Progress")
+                .setMessage("The process is still in progress, please wait.")
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
+    }
+
     private void showChanges() {
 
-        String changes = "Modified Session export to include full address\n\n" +
+        String changes = "Client Address, Contact Number and Email made non-mandatory\n\n" +
                 "--------------- Older Changes ---------------\n\n" +
+                "Addition of MACA-YC18 assessment and associated export\n\n" +
+                "Optimised search mechanism in Session Register when adding/removing clients.\n\n" +
+                "Corrected view issue with search icon in Session Register\n\n" +
+                "Fixed crash following re-display of sessions after creation of new session\n\n" +
+                "Added Special Educational Needs and Disabilities (SEND) field to the " +
+                "School Contact document to replace the outdated SENCO relationship. \n\n" +
+                "Modified export functionality to use the new SEND flag to indicate Special Needs\n\n" +
+                "Added a menu option to allow re-sync of all records from last 30/60/90 " +
+                "days. This can be used to reload documents which are found to be missing due to " +
+                "Internet dropouts. The process can take a significant time to run (especially " +
+                "the 60/90 options) so should only be run in a good wireless environment. \n\n" +
+                "Optimised the loading of Session registers. Load time should now be negligible " +
+                "even in the case of large groups.\n\n" +
+                "Added Free School Meals (FSM) field to the School Contact document. New cases " +
+                "will default to 'true' but existing records will need to be set by editing " +
+                "the most recent School Contact document.\n\n" +
+                "Added the following fields to Session Register export: Email, Commissioner, " +
+                "Current School, FSM flag and SEND flag.\n\n" +
+                "Moved the facility to Show Sync History to main menu from double click of " +
+                "SYNC option to prevent accidental manual syncs.\n\n" +
+
+                "Modified System Error view to ignore errors caused by poor internet connections.\n\n" +
+                "Added main menu option - Fix ListItems - to correct errors caused by historical bug in synchronisation of lists. " +
+                "This option should be run if any list item (gender, ethnicity, tier, group, school etc.) is 'unknown'.\n\n" +
+                "Fixed bug in Client Session View\n\n" +
+                "Modified sync facility to handle duplicate records\n\n" +
+                "Modified School and Agency Search to optimise search time and fix potential crash.\n\n" +
+                "Fixed problem with resolution of edit clashes which caused documents to fail to download following sync.\n\n" +
+                "Fixed crash when cancelling the creation of a new document\n\n" +
+                "Further optimisation of All Clients/My Clients load\n\n" +
+                "Fixed response document display issues in clients' notes\n\n" +
+                "Moved load timing statistics to footer to enable them to display correctly on smartphones\n\n" +
+                "Show Unread Documents moved to separate menu option to improve speed\n\n" +
+                "Load of All/My Clients modified to improve speed\n\n" +
+                "Load of individual client modified to improve speed\n\n" +
+                "Save process for edit//creation of new documents modified to improve speed\n\n" +
+                "Case Start Date format fixed on Clent Export\n\n" +
+                "Modified Session export to include telephone number\n\n" +
+                "Added KPI for Total Session Attendance\n\n" +
+                "Modified Session export to include full address\n\n" +
                 "Fixed bug where setting session time to 12:00 to 12:59 saved the session as 00:00 to 00:59.\n\n" +
                 "Disabled the hashtag functionality in Notes\n\n" +
                 "Enabled Broadcast Text from Client List\n\n" +
@@ -511,7 +643,7 @@ public class Main extends CRISActivity {
                 "Default 'create note' in Session Register Send MyWeek Link to Yes\n\n" +
                 "Add Created By to My Week export to enable MyWeeks created by 'The Client' to be recognised\n\n" +
                 "Fixed bug causing intermittant crashes with database constraint errors\n\n" +
-                "Added facility to complete MyWeek from link to website. Links may "+
+                "Added facility to complete MyWeek from link to website. Links may " +
                 "be sent by text or email from the Session Register or from an individual " +
                 "client using the 'Send MyWeek Link' menu option. Once the MyWeek is " +
                 "completed it is downloaded by the next sync and added to the client's records.\n\n" +
@@ -605,6 +737,7 @@ public class Main extends CRISActivity {
                 .show();
     }
 
+    /*
     private void doReadDocument(int position) {
         CRISMenuItem menuItem = menuItems.get(position);
         Document document = menuItem.getDocumentList().get(0);
@@ -620,6 +753,8 @@ public class Main extends CRISActivity {
         }
     }
 
+    */
+/*
     private void getUnreadDocuments() {
         // Remove existing non-static menu items
         for (int i = 0; i < menuItems.size(); i++) {
@@ -698,6 +833,8 @@ public class Main extends CRISActivity {
         }
     }
 
+ */
+
     private void doLogout() {
         // Logout
         User.setCurrentUser(null);
@@ -766,7 +903,7 @@ public class Main extends CRISActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         switch (requestCode) {
             case REQUEST_PERMISSION_WRITE_EXTERNAL_STORAGE: {
                 // If request is cancelled, the result arrays are empty.
@@ -825,6 +962,27 @@ public class Main extends CRISActivity {
 
     }
 
+    // Build 181 Resync Options
+    public void manualReSync(long days) {
+        if (isConnected()) {
+            // Set Icon(0) will display the 'spinner'
+            menuItems.get(0).setIcon(0);
+            adapter.notifyDataSetChanged();
+            // Request the sync on the Sync Adapter thread. Completion broadcasts the status which
+            // is picked up below in the SyncReceiver
+            // Convert the days into a date in the past (in millisecond format)
+            Date timeNow = new Date();
+            long checkDate = timeNow.getTime() - (days * 24 * 60 * 60 * 1000);
+            syncManager.requestReSync(checkDate);
+        } else {
+            CRISMenuItem syncItem = menuItems.get(0);
+            syncItem.setSummary("Manual sync failed, no Internet connection found");
+            syncItem.setIcon(R.drawable.ic_sync_activity_red);
+            syncItem.setDisplayDate(null);
+            adapter.notifyDataSetChanged();
+        }
+
+    }
     private CRISMenuItem getSyncMenuItem() {
 
         String summary = "Initialising...";
@@ -859,6 +1017,12 @@ public class Main extends CRISActivity {
                         icon = R.drawable.ic_sync_activity_red;
                         syncManager.requestManualSync();
                         break;
+                    case "PARTIAL_RECHECK":
+                        summary = syncActivity.getSummary();
+                        icon = R.drawable.ic_sync_activity_red;
+                        // Build 181 - requestReSync already called in SyncReceiver
+                        //syncManager.requestReSync();
+                        break;
                     default:
                         summary = "Initialising: " + status;
                         syncManager.requestManualSync();
@@ -866,6 +1030,86 @@ public class Main extends CRISActivity {
             }
         }
         return new CRISMenuItem("Sync", summary, icon, menuDate);
+    }
+
+    /**
+     * Build 179 Routine to fix spurious ListItem IDs caused by bug in SyncAdapter
+     */
+    private class FixItemListIdentifiers extends AsyncTask<Void, Integer, String> {
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+            User currentUser = User.getCurrentUser();
+            int changes = 0;
+            String output = "";
+            // Get the ListItems in ListType, ItemValue, CreationDate order
+            ArrayList<ListItem> listItems = new ArrayList<>();
+            listItems = localDB.getAllListItemsByValue();
+            String previousListType = "Initiating...";
+            String previousItemValue = "Initiating...";
+            UUID previousListItemID = null;
+            for (ListItem listItem : listItems) {
+                // Check for new ListItem
+                if (!listItem.getListType().toString().equals(previousListType) ||
+                        !listItem.getItemValue().equals(previousItemValue)) {
+                    // Reset the previous values
+                    previousListType = listItem.getListType().toString();
+                    previousItemValue = listItem.getItemValue();
+                    // In most cases, the earliest value is the one to propagate. However, there are a few cases
+                    // where the earliest value is incorrect
+                    if (previousListType.equals("GROUP") && previousItemValue.equals("Test Group 1")) {
+                        previousListItemID = UUID.fromString("508ad0cc-949d-472a-94ad-dab51d899c08");
+
+                    } else if (previousListType.equals("GROUP") && previousItemValue.equals("Test Group 2")) {
+                        previousListItemID = UUID.fromString("c8deab65-656f-47ba-9d56-a213d8774439");
+
+                    } else if (previousListType.equals("GROUP") && previousItemValue.equals("Test Group 3")) {
+                        previousListItemID = UUID.fromString("d29d2fa8-efae-40dd-b3da-600ee6e5963f");
+
+                    } else if (previousListType.equals("NOTE_TYPE") && previousItemValue.equals("Caring Role")) {
+                        previousListItemID = UUID.fromString("f615b680-987d-4da9-a89c-fc1ffad037d7");
+
+                    } else {
+                        previousListItemID = listItem.getListItemID();
+                    }
+                }
+
+                // Check that the ListItemID has not changed
+                if (!listItem.getListItemID().equals(previousListItemID)) {
+                    // Report the change (ListItem value and current ListItemID
+                    output += String.format("%s %s\n", listItem.getListType().toString(), listItem.getItemValue());
+                    output += String.format("%s\n", listItem.getListItemID().toString());
+                    // Reset the ListItemID
+                    listItem.setListItemID(previousListItemID);
+                    localDB.listItemUpdate(listItem, currentUser);
+                    // Report the change, new ListItemID
+                    changes++;
+                    output += String.format("->%s\n", previousListItemID.toString());
+                }
+
+            }
+            output += String.format("Number of Changes: %d\n", changes);
+            return output;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+        }
+
+        @Override
+        protected void onPostExecute(String output) {
+            inProgress = false;
+            // Runs on UI Thread
+            Intent intent = new Intent(getBaseContext(), AlertAndContinue.class);
+            intent.putExtra("title", String.format("Build 179 - Fix ListItem Identifiers"));
+            output = "A previous bug accidentally modified some of the list items (gender, tier etc.) " +
+                    "The following changes fix any problems in the local database.\n\n" +
+                    output;
+            intent.putExtra("message", output);
+            startActivity(intent);
+        }
     }
 
     private class MainMenuAdapter extends ArrayAdapter<CRISMenuItem> {
@@ -882,17 +1126,17 @@ public class Main extends CRISActivity {
                 convertView = getLayoutInflater().inflate(R.layout.layout_list_item, parent, false);
             }
 
-            ImageView viewItemIcon = (ImageView) convertView.findViewById(R.id.item_icon);
-            TextView viewItemDate = (TextView) convertView.findViewById(R.id.item_date);
-            TextView viewItemMainText = (TextView) convertView.findViewById(R.id.item_main_text);
-            TextView viewItemAdditionalText = (TextView) convertView.findViewById(R.id.item_additional_text);
-            TextView viewItemTitle = (TextView) convertView.findViewById(R.id.item_title);
-            ProgressBar syncProgress = (ProgressBar) convertView.findViewById(R.id.sync_progress);
+            ImageView viewItemIcon = convertView.findViewById(R.id.item_icon);
+            TextView viewItemDate = convertView.findViewById(R.id.item_date);
+            TextView viewItemMainText = convertView.findViewById(R.id.item_main_text);
+            TextView viewItemAdditionalText = convertView.findViewById(R.id.item_additional_text);
+            TextView viewItemTitle = convertView.findViewById(R.id.item_title);
+            ProgressBar syncProgress = convertView.findViewById(R.id.sync_progress);
 
             final CRISMenuItem menuItem = menuItems.get(position);
             String itemTitle = menuItem.getTitle();
             if (menuItem.getDocumentList() != null) {
-                itemTitle += "(1 of " + Integer.toString(menuItem.getDocumentList().size()) + ")";
+                itemTitle += "(1 of " + menuItem.getDocumentList().size() + ")";
             }
             convertView.setTag(menuItem);
 
@@ -1006,7 +1250,9 @@ public class Main extends CRISActivity {
                             // Sync Adapter may be called before login has completed
                             SyncActivity syncActivity = new SyncActivity(unknownUser);
                             syncActivity.setResult("FAILURE");
-                            syncActivity.setSummary("Exception in Sync Adapter");
+                            // Build 181 - Changed exception message
+                            //syncActivity.setSummary("Exception in Sync Adapter");
+                            syncActivity.setSummary("Exception in Sync Adapter, see System Error message");
                             syncActivity.appendLog("Exception - " + exceptionMessage);
                             syncActivity.setCompletionDate(new Date());
                             localDB.save(syncActivity);
@@ -1015,6 +1261,8 @@ public class Main extends CRISActivity {
                             localDB.save(systemError);
                             // No change to current user since we don't know the state of the
                             // database. User has been authenticated so acn, at least, sync again
+                            // Build 181 - Call onResume to display the result an allow the user to re-try
+                            onResume();
                             break;
                         case "PARTIAL":
                             // Build 138 - Add Partial Initialisation
@@ -1023,8 +1271,17 @@ public class Main extends CRISActivity {
                             // Call onResume to display the result an allow the user to see the progress
                             onResume();
                             break;
+                        case "PARTIAL_RECHECK":
+                            // Build 181 - Add Partial RecheckInitialisation
+                            // Initialisation not complete so kick off another sync
+                            long partialRecheckDate = extras.getLong(SyncManager.SYNC_PARTIAL_RECHECK_DATE);
+                            syncManager.requestReSync(partialRecheckDate);
+                            // Call onResume to display the result an allow the user to see the progress
+                            onResume();
+                            break;
+
                         default:
-                            throw new CRISException("Unexpected status return from Sync Adpter: " + status);
+                            throw new CRISException("Unexpected status return from Sync Adapter: " + status);
                     }
 
                 }
