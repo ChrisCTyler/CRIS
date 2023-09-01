@@ -581,8 +581,28 @@ public class Main extends CRISActivity {
 
     private void showChanges() {
 
-        String changes = "Client Address, Contact Number and Email made non-mandatory\n\n" +
-                "--------------- Older Changes ---------------\n\n" +
+        String changes = "Added the ability to select clients by Group, Link Worker etc. to the Session Register, \n\n" +
+                "--- Older Changes ---\n\n" +
+                "Minor mofification to SysAdmin - Link Sticky Notes-\n\n" +
+                "Fixed bug which was preventing the display of the Sticky Flag icon in Session Registers (red flag) " +
+                "showing clients who have a sticky note (such as an allergy warning)\n\n" +
+                "Fixed bug in Batch Invite of groups to sessions which was wrongly inviting non-matching clients\n\n" +
+                "Added functionality fo Plans and Financial Support checkboxes and review " +
+                "to Case form with associated changes to export and additional KPI reports.\n\n" +
+                "Added report of individual document counts\n\n" +
+                "Altered session attendance scores so that only ad-hoc sessions score negatively for DNA\n\n" +
+                "Fixed bug preventing Session save with no invitees selected\n\n" +
+                "Fixed bug in Select Schools which prevented scrolling\n\n" +
+                "Revert Session Register default to Show Uncancelled invitees.\n\n" +
+                "Update date/time in client session if session date/time is changed.\n\n" +
+                "Modify Session Register export to only export MyWeek documents for the session.\n\n" +
+                "Addition of point score for session attendance and associated update of client export\n\n" +
+                "Convert menu 'select' option to multi-choice checkboxes to allow multiple groups, schools etc." +
+                "Add 'Batch Invite' facility for ad-hoc group sessions allowing invite by group, school, keyworker etc.\n\n" +
+                "Optimise export facility and improve progress feedback.\n\n" +
+                "Rebuild for latest Android release Snow Cone (API Level 32)\n\n" +
+                "Extend range of devices supported using AndroidX for Fragment/Dialogs" +
+                "Client Address, Contact Number and Email made non-mandatory\n\n" +
                 "Addition of MACA-YC18 assessment and associated export\n\n" +
                 "Optimised search mechanism in Session Register when adding/removing clients.\n\n" +
                 "Corrected view issue with search icon in Session Register\n\n" +

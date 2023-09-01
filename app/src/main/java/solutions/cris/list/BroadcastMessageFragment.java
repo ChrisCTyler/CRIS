@@ -17,9 +17,11 @@ package solutions.cris.list;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
+import androidx.fragment.app.Fragment;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -39,6 +41,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
+import androidx.fragment.app.FragmentManager;
 
 import android.os.Parcelable;
 import android.telephony.SmsManager;
@@ -76,6 +79,7 @@ import solutions.cris.object.Note;
 import solutions.cris.object.NoteType;
 import solutions.cris.object.Session;
 import solutions.cris.object.User;
+import solutions.cris.utils.CRISExport;
 
 
 public class BroadcastMessageFragment extends Fragment {
@@ -162,8 +166,10 @@ public class BroadcastMessageFragment extends Fragment {
                         sendButton.setEnabled(false);
                         sendEmails();
                     } else {
-                        FragmentManager fragmentManager = getFragmentManager();
-                        fragmentManager.popBackStack();
+                        // Build 200 Use the androidX Fragment class
+                        //FragmentManager fragmentManager = getFragmentManager();
+                        //fragmentManager.popBackStack();
+                        getParentFragmentManager().popBackStack();
                     }
                 }
             }
@@ -598,14 +604,20 @@ public class BroadcastMessageFragment extends Fragment {
                     ((ListActivity) getActivity()).setMode(Document.Mode.READ);
                     ((ListActivity) getActivity()).setDocument(phoneNote);
                     localDB.read(phoneNote, currentUser);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
-                    Fragment fragment;
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new EditNote();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
+                    // Build 200 Use AndroidX fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //FragmentTransaction fragmentTransaction;
+                    //Fragment fragment;
+                    //fragmentTransaction = fragmentManager.beginTransaction();
+                    //fragment = new EditNote();
+                    //fragmentTransaction.replace(R.id.content, fragment);
+                    //fragmentTransaction.addToBackStack(null);
+                    //fragmentTransaction.commit();
+                    getParentFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, EditNote.class, null )
+                            .commit();
                 }
             }
         }

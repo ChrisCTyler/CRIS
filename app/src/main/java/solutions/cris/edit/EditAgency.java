@@ -16,8 +16,6 @@ package solutions.cris.edit;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.database.sqlite.SQLiteConstraintException;
 import android.os.Bundle;
-import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import android.text.TextUtils;
 import android.util.Patterns;
@@ -46,8 +44,6 @@ import solutions.cris.utils.ExceptionHandler;
 public class EditAgency extends CRISActivity {
 
     private Agency editAgency;
-    private LocalDB localDB;
-    private User currentUser;
     private boolean newMode;
 
 
@@ -69,14 +65,17 @@ public class EditAgency extends CRISActivity {
 
         // CurrentUser always exists so if this check fails then exception in child
         // // has rendered system inconsistent so exit and let Main start from scratch()
-        currentUser = User.getCurrentUser();
+        // Build 189 localDB not used
+        //private LocalDB localDB;
+        User currentUser = User.getCurrentUser();
         if (currentUser == null) {
             finish();
         } else {
-            localDB = LocalDB.getInstance();
+            // Build 189 localDB not used
+            //localDB = LocalDB.getInstance();
             setContentView(R.layout.activity_edit_agency);
 
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             // Get the parameter passed with the Intent
             newMode = getIntent().getBooleanExtra(Main.EXTRA_IS_NEW_MODE, false);
             if (newMode) {
@@ -90,32 +89,24 @@ public class EditAgency extends CRISActivity {
             setSupportActionBar(toolbar);
 
             // Set up the form.
-            agencyNameView = (EditText) findViewById(R.id.name);
-            isDisplayed = (CheckBox) findViewById(R.id.is_displayed);
-            isDefault = (CheckBox) findViewById(R.id.is_default);
-            addressView = (EditText) findViewById(R.id.address);
-            postcodeView = (EditText) findViewById(R.id.postcode);
-            contactNumberView = (EditText) findViewById(R.id.contact_number);
-            emailView = (EditText) findViewById(R.id.email);
-            additionalInformationView = (EditText) findViewById(R.id.additional_information);
+            agencyNameView = findViewById(R.id.name);
+            isDisplayed = findViewById(R.id.is_displayed);
+            isDefault = findViewById(R.id.is_default);
+            addressView = findViewById(R.id.address);
+            postcodeView = findViewById(R.id.postcode);
+            contactNumberView = findViewById(R.id.contact_number);
+            emailView = findViewById(R.id.email);
+            additionalInformationView = findViewById(R.id.additional_information);
 
             // Cancel Button
-            Button cancelButton = (Button) findViewById(R.id.cancel_button);
-            cancelButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    finish();
-                }
-            });
+            Button cancelButton = findViewById(R.id.cancel_button);
+            cancelButton.setOnClickListener(view -> finish());
             // Save Button
-            Button saveButton = (Button) findViewById(R.id.save_button);
-            saveButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    if (validate()) {
-                        if (save()) {
-                            finish();
-                        }
+            Button saveButton = findViewById(R.id.save_button);
+            saveButton.setOnClickListener(view -> {
+                if (validate()) {
+                    if (save()) {
+                        finish();
                     }
                 }
             });

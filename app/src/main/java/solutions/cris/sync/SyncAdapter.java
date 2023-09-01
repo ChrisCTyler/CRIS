@@ -30,6 +30,7 @@ import android.content.SharedPreferences;
 import android.content.SyncResult;
 import android.database.Cursor;
 import android.icu.util.DateInterval;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.core.app.NotificationCompat;
@@ -421,8 +422,16 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
             TaskStackBuilder stackBuilder = TaskStackBuilder.create(getContext());
             stackBuilder.addParentStack(Main.class);
             stackBuilder.addNextIntent(resultIntent);
-            PendingIntent resultPendingIntent =
-                    stackBuilder.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT);
+            // Build 230 Crash: Targeting S+ (version 31 and above) requires that one of
+            // FLAG_IMMUTABLE or FLAG_MUTABLE be specified when creating a PendingIntent.
+            PendingIntent resultPendingIntent;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                resultPendingIntent =
+                        stackBuilder.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            } else {
+                resultPendingIntent =
+                        stackBuilder.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT);
+            }
             builder.setContentIntent(resultPendingIntent);
             NotificationManager mNotificationManager =
                     (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);

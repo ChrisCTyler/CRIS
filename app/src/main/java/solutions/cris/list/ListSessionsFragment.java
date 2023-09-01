@@ -1,8 +1,20 @@
 package solutions.cris.list;
+//        CRIS - Client Record Information System
+//        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
+//
+//        This program is free software: you can redistribute it and/or modify
+//        it under the terms of the GNU General Public License as published by
+//        the Free Software Foundation, either version 3 of the License, or
+//        (at your option) any later version.
+//
+//        This program is distributed in the hope that it will be useful,
+//        but WITHOUT ANY WARRANTY; without even the implied warranty of
+//        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//        GNU General Public License for more details.
+//
+//        You should have received a copy of the GNU General Public License
+//        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -20,6 +32,11 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
+import androidx.fragment.app.Fragment;
 
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -52,29 +69,17 @@ import solutions.cris.object.Client;
 import solutions.cris.object.Document;
 import solutions.cris.object.Group;
 import solutions.cris.object.ListItem;
+import solutions.cris.object.ListType;
 import solutions.cris.object.Role;
 import solutions.cris.object.Session;
 import solutions.cris.object.User;
 import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.PickList;
+import solutions.cris.utils.PickListDialogFragment;
 import solutions.cris.utils.SwipeDetector;
 
-//        CRIS - Client Record Information System
-//        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
-//
-//        This program is free software: you can redistribute it and/or modify
-//        it under the terms of the GNU General Public License as published by
-//        the Free Software Foundation, either version 3 of the License, or
-//        (at your option) any later version.
-//
-//        This program is distributed in the hope that it will be useful,
-//        but WITHOUT ANY WARRANTY; without even the implied warranty of
-//        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//        GNU General Public License for more details.
-//
-//        You should have received a copy of the GNU General Public License
-//        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 public class ListSessionsFragment extends Fragment {
 
@@ -83,13 +88,13 @@ public class ListSessionsFragment extends Fragment {
     private View parent;
     private LocalDB localDB;
     private User currentUser;
-    private SelectMode selectMode = SelectMode.FUTURE;
     private SortMode sortMode = SortMode.DATE;
     private SearchView sv;
     private String searchText = "";
     private boolean isSearchIconified = true;
-    private UUID selectedID = null;
-    private String selectedValue;
+    // Build 200 Moved to ListSessions
+    //private UUID selectedID = null;
+    //private String selectedValue;
     private Date today;
     ArrayList<Session> sessionList;
     private SessionAdapter adapter;
@@ -97,7 +102,6 @@ public class ListSessionsFragment extends Fragment {
     private Parcelable listViewState;
     private UUID oldClientRecordID;
 
-    private enum SelectMode {ALL, UNCANCELLED, FUTURE, GROUP, SESSION_COORDINATOR}
 
     private enum SortMode {DATE, NAME}
 
@@ -107,6 +111,12 @@ public class ListSessionsFragment extends Fragment {
     // Build 181 - Load Adapter on background thread due to large number of sessions
     private Date startTime;
 
+    // Build 200 - This is called by the event listener in ListClients as a result of a OK
+    // in the PickListDialogFragment
+    public void pickListDialogFragmentOK() {
+        new LoadAdapter().execute();
+    }
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -115,6 +125,10 @@ public class ListSessionsFragment extends Fragment {
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
         footer = getActivity().findViewById(R.id.footer);
+        // Build 200 Initialise selectMode to UNCANCELLED
+        ((ListSessions) getActivity()).setSelectedIDs(new ArrayList<>());
+        ((ListSessions) getActivity()).clearSelectedValues();
+        ((ListActivity) getActivity()).setSelectMode(((ListActivity.SelectMode.FUTURE)));
         return parent;
     }
 
@@ -267,7 +281,11 @@ public class ListSessionsFragment extends Fragment {
         boolean selected = session.search(searchText);
         // Test explicit select modes
         if (selected) {
-            switch (selectMode) {
+            // Build 218 Some users have seen crash here due t0 getActivity() returning null
+            // Replace with requireActivity which raises IllegalStateException which is
+            // trapped in LoadAdapter background task which then exits
+            //switch (((ListActivity) getActivity()).getSelectMode()) {
+            switch (((ListActivity) requireActivity()).getSelectMode()) {
                 case ALL:
                     selected = true;
                     break;
@@ -284,14 +302,16 @@ public class ListSessionsFragment extends Fragment {
                     }
                     break;
 
-                case GROUP:
-                    if (!session.getGroupID().equals(selectedID)) {
+                case GROUPS:
+                    if (!((ListSessions) requireActivity()).getSelectedIDs().contains(session.getGroupID())) {
+                        //if (!session.getGroupID().equals(selectedID)) {
                         selected = false;
                     }
                     break;
 
-                case SESSION_COORDINATOR:
-                    if (!session.getSessionCoordinatorID().equals(selectedID)) {
+                case SESSION_COORDINATORS:
+                    if (!((ListSessions) requireActivity()).getSelectedIDs().contains(session.getSessionCoordinatorID())) {
+                        //if (!session.getSessionCoordinatorID().equals(selectedID)) {
                         selected = false;
                     }
                     break;
@@ -308,8 +328,8 @@ public class ListSessionsFragment extends Fragment {
     private static final int MENU_SELECT_ALL_SESSIONS = Menu.FIRST + 5;
     private static final int MENU_SELECT_UNCANCELLED_SESSIONS = Menu.FIRST + 6;
     private static final int MENU_SELECT_FUTURE_SESSIONS = Menu.FIRST + 7;
-    private static final int MENU_SELECT_GROUP = Menu.FIRST + 8;
-    private static final int MENU_SELECT_SESSION_COORDINATOR = Menu.FIRST + 9;
+    private static final int MENU_SELECT_GROUPS = Menu.FIRST + 8;
+    private static final int MENU_SELECT_SESSION_COORDINATORS = Menu.FIRST + 9;
     private static final int MENU_SORT_DATE = Menu.FIRST + 10;
     private static final int MENU_SORT_NAME = Menu.FIRST + 11;
 
@@ -341,10 +361,10 @@ public class ListSessionsFragment extends Fragment {
         selectUncancelledOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
 
-        MenuItem selectGroupOption = menu.add(0, MENU_SELECT_GROUP, 4, "Show One " + localSettings.Group);
+        MenuItem selectGroupOption = menu.add(0, MENU_SELECT_GROUPS, 4, String.format("Select %ss ", localSettings.Group));
         selectGroupOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-        MenuItem selectOpenOption = menu.add(0, MENU_SELECT_SESSION_COORDINATOR, 5, "Show One " + localSettings.SessionCoordinator);
+        MenuItem selectOpenOption = menu.add(0, MENU_SELECT_SESSION_COORDINATORS, 5, String.format("Select %ss ", localSettings.SessionCoordinator));
         selectOpenOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
         MenuItem sortLastFirstOption = menu.add(0, MENU_SORT_DATE, 10, "Sort by Date");
@@ -402,10 +422,11 @@ public class ListSessionsFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         final LocalSettings localSettings = LocalSettings.getInstance(getActivity());
+        PickListDialogFragment dialog;
         switch (item.getItemId()) {
             case MENU_EXPORT:
                 ((ListActivity) getActivity()).setExportListType("My Sessions");
-                switch (selectMode) {
+                switch (((ListActivity) getActivity()).getSelectMode()) {
                     case ALL:
                         ((ListActivity) getActivity()).setExportSelection("All Sessions (inc. cancelled sessions)");
                         break;
@@ -415,11 +436,15 @@ public class ListSessionsFragment extends Fragment {
                     case FUTURE:
                         ((ListActivity) getActivity()).setExportSelection("All Future Sessions");
                         break;
-                    case GROUP:
-                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", localSettings.Group, selectedValue));
+                    case GROUPS:
+                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s",
+                                localSettings.Group,
+                                ((ListSessions) getActivity()).getSelectedValues()));
                         break;
-                    case SESSION_COORDINATOR:
-                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", localSettings.Keyworker, selectedValue));
+                    case SESSION_COORDINATORS:
+                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s",
+                                localSettings.Keyworker,
+                                ((ListSessions) getActivity()).getSelectedValues()));
                         break;
                 }
                 switch (sortMode) {
@@ -435,38 +460,62 @@ public class ListSessionsFragment extends Fragment {
                 } else {
                     ((ListActivity) getActivity()).setExportSearch(searchText);
                 }
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                Fragment fragment = new CRISExport();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //Fragment fragment = new CRISExport();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, CRISExport.class, null)
+                        .commit();
                 return true;
 
             case MENU_SELECT_ALL_SESSIONS:
-                selectMode = SelectMode.ALL;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.ALL);
                 // Build 181 - Load adapter in the background
                 new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_UNCANCELLED_SESSIONS:
-                selectMode = SelectMode.UNCANCELLED;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.UNCANCELLED);
                 // Build 181 - Load adapter in the background
                 new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_FUTURE_SESSIONS:
-                selectMode = SelectMode.FUTURE;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.FUTURE);
                 // Build 181 - Load adapter in the background
                 new LoadAdapter().execute();
                 return true;
 
-            case MENU_SELECT_GROUP:
-                selectGroup();
+            case MENU_SELECT_GROUPS:
+                //ArrayList<String> itemList = new ArrayList<>();
+                //for (Group group : displayedGroups) {
+                //    itemList.add(group.getItemValue());
+                //}
+                PickList groups = new PickList(displayedGroups);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", localSettings.Group),
+                        groups, ListActivity.SelectMode.GROUPS);
+                dialog.show(getParentFragmentManager(), null);
                 return true;
 
-            case MENU_SELECT_SESSION_COORDINATOR:
-                selectSessionCoordinator();
+            case MENU_SELECT_SESSION_COORDINATORS:
+                //ArrayList<String> itemList = new ArrayList<>();
+                //for (User sessionCoordinator : displayedSessionCoordinators) {
+                //    itemList.add(sessionCoordinator.getFullName());
+                //}
+                PickList sessionCoordinators = new PickList(displayedSessionCoordinators);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Show sessions with one or more %ss", localSettings.SessionCoordinator),
+                        sessionCoordinators, ListActivity.SelectMode.SESSION_COORDINATORS);
+                dialog.show(getParentFragmentManager(), null);
                 return true;
 
             case MENU_SORT_DATE:
@@ -485,7 +534,7 @@ public class ListSessionsFragment extends Fragment {
                 return false;
         }
     }
-
+/*
     private void selectGroup() {
         // Use local settings for 'local' labels
         LocalSettings localSettings = LocalSettings.getInstance(getActivity());
@@ -542,6 +591,8 @@ public class ListSessionsFragment extends Fragment {
         dialog.show();
     }
 
+ */
+
     private void doNoPrivilege() {
         new AlertDialog.Builder(getActivity())
                 .setTitle("No Privilege")
@@ -573,12 +624,18 @@ public class ListSessionsFragment extends Fragment {
         if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_EDIT_ALL_SESSIONS) ||
                 session.getSessionCoordinatorID().equals(currentUser.getUserID())) {
             ((ListActivity) getActivity()).setSession(session);
-            FragmentManager fragmentManager = getFragmentManager();
-            FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-            Fragment fragment = new EditSession();
-            fragmentTransaction.replace(R.id.content, fragment);
-            fragmentTransaction.addToBackStack(null);
-            fragmentTransaction.commit();
+            // Build 200 Use the androidX Fragment class
+            //FragmentManager fragmentManager = getFragmentManager();
+            //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+            //Fragment fragment = new EditSession();
+            //fragmentTransaction.replace(R.id.content, fragment);
+            //fragmentTransaction.addToBackStack(null);
+            //fragmentTransaction.commit();
+            getParentFragmentManager().beginTransaction()
+                    .addToBackStack(null)
+                    .setReorderingAllowed(true)
+                    .replace(R.id.content, EditSession.class, null)
+                    .commit();
         } else {
             doNoPrivilege();
         }
@@ -589,12 +646,19 @@ public class ListSessionsFragment extends Fragment {
         ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
         listViewState = listView.onSaveInstanceState();
         ((ListActivity) getActivity()).setSession(new Session(currentUser));
-        FragmentManager fragmentManager = getFragmentManager();
-        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        Fragment fragment = new EditSession();
-        fragmentTransaction.replace(R.id.content, fragment);
-        fragmentTransaction.addToBackStack(null);
-        fragmentTransaction.commit();
+        // Build 200 Use the androidX Fragment class
+        //FragmentManager fragmentManager = getFragmentManager();
+        //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        //Fragment fragment = new EditSession();
+        //fragmentTransaction.replace(R.id.content, fragment);
+        //fragmentTransaction.addToBackStack(null);
+        //fragmentTransaction.commit();
+        Fragment editSessionFragment = new EditSession();
+        getParentFragmentManager().beginTransaction()
+                .addToBackStack(null)
+                .setReorderingAllowed(true)
+                .replace(R.id.content, editSessionFragment, "EditSessionFragment")
+                .commit();
         return true;
     }
 
@@ -675,42 +739,49 @@ public class ListSessionsFragment extends Fragment {
         @Override
         protected String doInBackground(Void... params) {
             LocalDB localDB = LocalDB.getInstance();
-            // Load the sessions from the database
-            if (sessionList == null) {
-                // Load the clients from the database
-                sessionList = localDB.getAllSessions();
-            }
-            // Clear the lists of displayed Groups/Sessions
-            displayedGroups = new ArrayList<>();
-            displayedSessionCoordinators = new ArrayList<>();
-            // Create the temporary adapter list
-            tempAdapterList = new ArrayList<Session>();
-            hidden = 0;
-            for (Session session : sessionList) {
-                loadDisplayedGroups(session);
-                loadDisplayedSessionCoordinators(session);
-                if (mySession(session)) {
-                    if (selectSession(session)) {
-                        tempAdapterList.add(session);
-                    } else {
-                        hidden++;
+
+            try {
+                // Load the sessions from the database
+                if (sessionList == null) {
+                    // Load the clients from the database
+                    sessionList = localDB.getAllSessions();
+                }
+                // Clear the lists of displayed Groups/Sessions
+                displayedGroups = new ArrayList<>();
+                displayedSessionCoordinators = new ArrayList<>();
+                // Create the temporary adapter list
+                tempAdapterList = new ArrayList<Session>();
+                hidden = 0;
+                for (Session session : sessionList) {
+                    loadDisplayedGroups(session);
+                    loadDisplayedSessionCoordinators(session);
+                    if (mySession(session)) {
+                        if (selectSession(session)) {
+                            tempAdapterList.add(session);
+                        } else {
+                            hidden++;
+                        }
                     }
                 }
-            }
-            // Sort the 'displayed' lists
-            Collections.sort(displayedGroups, ListItem.comparatorAZ);
-            Collections.sort(displayedSessionCoordinators, User.comparator);
-            switch (sortMode) {
-                case DATE:
-                    // Build 181
-                    //Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorDate);
-                    Collections.sort(tempAdapterList, Session.comparatorDate);
-                    break;
-                case NAME:
-                    // Build 181
-                    //Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorAZ);
-                    Collections.sort(tempAdapterList, Session.comparatorAZ);
-                    break;
+                // Sort the 'displayed' lists
+                Collections.sort(displayedGroups, ListItem.comparatorAZ);
+                Collections.sort(displayedSessionCoordinators, User.comparator);
+                switch (sortMode) {
+                    case DATE:
+                        // Build 181
+                        //Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorDate);
+                        Collections.sort(tempAdapterList, Session.comparatorDate);
+                        break;
+                    case NAME:
+                        // Build 181
+                        //Collections.sort(((ListActivity) getActivity()).getSessionAdapterList(), Session.comparatorAZ);
+                        Collections.sort(tempAdapterList, Session.comparatorAZ);
+                        break;
+                }
+            } catch (IllegalStateException ex) {
+                //Build 218 If the user uses back arrow to abandon the fragment, calls to
+                // requireActivity() can raise this exception. Load may simply be abandoned
+                // since fragment doesn't exist.
             }
             return "";
         }

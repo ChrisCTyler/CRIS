@@ -2,9 +2,11 @@ package solutions.cris.list;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
+// Build 200 Use the androidX Fragment class
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
+import androidx.fragment.app.Fragment;
+
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -33,6 +35,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.ShareActionProvider;
 import androidx.appcompat.widget.Toolbar;
+
 
 import android.telephony.SmsManager;
 import android.view.LayoutInflater;
@@ -98,6 +101,7 @@ import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.PickList;
+import solutions.cris.utils.PickListDialogFragment;
 import solutions.cris.utils.SwipeDetector;
 
 import static solutions.cris.list.BroadcastMessageFragment.SMS_BATCH_LIMIT;
@@ -126,7 +130,7 @@ public class ListClientDocumentsFragment extends Fragment {
     private static final int MENU_SELECT_ALL = Menu.FIRST + 2;
     private static final int MENU_SELECT_UNCANCELLED = Menu.FIRST + 3;
     private static final int MENU_SELECT_CONTACTS = Menu.FIRST + 4;
-    private static final int MENU_SELECT_TYPE = Menu.FIRST + 5;
+    private static final int MENU_SELECT_DOCUMENT_TYPES = Menu.FIRST + 5;
     private static final int MENU_SORT_DATE = Menu.FIRST + 6;
     private static final int MENU_SORT_TYPE = Menu.FIRST + 7;
     private static final int MENU_FOLLOW_CLIENT = Menu.FIRST + 8;
@@ -146,7 +150,8 @@ public class ListClientDocumentsFragment extends Fragment {
     private MenuItem followOption;
     private SearchView sv;
     private String searchText = "";
-    private String selectedDocumentType;
+    // Build 200 Moved to ListClientHeader
+    //private String selectedDocumentType;
     private ArrayList<String> documentTypes = new ArrayList<>();
     private ArrayList<Document> documentList;
     private UUID oldDocumentRecordID;
@@ -156,10 +161,10 @@ public class ListClientDocumentsFragment extends Fragment {
     private SimpleCursorAdapter mAdapter;
     private Parcelable listViewState;
 
-    private enum SelectMode {ALL, UNCANCELLED, CONTACT, TYPE}
-
-    private SelectMode selectMode = SelectMode.UNCANCELLED;
-    private SelectMode previousSelectMode = SelectMode.UNCANCELLED;
+    // Build 200 Moved SelectMode to ListActivity
+    //private enum SelectMode {ALL, UNCANCELLED, CONTACT, TYPE}
+    //private SelectMode selectMode = SelectMode.UNCANCELLED;
+    private ListActivity.SelectMode previousSelectMode = ListActivity.SelectMode.UNCANCELLED;
 
     private enum SortMode {TYPE, DATE}
 
@@ -190,6 +195,12 @@ public class ListClientDocumentsFragment extends Fragment {
     ListItem textListItem;
     boolean noteAdded = false;
 
+    // Build 200 - This is called by the event listener in ListClients as a result of a OK
+    // in the PickListDialogFragment
+    public void pickListDialogFragmentOK() {
+        new LoadAdapter().execute();
+    }
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -198,6 +209,10 @@ public class ListClientDocumentsFragment extends Fragment {
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
         footer = getActivity().findViewById(R.id.footer);
+        // Build 200 Initialise selectMode to UNCANCELLED
+        ((ListClientHeader) getActivity()).setSelectedDocuments(new ArrayList<>());
+        ((ListClientHeader) getActivity()).clearSelectedValues();
+        ((ListActivity) getActivity()).setSelectMode(((ListActivity.SelectMode.UNCANCELLED)));
         return parent;
     }
 
@@ -402,7 +417,11 @@ public class ListClientDocumentsFragment extends Fragment {
         // Check for selection
         if (selected) {
             selected = false;
-            switch (selectMode) {
+            // Build 218 Some users have seen crash here due t0 getActivity() returning null
+            // Replace with requireActivity which raises IllegalStateException which is
+            // trapped in LoadAdapter background task which then exits
+            //switch (((ListActivity) getActivity()).getSelectMode()) {
+            switch (((ListActivity)requireActivity()).getSelectMode()) {
                 case ALL:
                     selected = true;
                     break;
@@ -410,27 +429,33 @@ public class ListClientDocumentsFragment extends Fragment {
                     if (!document.getCancelledFlag())
                         selected = true;
                     break;
-                case CONTACT:
+                case CONTACT_DOCUMENTS:
                     if (document.getDocumentType() == Document.Contact) {
                         selected = true;
                     }
                     break;
-                case TYPE:
+                case DOCUMENT_TYPES:
                     switch (document.getDocumentType()) {
                         case Document.Note:
                             Note note = (Note) document;
-                            if (note.getNoteType().getItemValue().equals(selectedDocumentType)) {
+                            if (((ListClientHeader) requireActivity()).getSelectedDocuments().
+                                    contains(note.getNoteType().getItemValue())){
+                            //if (note.getNoteType().getItemValue().equals(selectedDocumentType)) {
                                 selected = true;
                             }
                             break;
                         case Document.PdfDocument:
                             PdfDocument pdfDocument = (PdfDocument) document;
-                            if (pdfDocument.getPdfType().getItemValue().equals(selectedDocumentType)) {
+                            if (((ListClientHeader) requireActivity()).getSelectedDocuments().
+                                    contains(pdfDocument.getPdfType().getItemValue())){
+                            //if (pdfDocument.getPdfType().getItemValue().equals(selectedDocumentType)) {
                                 selected = true;
                             }
                             break;
                         default:
-                            if (document.getDocumentTypeString().equals(selectedDocumentType)) {
+                            if (((ListClientHeader) requireActivity()).getSelectedDocuments().
+                                    contains(document.getDocumentTypeString())){
+                            //if (document.getDocumentTypeString().equals(selectedDocumentType)) {
                                 selected = true;
                             }
                     }
@@ -481,7 +506,7 @@ public class ListClientDocumentsFragment extends Fragment {
 
             if (document.getDocumentType() == Document.ClientSession) {
                 if (pos >= 0) {
-                    ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
+                    ClientSession[] clientSessions = ((ListClientHeader) requireActivity()).getClientSessions();
                     clientSessions[pos] = (ClientSession) document;
                     newPos--;
                 }
@@ -491,7 +516,7 @@ public class ListClientDocumentsFragment extends Fragment {
             // See testForMyWeeks()
             //if (document.getDocumentType() == Document.MyWeek) {
             //    MyWeek myWeek = (MyWeek) document;
-            //    ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
+            //    ClientSession[] clientSessions = ((ListClientHeader) requireActivity()).getClientSessions();
             //    for (int i = 0; i < 5; i++) {
             //        if (clientSessions[i] != null && clientSessions[i].getSessionID().equals(myWeek.getSessionID())) {
             //            clientSessions[i].setStatus((int) myWeek.getScore());
@@ -506,7 +531,7 @@ public class ListClientDocumentsFragment extends Fragment {
     private void testForMyWeeks(Document document) {
         if (document.getDocumentType() == Document.MyWeek) {
             MyWeek myWeek = (MyWeek) document;
-            ClientSession[] clientSessions = ((ListClientHeader) getActivity()).getClientSessions();
+            ClientSession[] clientSessions = ((ListClientHeader) requireActivity()).getClientSessions();
             for (int i = 0; i < 5; i++) {
                 if (clientSessions[i] != null && clientSessions[i].getSessionID().equals(myWeek.getSessionID())) {
                     // Build 150 - Don't set score for cancelled MyWeeks
@@ -595,7 +620,7 @@ public class ListClientDocumentsFragment extends Fragment {
                 client.save(false);
                 // Build 144 - Reload the client in the Activity Root to avoid a constraint error
                 // if the client document is then edited via EditClient
-                ((ListActivity) getActivity()).setClient(client);
+                ((ListActivity) requireActivity()).setClient(client);
             } catch (Exception ex) {
                 //ignore
             }
@@ -766,12 +791,12 @@ public class ListClientDocumentsFragment extends Fragment {
         selectAllOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem selectCancelledOption = menu.add(0, MENU_SELECT_UNCANCELLED, 11, "Show Uncancelled Documents");
         selectCancelledOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-        MenuItem selectContactOption = menu.add(0, MENU_SELECT_CONTACTS, 12, "Show Contact Documents");
+        MenuItem selectContactOption = menu.add(0, MENU_SELECT_CONTACTS, 12, "Select Contact Documents");
         // Build 151 - Odd crash recorded where getActivity was null - easiest to lose this line of code!
         //selectContactOption.setIcon(ContextCompat.getDrawable(getActivity(), R.drawable.ic_action_show_contacts));
         //selectContactOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
         selectContactOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-        MenuItem selectTypeOption = menu.add(0, MENU_SELECT_TYPE, 13, "Select Documents by Type");
+        MenuItem selectTypeOption = menu.add(0, MENU_SELECT_DOCUMENT_TYPES, 13, "Select Documents by Type");
         selectTypeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem sortDateOption = menu.add(0, MENU_SORT_DATE, 20, "Sort by Date");
         sortDateOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -906,15 +931,21 @@ public class ListClientDocumentsFragment extends Fragment {
                 ((ListActivity) getActivity()).setClientAdapterList(new ArrayList<Client>());
                 ((ListActivity) getActivity()).getClientAdapterList().add(client);
                 listViewState = listView.onSaveInstanceState();
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                Fragment fragment = new CRISExport();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use AndroidX fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //Fragment fragment = new CRISExport();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, CRISExport.class, null)
+                        .commit();
                 return true;
             case MENU_SELECT_ALL:
-                selectMode = SelectMode.ALL;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.ALL);
                 // V2.0 Set mode to NEW (not READ) to force the data re-load
                 //((ListActivity) getActivity()).setMode(Document.Mode.NEW);
                 //onResume();
@@ -923,7 +954,7 @@ public class ListClientDocumentsFragment extends Fragment {
                 return true;
 
             case MENU_SELECT_UNCANCELLED:
-                selectMode = SelectMode.UNCANCELLED;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.UNCANCELLED);
                 // V2.0 Set mode to NEW (not READ) to force the data re-load
                 //((ListActivity) getActivity()).setMode(Document.Mode.NEW);
                 //onResume();
@@ -932,11 +963,12 @@ public class ListClientDocumentsFragment extends Fragment {
                 return true;
 
             case MENU_SELECT_CONTACTS:
-                if (selectMode == SelectMode.CONTACT) {
-                    selectMode = previousSelectMode;
+                if (((ListActivity) getActivity()).getSelectMode() == ListActivity.SelectMode.CONTACT_DOCUMENTS){
+                //if (selectMode == SelectMode.CONTACT) {
+                    ((ListActivity) getActivity()).setSelectMode(previousSelectMode);
                 } else {
-                    previousSelectMode = selectMode;
-                    selectMode = SelectMode.CONTACT;
+                    previousSelectMode = ((ListActivity) getActivity()).getSelectMode();
+                    ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.CONTACT_DOCUMENTS);
 
                 }
                 // V2.0 Set mode to NEW (not READ) to force the data re-load
@@ -946,8 +978,15 @@ public class ListClientDocumentsFragment extends Fragment {
                 new LoadAdapter().execute();
                 return true;
 
-            case MENU_SELECT_TYPE:
-                doSelectDocumentType();
+            case MENU_SELECT_DOCUMENT_TYPES:
+                //String[] items = documentTypes.toArray(new String[documentTypes.size()]);
+                final PickList documentTypesPickList = new PickList(documentTypes);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                PickListDialogFragment dialog = new
+                        PickListDialogFragment("Show documents of type:",
+                            documentTypesPickList,
+                            ListActivity.SelectMode.DOCUMENT_TYPES);
+                dialog.show(getParentFragmentManager(), null);
                 return true;
 
             case MENU_FOLLOW_CLIENT:
@@ -1399,81 +1438,135 @@ public class ListClientDocumentsFragment extends Fragment {
                 // Build 158 Save this recordID to enable check for change to client
                 oldDocumentRecordID = document.getRecordID();
                 localDB.read(document, currentUser);
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction;
+                // Build 200 Use AndroidX fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction;
                 Fragment fragment;
 
                 switch (document.getDocumentType()) {
                     case Document.Case:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadCase();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadCase();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadCase.class, null)
+                                .commit();
                         break;
                     case Document.Client:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadClient();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadClient();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadClient.class, null)
+                                .commit();
                         break;
                     case Document.Contact:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadContact();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadContact();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadContact.class, null)
+                                .commit();
                         break;
                     case Document.ClientSession:
                         doClientSession();
                         break;
                     case Document.CriteriaAssessmentTool:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadCAT();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadCAT();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadCAT.class, null)
+                                .commit();
                         break;
                     case Document.Image:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadImage();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadImage();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadImage.class, null)
+                                .commit();
                         break;
                     case Document.MACAYC18:
-
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadMACAYC18();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadMACAYC18();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadMACAYC18.class, null)
+                                .commit();
                         break;
                     case Document.MyWeek:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadMyWeek();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadMyWeek();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadMyWeek.class, null)
+                                .commit();
                         break;
                     case Document.Note:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new EditNote();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new EditNote();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, EditNote.class, null)
+                                .commit();
                         break;
                     case Document.PdfDocument:
                         PdfDocument pdfDocument = (PdfDocument) document;
                         PdfDocument.displayPDFDocument(pdfDocument, parent.getContext());
                         break;
                     case Document.Transport:
-                        fragmentTransaction = fragmentManager.beginTransaction();
-                        fragment = new ReadTransport();
-                        fragmentTransaction.replace(R.id.content, fragment);
-                        fragmentTransaction.addToBackStack(null);
-                        fragmentTransaction.commit();
+                        // Build 200 Use AndroidX fragment class
+                        //fragmentTransaction = fragmentManager.beginTransaction();
+                        //fragment = new ReadTransport();
+                        //fragmentTransaction.replace(R.id.content, fragment);
+                        //fragmentTransaction.addToBackStack(null);
+                        //fragmentTransaction.commit();
+                        getParentFragmentManager().beginTransaction()
+                                .addToBackStack(null)
+                                .setReorderingAllowed(true)
+                                .replace(R.id.content, ReadTransport.class, null)
+                                .commit();
                         break;
                 }
             } else {
@@ -1546,74 +1639,123 @@ public class ListClientDocumentsFragment extends Fragment {
                         ((ListActivity) getActivity()).setDocument(document);
                         // Build 158 Save this recordID to enable check for change to client
                         oldDocumentRecordID = document.getRecordID();
-                        FragmentManager fragmentManager = getFragmentManager();
-                        FragmentTransaction fragmentTransaction;
+                        // Build 200 Use AndroidX fragment class
+                        //FragmentManager fragmentManager = getFragmentManager();
+                        //FragmentTransaction fragmentTransaction;
                         Fragment fragment;
                         switch (document.getDocumentType()) {
                             case Document.Case:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditCase();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditCase();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditCase.class, null)
+                                        .commit();
                                 break;
                             case Document.Client:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditClient();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditClient();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditClient.class, null)
+                                        .commit();
                                 break;
                             case Document.Contact:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditContact();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditContact();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditContact.class, null)
+                                        .commit();
                                 break;
                             case Document.ClientSession:
                                 doClientSession();
                                 break;
                             case Document.CriteriaAssessmentTool:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditCAT();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditCAT();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditCAT.class, null)
+                                        .commit();
                                 break;
                             case Document.Image:
                                 ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.EDIT, Document.Image);
                                 break;
                             case Document.MACAYC18:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditMACAYC18();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditMACAYC18();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditMACAYC18.class, null)
+                                        .commit();
                                 break;
                             case Document.MyWeek:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditMyWeek();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditMyWeek();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditMyWeek.class, null)
+                                        .commit();
                                 break;
                             case Document.Note:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditNote();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditNote();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditNote.class, null)
+                                        .commit();
                                 break;
                             case Document.PdfDocument:
                                 ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.EDIT, Document.PdfDocument);
                                 break;
                             case Document.Transport:
-                                fragmentTransaction = fragmentManager.beginTransaction();
-                                fragment = new EditTransport();
-                                fragmentTransaction.replace(R.id.content, fragment);
-                                fragmentTransaction.addToBackStack(null);
-                                fragmentTransaction.commit();
+                                // Build 200 Use AndroidX fragment class
+                                //fragmentTransaction = fragmentManager.beginTransaction();
+                                //fragment = new EditTransport();
+                                //fragmentTransaction.replace(R.id.content, fragment);
+                                //fragmentTransaction.addToBackStack(null);
+                                //fragmentTransaction.commit();
+                                getParentFragmentManager().beginTransaction()
+                                        .addToBackStack(null)
+                                        .setReorderingAllowed(true)
+                                        .replace(R.id.content, EditTransport.class, null)
+                                        .commit();
                                 break;
                             default:
                                 throw new CRISException(String.format(Locale.UK,
@@ -1675,67 +1817,104 @@ public class ListClientDocumentsFragment extends Fragment {
                     }
                 }
                 if (accessAllowed) {
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
+                    // Build 200 Use AndroidX fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //FragmentTransaction fragmentTransaction;
                     Fragment fragment;
                     switch (Document.getDocumentType(documentType)) {
                         case Document.Case:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditCase();
+                            // Build 200 Use AndroidX fragment class
+                            //fragmentTransaction = fragmentManager.beginTransaction();
+                            //fragment = new EditCase();
+                            //fragmentTransaction.replace(R.id.content, fragment);
+                            //fragmentTransaction.addToBackStack(null);
+                            //fragmentTransaction.commit();
                             ((ListActivity) getActivity()).setDocument(new Case(currentUser, client.getClientID()));
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
+                            getParentFragmentManager().beginTransaction()
+                                    .addToBackStack(null)
+                                    .setReorderingAllowed(true)
+                                    .replace(R.id.content, EditCase.class, null)
+                                    .commit();
                             break;
                         case Document.Contact:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditContact();
+                            // Build 200 Use AndroidX fragment class
+                            //fragmentTransaction = fragmentManager.beginTransaction();
+                            //fragment = new EditContact();
+                            //fragmentTransaction.replace(R.id.content, fragment);
+                            //fragmentTransaction.addToBackStack(null);
+                            //fragmentTransaction.commit();
                             ((ListActivity) getActivity()).setDocument(new Contact(currentUser, client.getClientID()));
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
+                            getParentFragmentManager().beginTransaction()
+                                    .addToBackStack(null)
+                                    .setReorderingAllowed(true)
+                                    .replace(R.id.content, EditContact.class, null)
+                                    .commit();
                             break;
                         case Document.CriteriaAssessmentTool:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditCAT();
+                            // Build 200 Use AndroidX fragment class
+                            //fragmentTransaction = fragmentManager.beginTransaction();
+                            //fragment = new EditCAT();
+                            //fragmentTransaction.replace(R.id.content, fragment);
+                            //fragmentTransaction.addToBackStack(null);
+                            //fragmentTransaction.commit();
                             ((ListActivity) getActivity()).setDocument(
                                     new CriteriaAssessmentTool(currentUser, client.getClientID()));
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
+                            getParentFragmentManager().beginTransaction()
+                                    .addToBackStack(null)
+                                    .setReorderingAllowed(true)
+                                    .replace(R.id.content, EditCAT.class, null)
+                                    .commit();
                             break;
                         case Document.Image:
                             ((ListActivity) getActivity()).setDocument(new Image(currentUser, client.getClientID()));
                             ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.NEW, Document.Image);
                             break;
                         case Document.MACAYC18:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditMACAYC18();
+                            // Build 200 Use AndroidX fragment class
+                            //fragmentTransaction = fragmentManager.beginTransaction();
+                            //fragment = new EditMACAYC18();
+                            //fragmentTransaction.replace(R.id.content, fragment);
+                            //fragmentTransaction.addToBackStack(null);
+                            //fragmentTransaction.commit();
                             ((ListActivity) getActivity()).setDocument(
                                     new MACAYC18(currentUser, client.getClientID()));
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
+                            getParentFragmentManager().beginTransaction()
+                                    .addToBackStack(null)
+                                    .setReorderingAllowed(true)
+                                    .replace(R.id.content, EditMACAYC18.class, null)
+                                    .commit();
                             break;
                         case Document.Note:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditNote();
+                            // Build 200 Use AndroidX fragment class
+                            //fragmentTransaction = fragmentManager.beginTransaction();
+                            //fragment = new EditNote();
+                            //fragmentTransaction.replace(R.id.content, fragment);
+                            //fragmentTransaction.addToBackStack(null);
+                            //fragmentTransaction.commit();
                             ((ListActivity) getActivity()).setDocument(new Note(currentUser, client.getClientID()));
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
+                            getParentFragmentManager().beginTransaction()
+                                    .addToBackStack(null)
+                                    .setReorderingAllowed(true)
+                                    .replace(R.id.content, EditNote.class, null)
+                                    .commit();
                             break;
                         case Document.PdfDocument:
                             ((ListActivity) getActivity()).setDocument(new PdfDocument(currentUser, client.getClientID()));
                             ((ListActivity) getActivity()).tryEditFileDocument(Document.Mode.NEW, Document.PdfDocument);
                             break;
                         case Document.Transport:
-                            fragmentTransaction = fragmentManager.beginTransaction();
-                            fragment = new EditTransport();
+                            // Build 200 Use AndroidX fragment class
+                            //fragmentTransaction = fragmentManager.beginTransaction();
+                            //fragment = new EditTransport();
+                            //fragmentTransaction.replace(R.id.content, fragment);
+                            //fragmentTransaction.addToBackStack(null);
+                            //fragmentTransaction.commit();
                             ((ListActivity) getActivity()).setDocument(new Transport(currentUser, client.getClientID()));
-                            fragmentTransaction.replace(R.id.content, fragment);
-                            fragmentTransaction.addToBackStack(null);
-                            fragmentTransaction.commit();
+                            getParentFragmentManager().beginTransaction()
+                                    .addToBackStack(null)
+                                    .setReorderingAllowed(true)
+                                    .replace(R.id.content, EditTransport.class, null)
+                                    .commit();
                             break;
                         default:
                             new AlertDialog.Builder(getActivity())
@@ -1899,31 +2078,6 @@ public class ListClientDocumentsFragment extends Fragment {
         } else {
             doNoPrivilege();
         }
-    }
-
-
-    private void doSelectDocumentType() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Only Display Documents of Type:");
-        String[] items = documentTypes.toArray(new String[documentTypes.size()]);
-
-        builder.setItems(items, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String documentType = documentTypes.get(which);
-                selectMode = SelectMode.TYPE;
-                selectedDocumentType = documentType;
-                // V2.0 Set mode to NEW (not READ) to force the data re-load
-                //((ListActivity) getActivity()).setMode(Document.Mode.NEW);
-                //onResume();
-                // Build 158
-                new LoadAdapter().execute();
-            }
-        });
-
-        // Create the AlertDialog
-        AlertDialog dialog = builder.create();
-        dialog.show();
     }
 
     private class DocumentAdapter extends ArrayAdapter<Document> {
@@ -2182,6 +2336,7 @@ public class ListClientDocumentsFragment extends Fragment {
 
             tempAdapterList = new ArrayList<>();
 
+            try {
             // Build 144 - Reload the client in case an EditClient has been done
             client = ((ListActivity) getActivity()).getClient();
             int clientSessionPos = 4;
@@ -2258,6 +2413,11 @@ public class ListClientDocumentsFragment extends Fragment {
                 output = String.format(Locale.UK, "%d document is not shown.", hidden);
             } else {
                 output = String.format("%s", getString(R.string.info_all_documents_shown));
+            }
+            } catch (IllegalStateException ex) {
+                //Build 218 If the user uses back arrow to abandon the fragment, calls to
+                // requireActivity() can raise this exception. Load may simply be abandoned
+                // since fragment doesn't exist.
             }
             return output;
         }

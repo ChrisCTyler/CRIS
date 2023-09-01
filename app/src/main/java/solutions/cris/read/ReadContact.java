@@ -14,7 +14,9 @@ package solutions.cris.read;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import android.app.Fragment;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+import androidx.fragment.app.Fragment;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -153,6 +155,7 @@ public class ReadContact extends Fragment {
         // Build 181
         freeSchoolMealsLayoutView.setVisibility(View.GONE);
         freeSchoolMeals.setVisibility(View.GONE);
+        // Build 233
         freeSchoolMealsTextView.setVisibility(View.VISIBLE);
         freeSchoolMealsTextView.setFocusable(false);
         // Build 183
@@ -217,6 +220,8 @@ public class ReadContact extends Fragment {
                 addressLayout.setVisibility(View.GONE);
                 schoolTextView.setText(editDocument.getSchool().getItemValue());
                 // Build 181
+                // Build 233 FSM Moved to Case Document
+                /*
                 freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
                 freeSchoolMealsTextView.setVisibility(View.VISIBLE);
                 if (editDocument.isFreeSchoolMeals()) {
@@ -224,6 +229,7 @@ public class ReadContact extends Fragment {
                 } else {
                     freeSchoolMealsTextView.setText("No");
                 }
+                 */
                 // Build 183
                 specialNeedsLayoutView.setVisibility(View.VISIBLE);
                 specialNeedsTextView.setVisibility(View.VISIBLE);

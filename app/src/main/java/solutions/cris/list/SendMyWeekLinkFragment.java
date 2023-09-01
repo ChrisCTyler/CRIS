@@ -16,9 +16,6 @@ package solutions.cris.list;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.Manifest;
 import android.app.Activity;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -36,6 +33,10 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 
 import android.telephony.SmsManager;
 import android.view.LayoutInflater;
@@ -173,8 +174,10 @@ public class SendMyWeekLinkFragment extends Fragment {
                     sendButton.setEnabled(false);
                     sendEmails();
                 }else {
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                 }
             }
         });

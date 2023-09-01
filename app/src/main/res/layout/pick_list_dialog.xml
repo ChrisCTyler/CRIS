@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginLeft="@dimen/spinner_field_margin"
+    android:layout_marginRight="@dimen/spinner_field_margin">
+
+    <!-- Build 224 - Enabled scrolling for long lists (Schools, Groups etc.) -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/checkbox_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:layout_marginTop="@dimen/spinner_field_margin"
+        android:layout_marginRight="@dimen/spinner_field_margin"
+        android:layout_marginLeft="@dimen/spinner_field_margin">
+        <CheckBox
+            android:id="@+id/select_all"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spinner_field_margin"
+            android:layout_weight="0"
+            android:checked="false"
+            android:text="@string/prompt_select_all" />
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_marginRight="@dimen/spinner_field_margin"
+            android:layout_marginLeft="@dimen/spinner_field_margin"
+            android:layout_height="5dp"
+            android:src="@drawable/list_divider" />
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_marginTop="@dimen/spinner_field_margin"
+            android:layout_marginRight="@dimen/spinner_field_margin"
+            android:layout_marginLeft="@dimen/spinner_field_margin"
+            android:layout_height="5dp"
+            android:src="@drawable/list_divider" />
+
+    </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

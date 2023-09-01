@@ -245,6 +245,20 @@
                 android:layout_height="wrap_content">
 
                 <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/attendance_points"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/prompt_attendance_points"
+                    android:inputType="number"
+                    android:maxLines="1" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/additional_information"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -273,6 +287,13 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/action_save" />
+                <Button
+                    android:id="@+id/batch_invite_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:visibility="gone"
+                    android:text="@string/action_batch_invite" />
             </LinearLayout>
 
         </LinearLayout>

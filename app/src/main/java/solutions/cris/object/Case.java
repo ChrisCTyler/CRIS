@@ -1,7 +1,5 @@
 package solutions.cris.object;
 
-import android.app.Activity;
-
 import com.google.api.services.sheets.v4.model.CellData;
 import com.google.api.services.sheets.v4.model.CellFormat;
 import com.google.api.services.sheets.v4.model.DimensionProperties;
@@ -16,6 +14,9 @@ import com.google.api.services.sheets.v4.model.UpdateDimensionPropertiesRequest;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -59,6 +60,13 @@ public class Case extends Document implements Serializable {
 
     public Case(User currentUser, UUID clientID) {
         super(currentUser, clientID, Document.Case);
+        pupilPremium = false;
+        freeSchoolMeals = false;
+        childProtectionPlan = false;
+        childInNeedPlan = false;
+        tafEarlyHelpPlan = false;
+        socialServicesRecommendation = false;
+        otherPlanFinancialSupport = false;
     }
 
     private String caseType;
@@ -94,8 +102,8 @@ public class Case extends Document implements Serializable {
         this.clientStatus = clientStatus;
     }
 
-    public static String getClientStatusString(int clientStatus){
-        switch (clientStatus){
+    public static String getClientStatusString(int clientStatus) {
+        switch (clientStatus) {
             case RED:
                 return "RED";
 
@@ -122,7 +130,7 @@ public class Case extends Document implements Serializable {
     }
 
     public User getKeyWorker() {
-        if (keyWorkerID != null  && keyWorker == null) {
+        if (keyWorkerID != null && keyWorker == null) {
             LocalDB localDB = LocalDB.getInstance();
             keyWorker = (localDB.getUser(keyWorkerID));
         }
@@ -168,7 +176,7 @@ public class Case extends Document implements Serializable {
     }
 
     public User getCoWorker2() {
-        if (coWorker2ID!= null) {
+        if (coWorker2ID != null) {
             LocalDB localDB = LocalDB.getInstance();
             coWorker2 = localDB.getUser(coWorker2ID);
         }
@@ -230,6 +238,7 @@ public class Case extends Document implements Serializable {
         }
         return group;
     }
+
     public void setGroup(ListItem group) {
         this.group = group;
     }
@@ -259,6 +268,7 @@ public class Case extends Document implements Serializable {
         }
         return group2;
     }
+
     public void setGroup2(ListItem group2) {
         this.group2 = group2;
     }
@@ -339,7 +349,7 @@ public class Case extends Document implements Serializable {
     private String caseSummary;
 
     public String getCaseSummary() {
-        if (caseSummary == null){
+        if (caseSummary == null) {
             caseSummary = "";
         }
         return caseSummary;
@@ -351,25 +361,178 @@ public class Case extends Document implements Serializable {
 
     // Build 105 - Two new checkboxes
     private boolean photographyConsentFlag;
-    public boolean isPhotographyConsentFlag() {return photographyConsentFlag;}
+
+    public boolean isPhotographyConsentFlag() {
+        return photographyConsentFlag;
+    }
+
     public void setPhotographyConsentFlag(boolean photographyConsentFlag) {
         this.photographyConsentFlag = photographyConsentFlag;
     }
 
     private boolean doNotInviteFlag;
-    public boolean isDoNotInviteFlag() {return doNotInviteFlag;}
+
+    public boolean isDoNotInviteFlag() {
+        return doNotInviteFlag;
+    }
+
     public void setDoNotInviteFlag(boolean doNotInviteFlag) {
         this.doNotInviteFlag = doNotInviteFlag;
     }
 
     // Build 139 - Second Group
     private boolean doNotInvite2Flag;
-    public boolean isDoNotInvite2Flag() {return doNotInvite2Flag;}
+
+    public boolean isDoNotInvite2Flag() {
+        return doNotInvite2Flag;
+    }
+
     public void setDoNotInvite2Flag(boolean doNotInvite2Flag) {
         this.doNotInvite2Flag = doNotInvite2Flag;
     }
 
-    public void clear(){
+    // Build 232 - Plans and Financial Support
+    private boolean pupilPremium;
+
+    public boolean isPupilPremium() {
+        return pupilPremium;
+    }
+
+    public void setPupilPremium(boolean pupilPremium) {
+        this.pupilPremium = pupilPremium;
+    }
+
+    private boolean freeSchoolMeals;
+
+    public boolean isFreeSchoolMeals() {
+        return freeSchoolMeals;
+    }
+
+    public void setFreeSchoolMeals(boolean freeSchoolMeals) {
+        this.freeSchoolMeals = freeSchoolMeals;
+    }
+
+    private boolean childProtectionPlan;
+
+    public boolean isChildProtectionPlan() {
+        return childProtectionPlan;
+    }
+
+    public void setChildProtectionPlan(boolean childProtectionPlan) {
+        this.childProtectionPlan = childProtectionPlan;
+    }
+
+    private boolean childInNeedPlan;
+
+    public boolean isChildInNeedPlan() {
+        return childInNeedPlan;
+    }
+
+    public void setChildInNeedPlan(boolean childInNeedPlan) {
+        this.childInNeedPlan = childInNeedPlan;
+    }
+
+    private boolean tafEarlyHelpPlan;
+
+    public boolean isTafEarlyHelpPlan() {
+        return tafEarlyHelpPlan;
+    }
+
+    public void setTafEarlyHelpPlan(boolean tafEarlyHelpPlan) {
+        this.tafEarlyHelpPlan = tafEarlyHelpPlan;
+    }
+
+    private boolean socialServicesRecommendation;
+
+    public boolean isSocialServicesRecommendation() {
+        return socialServicesRecommendation;
+    }
+
+    public void setSocialServicesRecommendation(boolean socialServicesRecommendation) {
+        this.socialServicesRecommendation = socialServicesRecommendation;
+    }
+
+    private boolean otherPlanFinancialSupport;
+
+    public boolean isOtherPlanFinancialSupport() {
+        return otherPlanFinancialSupport;
+    }
+
+    public void setOtherPlanFinancialSupport(boolean otherPlanFinancialSupport) {
+        this.otherPlanFinancialSupport = otherPlanFinancialSupport;
+    }
+
+    // Reviewer
+    private UUID lastReviewedByID;
+
+    public UUID getLastReviewedByID() {
+        if (lastReviewedByID == null) {
+            lastReviewedByID = User.unknownUser;
+        }
+        return lastReviewedByID;
+    }
+
+    public void setLastReviewedByID(UUID lastReviewedByID) {
+        this.lastReviewedByID = lastReviewedByID;
+    }
+
+    private User lastReviewedBy;
+
+    public User getLastReviewedBy() {
+        if (lastReviewedByID == null){
+            lastReviewedByID = User.unknownUser;
+        }
+        if (lastReviewedBy == null) {
+            if (lastReviewedByID == User.unknownUser) {
+                lastReviewedBy = new User(User.unknownUser);
+            } else {
+                LocalDB localDB = LocalDB.getInstance();
+                lastReviewedBy = (localDB.getUser(lastReviewedByID));
+                if (lastReviewedBy == null){
+                    lastReviewedBy = new User(User.unknownUser);
+                }
+            }
+        }
+        return lastReviewedBy;
+    }
+
+    public void setLastReviewedBy(User lastReviewedBy) {
+        this.lastReviewedBy = lastReviewedBy;
+    }
+
+
+    // ReviewDate
+    private Date lastReviewDate;
+
+    public Date getlastReviewDate() {
+        if (lastReviewDate == null) {
+            Calendar jan12023 = Calendar.getInstance();
+            jan12023.set(2023,0,1);
+            return jan12023.getTime();
+        } else {
+            return lastReviewDate;
+        }
+    }
+
+    public void setLastReviewDate(Date lastReviewDate) {
+        this.lastReviewDate = lastReviewDate;
+    }
+
+    // Build 232 Add a useful function to check for any plan
+    public boolean isPlanOrSupport() {
+        if (pupilPremium ||
+                freeSchoolMeals ||
+                childProtectionPlan ||
+                childInNeedPlan ||
+                tafEarlyHelpPlan ||
+                socialServicesRecommendation ||
+                otherPlanFinancialSupport)
+            return true;
+        else
+            return false;
+    }
+
+    public void clear() {
         setTier(null);
         setGroup(null);
         // Build 139 - Second Group
@@ -378,6 +541,8 @@ public class Case extends Document implements Serializable {
         setCoWorker1(null);
         setCoWorker2(null);
         setCommissioner(null);
+        // Build 232
+        setLastReviewedBy(null);
     }
 
     public void save(boolean isNewMode) {
@@ -389,6 +554,8 @@ public class Case extends Document implements Serializable {
         User keyWorker = getKeyWorker();
         User coWorker1 = getCoWorker1();
         User coWorker2 = getCoWorker2();
+        // Build 232
+        User lastReviewedBy = getLastReviewedBy();
         ListItem commissioner = getCommissioner();
         clear();
 
@@ -398,20 +565,20 @@ public class Case extends Document implements Serializable {
             summaryText += tier.getItemValue();
         }
         if (group != null) {
-            if (!summaryText.isEmpty()){
+            if (!summaryText.isEmpty()) {
                 summaryText += ", ";
             }
             summaryText += group.getItemValue();
         }
         // Build 139 - Second Group
         if (group2 != null) {
-            if (!summaryText.isEmpty()){
+            if (!summaryText.isEmpty()) {
                 summaryText += ", ";
             }
             summaryText += " plus 1";
         }
         if (keyWorker != null) {
-            if (!summaryText.isEmpty()){
+            if (!summaryText.isEmpty()) {
                 summaryText += ", ";
             }
             summaryText += String.format("%s,(%s)",
@@ -429,6 +596,8 @@ public class Case extends Document implements Serializable {
         setKeyWorker(keyWorker);
         setCoWorker1(coWorker1);
         setCoWorker2(coWorker2);
+        // Build 232
+        setLastReviewedBy(lastReviewedBy);
         setCommissioner(commissioner);
 
         // If keyworker was not following this client, setFollow
@@ -475,11 +644,21 @@ public class Case extends Document implements Serializable {
             if (getCoWorker2() != null) {
                 text += getCoWorker2().getFullName() + " ";
             }
+            // Build 232
+            if (getLastReviewedBy() != null) {
+                text += getLastReviewedBy().getFullName() + " ";
+            }
             if (getCommissioner() != null) {
                 text += getCommissioner().getItemValue() + " ";
             }
             return text.toLowerCase().contains(searchText.toLowerCase());
         }
+    }
+
+    // Build 232
+    private String displayBoolean(boolean value) {
+        if (value) return "Yes";
+        else return "No";
     }
 
     @Override
@@ -496,7 +675,7 @@ public class Case extends Document implements Serializable {
         }
         summary += "\n";
         // Build 103 - Added Case Summary
-        if (caseSummary != null){
+        if (caseSummary != null) {
             summary += String.format("Case Summary: %s\n", caseSummary);
         }
         switch (getClientStatus()) {
@@ -509,7 +688,7 @@ public class Case extends Document implements Serializable {
             case GREEN:
                 summary += "Status: GREEN\n";
         }
-        if (isPhotographyConsentFlag()){
+        if (isPhotographyConsentFlag()) {
             summary += "Photography/Media Consent: Yes\n";
         } else {
             summary += "Photography/Media Consent: No\n";
@@ -523,7 +702,7 @@ public class Case extends Document implements Serializable {
         summary += localSettings.Group + ": ";
         if (getGroup() != null) {
             summary += getGroup().getItemValue();
-            if (isDoNotInviteFlag()){
+            if (isDoNotInviteFlag()) {
                 summary += " (Do not invite to Sessions)";
             }
         }
@@ -532,11 +711,27 @@ public class Case extends Document implements Serializable {
         if (getGroup2() != null) {
             summary += localSettings.Group + "2: ";
             summary += getGroup2().getItemValue();
-            if (isDoNotInvite2Flag()){
+            if (isDoNotInvite2Flag()) {
                 summary += " (Do not invite to Sessions)";
             }
             summary += "\n";
         }
+
+        // Build 232
+        summary += String.format("Pupil Premium %s\n", displayBoolean(pupilPremium));
+        summary += String.format("Free School Meals %s\n", displayBoolean(freeSchoolMeals));
+        summary += String.format("Child Protection Plan %s\n", displayBoolean(childProtectionPlan));
+        summary += String.format("Child In Need Plan %s\n", displayBoolean(childInNeedPlan));
+        summary += String.format("TAF/Early Help Plan %s\n", displayBoolean(tafEarlyHelpPlan));
+        summary += String.format("Social Services Recommendation %s\n", displayBoolean(socialServicesRecommendation));
+        summary += String.format("Other Plan/Financial Support %s\n", displayBoolean(otherPlanFinancialSupport));
+        if (getLastReviewedByID() == User.unknownUser){
+            summary += "Plans and Financial Support have not yet been reviewed";
+        } else {
+            summary += String.format("Last Reviewed By %s\n", getLastReviewedBy().getFullName());
+            summary += String.format("Last Review Date %s\n", sDate.format(getlastReviewDate()));
+        }
+
         summary += "Transport Required: " + getTransportRequired() + "\n";
         summary += "Special Instructions: " + getTransportSpecialInstructions() + "\n";
         summary += localSettings.Keyworker + ": ";
@@ -559,10 +754,11 @@ public class Case extends Document implements Serializable {
             summary += getCommissioner().getItemValue();
         }
         summary += "\n";
+
         return summary;
     }
 
-    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
         SimpleDateFormat sDate = new SimpleDateFormat("dd MMM yyyy", Locale.UK);
         SimpleDateFormat sDateTime = new SimpleDateFormat("EEE dd MMM yyyy HH:mm", Locale.UK);
         LocalSettings localSettings = LocalSettings.getInstance();
@@ -571,9 +767,9 @@ public class Case extends Document implements Serializable {
         Case thisDocument = (Case) localDB.getDocumentByRecordID(thisRecordID);
         String changes = Document.getChanges(previousDocument, thisDocument);
         changes += CRISUtil.getChanges(previousDocument.getCaseType(), thisDocument.getCaseType(), "Case Type");
-        if (previousDocument.getClientStatus() != thisDocument.getClientStatus()){
+        if (previousDocument.getClientStatus() != thisDocument.getClientStatus()) {
             changes += String.format("Client Status changed from %s to %s\n",
-                    getClientStatusString (previousDocument.getClientStatus()),
+                    getClientStatusString(previousDocument.getClientStatus()),
                     getClientStatusString(thisDocument.getClientStatus()));
         }
         changes += CRISUtil.getChanges(previousDocument.getCaseSummary(), thisDocument.getCaseSummary(), "Case Summary");
@@ -582,23 +778,33 @@ public class Case extends Document implements Serializable {
         changes += CRISUtil.getChanges(previousDocument.getTier(), thisDocument.getTier(), localSettings.Tier);
         changes += CRISUtil.getChanges(previousDocument.getGroup(), thisDocument.getGroup(), localSettings.Group);
         // Build 139 - Second Group
-        changes += CRISUtil.getChanges(previousDocument.getGroup2(), thisDocument.getGroup2(), localSettings.Group +"2");
+        changes += CRISUtil.getChanges(previousDocument.getGroup2(), thisDocument.getGroup2(), localSettings.Group + "2");
         changes += CRISUtil.getChanges(previousDocument.isDoNotInviteFlag(), thisDocument.isDoNotInviteFlag(), "Do Not Invite flag");
+        // Build 232
+        changes += CRISUtil.getChanges(previousDocument.isPupilPremium(), thisDocument.isPupilPremium(), "Pupil Premium");
+        changes += CRISUtil.getChanges(previousDocument.isFreeSchoolMeals(), thisDocument.isFreeSchoolMeals(), "Free School Meals");
+        changes += CRISUtil.getChanges(previousDocument.isChildProtectionPlan(), thisDocument.isChildProtectionPlan(), "Child Protection Plan");
+        changes += CRISUtil.getChanges(previousDocument.isChildInNeedPlan(), thisDocument.isChildInNeedPlan(), "Child In Need Plan");
+        changes += CRISUtil.getChanges(previousDocument.isTafEarlyHelpPlan(), thisDocument.isTafEarlyHelpPlan(), "TAF/Early Help Plan");
+        changes += CRISUtil.getChanges(previousDocument.isSocialServicesRecommendation(), thisDocument.isSocialServicesRecommendation(), "Social Services Recommendation");
+        changes += CRISUtil.getChanges(previousDocument.isOtherPlanFinancialSupport(), thisDocument.isOtherPlanFinancialSupport(), "Other Plan/Financial Support");
+        changes += CRISUtil.getChanges(previousDocument.getLastReviewedBy(), thisDocument.getLastReviewedBy(), "Last Reviewed By");
+        changes += CRISUtil.getChangesDate(previousDocument.getlastReviewDate(), thisDocument.getlastReviewDate(), "Last Reviewe Date");
+
         changes += CRISUtil.getChanges(previousDocument.getTransportRequired(), thisDocument.getTransportRequired(), "Transport Required");
         changes += CRISUtil.getChanges(previousDocument.getTransportSpecialInstructions(), thisDocument.getTransportSpecialInstructions(), "Special Transport Instructions");
         changes += CRISUtil.getChanges(previousDocument.getKeyWorker(), thisDocument.getKeyWorker(), localSettings.Keyworker);
         changes += CRISUtil.getChanges(previousDocument.getCoWorker1(), thisDocument.getCoWorker1(), localSettings.Coworker1);
         changes += CRISUtil.getChanges(previousDocument.getCoWorker2(), thisDocument.getCoWorker2(), localSettings.Coworker2);
         changes += CRISUtil.getChanges(previousDocument.getCommissioner(), thisDocument.getCommissioner(), localSettings.Commisioner);
-        if (changes.length() == 0){
+        if (changes.length() == 0) {
             changes = "No changes found.\n";
         }
         changes += "-------------------------------------------------------------\n";
         return changes;
     }
 
-    private static List<Object> getExportFieldNames(Activity activity) {
-        final LocalSettings localSettings = LocalSettings.getInstance(activity);
+    public static List<Object> getExportFieldNames(LocalSettings localSettings) {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -616,10 +822,21 @@ public class Case extends Document implements Serializable {
         fNames.add(localSettings.Keyworker);
         fNames.add(localSettings.Commisioner);
         fNames.add(localSettings.Tier);
+        fNames.add("Plan or Support");
+        fNames.add("Pupil Premium");
+        fNames.add("Free School Meals");
+        fNames.add("Child Protection Plan");
+        fNames.add("Child InNeed Plan");
+        fNames.add("TAF or Early Help Plan");
+        fNames.add("Social Services Recommendation");
+        fNames.add("Other PlanFinancial Support");
+        fNames.add("Last Review Date");
+        fNames.add("Last Reviewed By");
         fNames.add("Transport Required");
         return fNames;
     }
 
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getCaseData(ArrayList<Document> documents, Activity activity) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -635,6 +852,8 @@ public class Case extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();
@@ -765,8 +984,32 @@ public class Case extends Document implements Serializable {
         } else {
             row.add("");    // Tier
         }
+        // Build 232
+        if (isPlanOrSupport()) {
+            row.add("True");
+        } else {
+            row.add("False");
+        }
+        row.add(displayExportBoolean(pupilPremium));
+        row.add(displayExportBoolean(freeSchoolMeals));
+        row.add(displayExportBoolean(childProtectionPlan));
+        row.add(displayExportBoolean(childInNeedPlan));
+        row.add(displayExportBoolean(tafEarlyHelpPlan));
+        row.add(displayExportBoolean(socialServicesRecommendation));
+        row.add(displayExportBoolean(otherPlanFinancialSupport));
+        row.add(sDate.format(getlastReviewDate()));
+        if (getLastReviewedByID() == User.unknownUser){
+            row.add("Not Reviewed Yet");
+        } else {
+            row.add(getLastReviewedBy().getFullName());
+        }
         row.add(getTransportRequired());
         return row;
 
+    }
+
+    private String displayExportBoolean(boolean value) {
+        if (value) return "True";
+        else return "False";
     }
 }

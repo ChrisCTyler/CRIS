@@ -16,8 +16,10 @@ package solutions.cris.edit;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
@@ -826,8 +828,10 @@ public class EditMACAYC18 extends Fragment {
             public void onClick(View view) {
                 // Cancel so no need to update list of documents
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         });
         // Save Button
@@ -837,8 +841,10 @@ public class EditMACAYC18 extends Fragment {
             public void onClick(View view) {
                 if (validate()) {
                     editDocument.save(isNewMode);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                 }
             }
         });
@@ -968,8 +974,10 @@ public class EditMACAYC18 extends Fragment {
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     editDocument.save(isNewMode);
-                                    FragmentManager fragmentManager = getFragmentManager();
-                                    fragmentManager.popBackStack();
+                                    // Build 200 Use the androidX Fragment class
+                                    //FragmentManager fragmentManager = getFragmentManager();
+                                    //fragmentManager.popBackStack();
+                                    getParentFragmentManager().popBackStack();
                                 }
                             }
                         }
@@ -987,8 +995,10 @@ public class EditMACAYC18 extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 editDocument.save(isNewMode);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         }
     }

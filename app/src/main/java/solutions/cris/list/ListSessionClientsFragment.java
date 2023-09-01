@@ -1,8 +1,5 @@
 package solutions.cris.list;
 
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -19,6 +16,11 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
+import androidx.fragment.app.Fragment;
 
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -53,8 +55,10 @@ import solutions.cris.edit.EditTransport;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
 import solutions.cris.object.ClientSession;
+import solutions.cris.object.Contact;
 import solutions.cris.object.Document;
 import solutions.cris.object.ListItem;
+import solutions.cris.object.ListType;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
 import solutions.cris.object.NoteType;
@@ -70,6 +74,8 @@ import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.PickList;
+import solutions.cris.utils.PickListDialogFragment;
 import solutions.cris.utils.SwipeDetector;
 
 //        CRIS - Client Record Information System
@@ -115,10 +121,6 @@ public class ListSessionClientsFragment extends Fragment {
 
     private SortMode sortMode = SortMode.LAST_FIRST;
 
-    private enum SelectMode {ALL, UNCANCELLED}
-
-    private SelectMode selectMode = SelectMode.UNCANCELLED;
-
     // Used to switch between show existing invitees and get new invitees
     private boolean displayAllClients = false;
 
@@ -135,6 +137,11 @@ public class ListSessionClientsFragment extends Fragment {
     ClientEntryAdapter clientAdapter;
     private RegisterEntryAdapter registerAdapter;
 
+    // Build 200 - This is called by the event listener in ListClients as a result of a OK
+    // in the PickListDialogFragment
+    public void pickListDialogFragmentOK() {
+        onResume();
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -144,6 +151,11 @@ public class ListSessionClientsFragment extends Fragment {
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
         footer = getActivity().findViewById(R.id.footer);
+        // Build 200 Instantiate a new SelectdIDs array and set the defualt mode to OPEN
+        ((ListSessionClients) getActivity()).setSelectedIDs(new ArrayList<>());
+        ((ListSessionClients) getActivity()).clearSelectedValues();
+        // Build 217 Restored the correct default
+        ((ListActivity) getActivity()).setSelectMode(((ListActivity.SelectMode.UNCANCELLED)));
         return parent;
     }
 
@@ -240,6 +252,13 @@ public class ListSessionClientsFragment extends Fragment {
     private static final int MENU_EXPORT = Menu.FIRST + 1;
     private static final int MENU_SELECT_ALL = Menu.FIRST + 2;
     private static final int MENU_SELECT_UNCANCELLED = Menu.FIRST + 3;
+    // Build 200 - Added select options to menu
+    private static final int MENU_SELECT_GROUPS = Menu.FIRST + 4;
+    private static final int MENU_SELECT_KEYWORKERS = Menu.FIRST + 5;
+    private static final int MENU_SELECT_COMMISSIONERS = Menu.FIRST + 6;
+    private static final int MENU_SELECT_SCHOOLS = Menu.FIRST + 7;
+    private static final int MENU_SELECT_AGENCIES = Menu.FIRST + 8;
+
     private static final int MENU_SORT_FIRST_LAST = Menu.FIRST + 10;
     private static final int MENU_SORT_LAST_FIRST = Menu.FIRST + 11;
     private static final int MENU_SORT_ATTENDED = Menu.FIRST + 12;
@@ -260,10 +279,28 @@ public class ListSessionClientsFragment extends Fragment {
             MenuItem selectExport = menu.add(0, MENU_EXPORT, 1, "Export to Google Sheets");
             selectExport.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         }
-        MenuItem selectAllOption = menu.add(0, MENU_SELECT_ALL, 1, "Show All Clients");
+        MenuItem selectAllOption = menu.add(0, MENU_SELECT_ALL, 2, "Show All Clients");
         selectAllOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-        MenuItem selectUncancelledOption = menu.add(0, MENU_SELECT_UNCANCELLED, 10, "Show Uncancelled Clients");
+        MenuItem selectUncancelledOption = menu.add(0, MENU_SELECT_UNCANCELLED, 3, "Show Uncancelled Clients");
         selectUncancelledOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+        // Build 200 - Added select options to menu
+        MenuItem selectGroupOption = menu.add(0, MENU_SELECT_GROUPS, 4, String.format("Select %ss", localSettings.Group));
+        selectGroupOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+        MenuItem selectKeyworkerOption = menu.add(0, MENU_SELECT_KEYWORKERS, 5, String.format("Select %ss", localSettings.Keyworker));
+        selectKeyworkerOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+        MenuItem selectCommissionerOption = menu.add(0, MENU_SELECT_COMMISSIONERS, 6, String.format("Select %ss", localSettings.Commisioner));
+        selectCommissionerOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+        //Build 110 Added School, Agency
+        MenuItem selectSchoolOption = menu.add(0, MENU_SELECT_SCHOOLS, 7, "Select Schools");
+        selectSchoolOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+        MenuItem selectAgencyOption = menu.add(0, MENU_SELECT_AGENCIES, 8, "Select Agencies");
+        selectAgencyOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
 
         MenuItem sortFirstLastOption = menu.add(0, MENU_SORT_FIRST_LAST, 10, "Sort by FirstName");
         sortFirstLastOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -278,7 +315,7 @@ public class ListSessionClientsFragment extends Fragment {
         sortAgeOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         MenuItem broadcastOption = menu.add(0, MENU_BROADCAST, 20, "Broadcast Message");
         broadcastOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-        MenuItem sendMyWeekLinkOption = menu.add(0, MENU_SEND_MYWEEK_LINK, 20, "Send MyWeek Links");
+        MenuItem sendMyWeekLinkOption = menu.add(0, MENU_SEND_MYWEEK_LINK, 21, "Send MyWeek Links");
         sendMyWeekLinkOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
         // Build 186 Revert to standard search
@@ -390,6 +427,7 @@ public class ListSessionClientsFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         SimpleDateFormat sDate = new SimpleDateFormat("WWW dd/MM/yyyy", Locale.UK);
+        PickListDialogFragment dialog;
         switch (item.getItemId()) {
             case MENU_EXPORT:
                 ((ListActivity) getActivity()).setExportListType("One Session");
@@ -400,21 +438,84 @@ public class ListSessionClientsFragment extends Fragment {
                 ((ListActivity) getActivity()).setExportSearch(" ");
                 ((ListActivity) getActivity()).setSessionAdapterList(new ArrayList<Session>());
                 ((ListActivity) getActivity()).getSessionAdapterList().add(session);
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                Fragment fragment = new CRISExport();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //Fragment fragment = new CRISExport();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, CRISExport.class, null)
+                        .commit();
+
                 return true;
             case MENU_SELECT_ALL:
-                selectMode = SelectMode.ALL;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.ALL);
                 onResume();
                 return true;
             case MENU_SELECT_UNCANCELLED:
-                selectMode = SelectMode.UNCANCELLED;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.UNCANCELLED);
                 onResume();
                 return true;
+
+            // Build 200 - Added select options to menu
+            case MENU_SELECT_GROUPS:
+                final PickList groups = new PickList(localDB, ListType.GROUP, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", localSettings.Group),
+                        groups, ListActivity.SelectMode.GROUPS);
+                dialog.show(getParentFragmentManager(), null);
+                return true;
+
+            case MENU_SELECT_KEYWORKERS:
+                // Get a list of keyworkers
+                ArrayList<User> users = localDB.getAllUsers();
+                ArrayList<User> keyworkerList = new ArrayList<>();
+                for (User user : users) {
+                    if (user.getRole().hasPrivilege(Role.PRIVILEGE_USER_IS_KEYWORKER)) {
+                        keyworkerList.add(user);
+                    }
+                }
+                Collections.sort(keyworkerList, User.comparator);
+                final PickList keyworkers = new PickList(keyworkerList, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", localSettings.Keyworker),
+                        keyworkers, ListActivity.SelectMode.KEYWORKERS);
+                dialog.show(getParentFragmentManager(), null);
+                return true;
+
+            case MENU_SELECT_COMMISSIONERS:
+                final PickList commissioners = new PickList(localDB, ListType.COMMISSIONER, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", localSettings.Commisioner),
+                        commissioners, ListActivity.SelectMode.COMMISSIONERS);
+                dialog.show(getParentFragmentManager(), null);
+                return true;
+
+            case MENU_SELECT_SCHOOLS:
+                final PickList schools = new PickList(localDB, ListType.SCHOOL, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", "School"),
+                        schools, ListActivity.SelectMode.SCHOOLS);
+                dialog.show(getParentFragmentManager(), null);
+                return true;
+
+            case MENU_SELECT_AGENCIES:
+                final PickList agencies = new PickList(localDB, ListType.AGENCY, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        "Select one or more Agencies",
+                        agencies, ListActivity.SelectMode.AGENCIES);
+                dialog.show(getParentFragmentManager(), null);
+                return true;
+
             case MENU_SORT_FIRST_LAST:
                 sortMode = SortMode.FIRST_LAST;
                 onResume();
@@ -440,12 +541,18 @@ public class ListSessionClientsFragment extends Fragment {
                 }
                 ((ListActivity) getActivity()).setBroadcastClientList(broadcastClientList);
                 // Start the Broadcast fragment
-                fragmentManager = getFragmentManager();
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new BroadcastMessageFragment();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment class
+                //fragmentManager = getFragmentManager();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new BroadcastMessageFragment();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, BroadcastMessageFragment.class, null)
+                        .commit();
                 return true;
             // Build 143 Send MyWeekLink handler
             case MENU_SEND_MYWEEK_LINK:
@@ -456,12 +563,18 @@ public class ListSessionClientsFragment extends Fragment {
                 }
                 ((ListActivity) getActivity()).setBroadcastClientList(sendMyWeekClientList);
                 // Start the SendMyWeek fragment
-                fragmentManager = getFragmentManager();
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new SendMyWeekLinkFragment();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment class
+                //fragmentManager = getFragmentManager();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new SendMyWeekLinkFragment();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, SendMyWeekLinkFragment.class, null)
+                        .commit();
                 return true;
             default:
                 // Build 105 - Added search so allow search option to return false
@@ -641,20 +754,29 @@ public class ListSessionClientsFragment extends Fragment {
                     break;
                 }
             }
-            */
-            // Build 181 - This mechanism is very fast but SessionID field is only set for ClientSession records
-            // pre this build. Fixed by modification to document.Save() and re-save via Fix option in SysAdmin
+*/
+
             ArrayList<Document> notes = localDB.getAllDocumentsOfType(clientSession.getClientID(),
                     Document.Note, clientSession.getSessionID());
             for (Document document : notes) {
                 Note note = (Note) document;
                 this.note = note;
-                // Build 110 If sticky note found
-                if (note.isStickyFlag()) {
-                    stickyNoteFlag = true;
-                }
                 break;
             }
+            // Build 239 - Problem using SessionID search for Notes since it only finds 'session' notes
+            // and not the sticky notes but older method is too slow for large registers.
+            // Fix is to set a dummy SessionID on sticky notes
+            //if (note.isStickyFlag()) {
+            //    stickyNoteFlag = true;
+            //}
+            notes = localDB.getAllDocumentsOfType(clientSession.getClientID(),
+                    Document.Note, Session.stickyNoteSessionID);
+            if (notes.size() > 0) {
+                stickyNoteFlag = true;
+            }
+
+            // Build 181 - This mechanism is very fast but SessionID field is only set for ClientSession records
+            // pre this build. Fixed by modification to document.Save() and re-save via Fix option in SysAdmin
             ArrayList<Document> pdfDocuments = localDB.getAllDocumentsOfType(clientSession.getClientID(),
                     Document.PdfDocument, clientSession.getSessionID());
             for (Document document : pdfDocuments) {
@@ -743,6 +865,7 @@ public class ListSessionClientsFragment extends Fragment {
         // Constructor
         RegisterEntryAdapter(Context context, List<RegisterEntry> objects) {
             super(context, 0, objects);
+
         }
 
         private void displayClientRecord(ClientSession clientSession) {
@@ -853,18 +976,24 @@ public class ListSessionClientsFragment extends Fragment {
 
             if (noteDocument == null) {
                 // Create New
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction;
-                Fragment fragment = new EditNote();
-                fragmentTransaction = fragmentManager.beginTransaction();
                 ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
                 registerEntry.setNote(new Note(currentUser, clientSession.getClientID()));
                 registerEntry.getNote().setSessionID(clientSession.getSessionID());
                 registerEntry.getNote().setSession(clientSession.getSession());
                 ((ListActivity) getActivity()).setDocument(registerEntry.getNote());
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment clas
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction;
+                //Fragment fragment = new EditNote();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, EditNote.class, null)
+                        .commit();
                 notifyDataSetChanged();
             } else {
                 // Read Note
@@ -874,14 +1003,20 @@ public class ListSessionClientsFragment extends Fragment {
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
                 ((ListActivity) getActivity()).setDocument(noteDocument);
                 localDB.read(noteDocument, currentUser);
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction;
-                Fragment fragment;
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new EditNote();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction;
+                //Fragment fragment;
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new EditNote();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, EditNote.class, null)
+                        .commit();
             }
         }
 
@@ -891,10 +1026,7 @@ public class ListSessionClientsFragment extends Fragment {
             // Display the Client Header
             ((ListSessionClients) getActivity()).loadClientHeader(client);
             if (transport == null) {
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction;
-                Fragment fragment = new EditTransport();
-                fragmentTransaction = fragmentManager.beginTransaction();
+
                 ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
                 Transport newTransport = new Transport(currentUser, clientSession.getClientID());
                 // Load the current session details
@@ -913,36 +1045,59 @@ public class ListSessionClientsFragment extends Fragment {
                 newTransport.setReturnDate(CRISUtil.midnightEarlier(sessionDate));
                 registerEntry.setTransport(newTransport);
                 ((ListActivity) getActivity()).setDocument(newTransport);
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction;
+                //Fragment fragment = new EditTransport();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, EditTransport.class, null)
+                        .commit();
                 notifyDataSetChanged();
             } else {
                 // Longpress to edit
                 if (longPress) {
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
-                    Fragment fragment = new EditTransport();
-                    fragmentTransaction = fragmentManager.beginTransaction();
                     ((ListActivity) getActivity()).setMode(Document.Mode.EDIT);
                     ((ListActivity) getActivity()).setDocument(transport);
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //FragmentTransaction fragmentTransaction;
+                    //Fragment fragment = new EditTransport();
+                    //fragmentTransaction = fragmentManager.beginTransaction();
+
+                    //fragmentTransaction.replace(R.id.content, fragment);
+                    //fragmentTransaction.addToBackStack(null);
+                    //fragmentTransaction.commit();
+                    getParentFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, EditTransport.class, null)
+                            .commit();
                     notifyDataSetChanged();
                 } else {
                     // Read Transport document
                     ((ListActivity) getActivity()).setMode(Document.Mode.READ);
                     ((ListActivity) getActivity()).setDocument(transport);
                     localDB.read(transport, currentUser);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
-                    Fragment fragment;
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadTransport();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //FragmentTransaction fragmentTransaction;
+                    //Fragment fragment;
+                    //fragmentTransaction = fragmentManager.beginTransaction();
+                    //fragment = new ReadTransport();
+                    //fragmentTransaction.replace(R.id.content, fragment);
+                    //fragmentTransaction.addToBackStack(null);
+                    //fragmentTransaction.commit();
+                    getParentFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, ReadTransport.class, null)
+                            .commit();
                 }
             }
         }
@@ -1032,10 +1187,6 @@ public class ListSessionClientsFragment extends Fragment {
                     }
                     // End of Build 105 change
                     // Create New MyWeek
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
-                    Fragment fragment = new EditMyWeek();
-                    fragmentTransaction = fragmentManager.beginTransaction();
                     ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
                     registerEntry.setStatusDocument(new MyWeek(currentUser, clientSession.getClientID()));
                     registerEntry.getStatusDocument().setSessionID(clientSession.getSessionID());
@@ -1043,9 +1194,19 @@ public class ListSessionClientsFragment extends Fragment {
                     // Status document ReferenceDate is the session date
                     registerEntry.getStatusDocument().setReferenceDate(clientSession.getReferenceDate());
                     ((ListActivity) getActivity()).setDocument(registerEntry.getStatusDocument());
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //FragmentTransaction fragmentTransaction;
+                    //Fragment fragment = new EditMyWeek();
+                    //fragmentTransaction = fragmentManager.beginTransaction();
+                    //fragmentTransaction.replace(R.id.content, fragment);
+                    //fragmentTransaction.addToBackStack(null);
+                    //fragmentTransaction.commit();
+                    getParentFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, EditMyWeek.class, null)
+                            .commit();
                     notifyDataSetChanged();
                 } else {
                     doFutureError();
@@ -1055,15 +1216,21 @@ public class ListSessionClientsFragment extends Fragment {
                     // Edit MyWeek
                     // Set the flag to prevent back button
                     ((ListSessionClients) getActivity()).setEditMyWeek(true);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
-                    Fragment fragment = new EditMyWeek();
-                    fragmentTransaction = fragmentManager.beginTransaction();
                     ((ListActivity) getActivity()).setMode(Document.Mode.EDIT);
                     ((ListActivity) getActivity()).setDocument(statusDocument);
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //FragmentTransaction fragmentTransaction;
+                    //Fragment fragment = new EditMyWeek();
+                    //fragmentTransaction = fragmentManager.beginTransaction();
+                    //fragmentTransaction.replace(R.id.content, fragment);
+                    //fragmentTransaction.addToBackStack(null);
+                    //fragmentTransaction.commit();
+                    getParentFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, EditMyWeek.class, null)
+                            .commit();
                     notifyDataSetChanged();
                 } else {
                     // Read Note
@@ -1071,14 +1238,20 @@ public class ListSessionClientsFragment extends Fragment {
                     ((ListActivity) getActivity()).setMode(Document.Mode.READ);
                     ((ListActivity) getActivity()).setDocument(myWeekDocument);
                     localDB.read(myWeekDocument, currentUser);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    FragmentTransaction fragmentTransaction;
-                    Fragment fragment;
-                    fragmentTransaction = fragmentManager.beginTransaction();
-                    fragment = new ReadMyWeek();
-                    fragmentTransaction.replace(R.id.content, fragment);
-                    fragmentTransaction.addToBackStack(null);
-                    fragmentTransaction.commit();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //FragmentTransaction fragmentTransaction;
+                    //Fragment fragment;
+                    //fragmentTransaction = fragmentManager.beginTransaction();
+                    //fragment = new ReadMyWeek();
+                    //fragmentTransaction.replace(R.id.content, fragment);
+                    //fragmentTransaction.addToBackStack(null);
+                    //fragmentTransaction.commit();
+                    getParentFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, ReadMyWeek.class, null)
+                            .commit();
                 }
             }
         }
@@ -1181,6 +1354,7 @@ public class ListSessionClientsFragment extends Fragment {
 
             // Build 110 - If sticky note flag, display client record
             ImageView flagIcon = convertView.findViewById(R.id.flag_icon);
+
             flagIcon.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
@@ -1406,6 +1580,7 @@ public class ListSessionClientsFragment extends Fragment {
             } else {
                 flagIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_flag_grey));
             }
+
             return convertView;
         }
     }
@@ -2044,47 +2219,196 @@ public class ListSessionClientsFragment extends Fragment {
             hidden = 0;
             // Build 110 - Add Reserved option
             reserves = 0;
-            tempAdapterList = new ArrayList<>();
-            ArrayList<ClientSession> clientSessions = localDB.getAllClientSessions(session);
+            try {
+                tempAdapterList = new ArrayList<>();
+                ArrayList<ClientSession> clientSessions = localDB.getAllClientSessions(session);
 
-            for (ClientSession clientSession : clientSessions) {
-                // Build 186 Implement search in the register view
-                if (clientSession.getClient().search(searchText)) {
-                    switch (selectMode) {
-                        case ALL:
-                            tempAdapterList.add(new RegisterEntry(clientSession));
-                            if (clientSession.isAttended()) attendees++;
-                            if (clientSession.isReserved()) {
-                                reserves++;
-                            }
-                            break;
-                        case UNCANCELLED:
-                            if (!clientSession.getCancelledFlag()) {
+                for (ClientSession clientSession : clientSessions) {
+                    // Build 240 add client to enable other 'selects'
+                    Client client = clientSession.getClient();
+                    // Build 186 Implement search in the register view
+                    if (client.search(searchText)) {
+                        // Build 218 Some users have seen crash here due t0 getActivity() returning null
+                        // Replace with requireActivity which raises IllegalStateException which is
+                        // trapped in LoadAdapter background task which then exits
+                        //switch (((ListActivity) getActivity()).getSelectMode()) {
+
+                        switch (((ListActivity) requireActivity()).getSelectMode()) {
+                            case ALL:
                                 tempAdapterList.add(new RegisterEntry(clientSession));
-                                if (clientSession.isAttended()) attendees++;
-                                if (clientSession.isReserved()) {
-                                    reserves++;
+                                // Build 240 Move to after case statement
+                                //if (clientSession.isAttended()) attendees++;
+                                //if (clientSession.isReserved()) {
+                                //    reserves++;
+                                //}
+                                break;
+                            case UNCANCELLED:
+                                if (!clientSession.getCancelledFlag()) {
+                                    tempAdapterList.add(new RegisterEntry(clientSession));
+                                    // Build 240 Move to after case statement
+                                    //if (clientSession.isAttended()) attendees++;
+                                    //if (clientSession.isReserved()) {
+                                    //    reserves++;
+                                    //}
                                 }
-                            }
+                                break;
+                            // Build 240 Add the 'select' cases which were available in the menu
+                            // but it was assumed would not be used in the RegisterAdapter case
+                            case GROUPS:
+                                boolean hide = true;
+                                UUID groupID = null;
+                                if (client.getCurrentCase() != null) {
+                                    Case currentCase = client.getCurrentCase();
+                                    if (!currentCase.getCaseType().equals("Close")) {
+                                        if (currentCase.getGroupID() != null) {
+                                            groupID = currentCase.getGroupID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(groupID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                        if (currentCase.getGroup2ID() != null) {
+                                            groupID = currentCase.getGroup2ID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(groupID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hidden++;
+                                } else {
+                                    tempAdapterList.add(new RegisterEntry(clientSession));
+                                }
+                                break;
+
+                            case KEYWORKERS:
+                                hide = true;
+                                if (client.getCurrentCase() != null) {
+                                    Case currentCase = client.getCurrentCase();
+                                    if (!currentCase.getCaseType().equals("Close")) {
+                                        if (currentCase.getKeyWorkerID() != null) {
+                                            UUID keyworkerID = currentCase.getKeyWorkerID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(keyworkerID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hidden++;
+                                } else {
+                                    tempAdapterList.add(new RegisterEntry(clientSession));
+                                }
+                                break;
+                            case COMMISSIONERS:
+                                hide = true;
+                                if (client.getCurrentCase() != null) {
+                                    Case currentCase = client.getCurrentCase();
+                                    if (!currentCase.getCaseType().equals("Close")) {
+                                        if (currentCase.getCommissionerID() != null) {
+                                            UUID commissionerID = currentCase.getCommissionerID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(commissionerID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hidden++;
+                                } else {
+                                    tempAdapterList.add(new RegisterEntry(clientSession));
+                                }
+                                break;
+                            //Build 110 Added School, Agency
+                            case SCHOOLS:
+                                hide = true;
+                                if (client.getCurrentSchoolID() != null) {
+                                    Contact contactDocument = client.getCurrentSchool();
+                                    if (contactDocument != null) {
+                                        // Build 162 - This fixes a very odd bug where SchoolID was null in a
+                                        // Contact Document attached via client.getCurrentSchoolID
+                                        UUID schoolID = contactDocument.getSchoolID();
+                                        if (schoolID != null) {
+                                            // Build 136 - Only show school with end date later than today
+                                            Date now = new Date();
+                                            if (contactDocument.getEndDate() == null ||
+                                                    contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                                    contactDocument.getEndDate().after(now)) {
+                                                if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(schoolID)) {
+                                                    hide = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hidden++;
+                                } else {
+                                    tempAdapterList.add(new RegisterEntry(clientSession));
+                                }
+                                break;
+                            case AGENCIES:
+                                hide = true;
+                                if (client.getCurrentAgencyID() != null) {
+                                    Contact contactDocument = client.getCurrentAgency();
+                                    if (contactDocument != null) {
+                                        // Build 162 - This fixes a very odd bug where AgencyID was null in a
+                                        // Contact Document attached via client.getCurrentAgencyID
+                                        UUID agencyID = contactDocument.getAgencyID();
+                                        if (agencyID != null) {
+                                            // Build 136 - Only show agency with end date later than today
+                                            Date now = new Date();
+                                            if (contactDocument.getEndDate() == null ||
+                                                    contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                                    contactDocument.getEndDate().after(now)) {
+                                                if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(agencyID)) {
+                                                    hide = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hidden++;
+                                } else {
+                                    tempAdapterList.add(new RegisterEntry(clientSession));
+                                }
+                                break;
+                        }
+                    } else {
+                        hidden++;
                     }
-                } else {
-                    hidden++;
+                    // Build 240 End of changes
                 }
-            }
-            // Sort the documents
-            switch (sortMode) {
-                case FIRST_LAST:
-                    Collections.sort(tempAdapterList, comparatorREFirstLast);
-                    break;
-                case LAST_FIRST:
-                    Collections.sort(tempAdapterList, comparatorRELastFirst);
-                    break;
-                case ATTENDED:
-                    Collections.sort(tempAdapterList, comparatorREAttended);
-                    break;
-                case AGE:
-                    Collections.sort(tempAdapterList, comparatorREAge);
-                    break;
+                // Build 240 Only count the displayed clients for attendance
+                for (RegisterEntry registerEntry : tempAdapterList){
+                    if (registerEntry.getClientSession().isAttended()) attendees++;
+                    else {
+                        if (registerEntry.getClientSession().isReserved()) {
+                            reserves++;
+                        }
+                    }
+                }
+
+                // Sort the documents
+                switch (sortMode) {
+                    case FIRST_LAST:
+                        Collections.sort(tempAdapterList, comparatorREFirstLast);
+                        break;
+                    case LAST_FIRST:
+                        Collections.sort(tempAdapterList, comparatorRELastFirst);
+                        break;
+                    case ATTENDED:
+                        Collections.sort(tempAdapterList, comparatorREAttended);
+                        break;
+                    case AGE:
+                        Collections.sort(tempAdapterList, comparatorREAge);
+                        break;
+                }
+            } catch (IllegalStateException ex) {
+                //Build 218 If the user uses back arrow to abandon the fragment, calls to
+                // requireActivity() can raise this exception. Load may simply be abandoned
+                // since fragment doesn't exist.
             }
             return "";
         }
@@ -2105,33 +2429,43 @@ public class ListSessionClientsFragment extends Fragment {
         protected void onPostExecute(String output) {
             // Runs on UI Thread
             // Reload the adapter list
-            registerAdapterList = new ArrayList<>();
-            // Build 184 A System Error is being caused by a bad clientAdapterList it is
-            // possible that addAll() has a problem with empty lists
-            if (tempAdapterList.size() > 0) {
-                registerAdapterList.addAll(tempAdapterList);
-            }
-            registerAdapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
-            listView.setAdapter(registerAdapter);
-            registerAdapter.notifyDataSetChanged();
-            // Report the number of documents in the footer.
-            String footerText;
-            if (session.getReferenceDate().before(new Date())) {
-                footerText = String.format(Locale.UK, "Attended: %d, DNA: %d, Reserves: %d", attendees, registerAdapterList.size() - attendees - reserves, reserves);
-            } else {
-                footerText = String.format(Locale.UK, "Invited: %d, Reserves: %d", registerAdapterList.size() - reserves, reserves);
-            }
-            if (hidden > 0) {
-                footerText += String.format(Locale.UK, ", Hidden: %d", hidden);
-            }
-            Date endTime = new Date();
-            long elapsed = (endTime.getTime() - startTime.getTime()) / 1000;
-            //long elapsed = (endTime.getTime() - startTime.getTime()) / 100;
-            if (elapsed > 0) {
+            try {
+                registerAdapterList = new ArrayList<>();
+                // Build 184 A System Error is being caused by a bad clientAdapterList it is
+                // possible that addAll() has a problem with empty lists
+                if (tempAdapterList.size() > 0) {
+                    registerAdapterList.addAll(tempAdapterList);
+                }
+                // Build 218 Some users have seen crash here due t0 getActivity() returning null
+                // Replace with requireActivity which raises IllegalStateException which is
+                // trapped in LoadAdapter background task which then exits
+                //registerAdapter = new RegisterEntryAdapter(getActivity(), registerAdapterList);
+                registerAdapter = new RegisterEntryAdapter(requireActivity(), registerAdapterList);
+                listView.setAdapter(registerAdapter);
+                registerAdapter.notifyDataSetChanged();
+                // Report the number of documents in the footer.
+                String footerText;
+                if (session.getReferenceDate().before(new Date())) {
+                    footerText = String.format(Locale.UK, "Attended: %d, DNA: %d, Reserves: %d", attendees, registerAdapterList.size() - attendees - reserves, reserves);
+                } else {
+                    footerText = String.format(Locale.UK, "Invited: %d, Reserves: %d", registerAdapterList.size() - reserves, reserves);
+                }
+                if (hidden > 0) {
+                    footerText += String.format(Locale.UK, ", Hidden: %d", hidden);
+                }
+                Date endTime = new Date();
+                long elapsed = (endTime.getTime() - startTime.getTime()) / 1000;
+                //long elapsed = (endTime.getTime() - startTime.getTime()) / 100;
+                if (elapsed > 0) {
 
-                footer.setText(String.format("%s (%d sec)", footerText, elapsed));
-            } else {
-                footer.setText(footerText);
+                    footer.setText(String.format("%s (%d sec)", footerText, elapsed));
+                } else {
+                    footer.setText(footerText);
+                }
+            } catch (IllegalStateException ex) {
+                //Build 218 If the user uses back arrow to abandon the fragment, calls to
+                // requireActivity() can raise this exception. Load may simply be abandoned
+                // since fragment doesn't exist.
             }
         }
     }
@@ -2150,47 +2484,185 @@ public class ListSessionClientsFragment extends Fragment {
 
             // Background thread works on two background lists and only loads the clientAdapterList
             // in  the post execute to prevent partial results being shown
+            try {
+                // Move the hidden clients back in case of a previous search/select
+                displayedClientList.addAll(hiddenClientList);
+                hiddenClientList.clear();
 
-            // Move the hidden clients back in case of a previous search
-            displayedClientList.addAll(hiddenClientList);
-            hiddenClientList.clear();
-
-            // Load the client list if it is the first time
-            if (displayedClientList.size() == 0) {
-                // Load the clients from the database
-                ArrayList<Client> clientList = localDB.getAllClients();
-                for (Client client : clientList) {
-                    client.setLatestDocument(localDB.getLatestDocument(client));
-                    displayedClientList.add(new ClientEntry(client));
+                // Load the client list if it is the first time
+                if (displayedClientList.size() == 0) {
+                    // Load the clients from the database
+                    ArrayList<Client> clientList = localDB.getAllClients();
+                    for (Client client : clientList) {
+                        client.setLatestDocument(localDB.getLatestDocument(client));
+                        displayedClientList.add(new ClientEntry(client));
+                    }
+                    setInvitedReservedFlags();
                 }
-                setInvitedReservedFlags();
-            }
-            // Move entries from displayedList to hiddenList if not in search criteria
-            if (searchText.length() > 0) {
-                // Note: Can't modify clientAdapterList whilst looping through it so add to
-                // stored on this pass and remove from clientAdapterlist on next pass
+
+                // Build 200 - Add the set of select options
                 for (ClientEntry clientEntry : displayedClientList) {
-                    if (!clientEntry.getClient().search(searchText)) {
-                        hiddenClientList.add(clientEntry);
+                    // Always display the invited/reserved clients
+                    if (!clientEntry.isInvited() && !clientEntry.isReserved()) {
+                        Client client = clientEntry.getClient();
+                        // Build 218 Some users have seen crash here due t0 getActivity() returning null
+                        // Replace with requireActivity which raises IllegalStateException which is
+                        // trapped in LoadAdapter background task which then exits
+                        //switch (((ListActivity) getActivity()).getSelectMode()) {
+                        switch (((ListActivity) requireActivity()).getSelectMode()) {
+                            case ALL:
+                                break;
+
+                            case GROUPS:
+                                boolean hide = true;
+                                UUID groupID = null;
+                                if (client.getCurrentCase() != null) {
+                                    Case currentCase = client.getCurrentCase();
+                                    if (!currentCase.getCaseType().equals("Close")) {
+                                        if (currentCase.getGroupID() != null) {
+                                            groupID = currentCase.getGroupID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(groupID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                        if (currentCase.getGroup2ID() != null) {
+                                            groupID = currentCase.getGroup2ID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(groupID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hiddenClientList.add(clientEntry);
+                                }
+                                break;
+
+                            case KEYWORKERS:
+                                hide = true;
+                                if (client.getCurrentCase() != null) {
+                                    Case currentCase = client.getCurrentCase();
+                                    if (!currentCase.getCaseType().equals("Close")) {
+                                        if (currentCase.getKeyWorkerID() != null) {
+                                            UUID keyworkerID = currentCase.getKeyWorkerID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(keyworkerID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hiddenClientList.add(clientEntry);
+                                }
+                                break;
+                            case COMMISSIONERS:
+                                hide = true;
+                                if (client.getCurrentCase() != null) {
+                                    Case currentCase = client.getCurrentCase();
+                                    if (!currentCase.getCaseType().equals("Close")) {
+                                        if (currentCase.getCommissionerID() != null) {
+                                            UUID commissionerID = currentCase.getCommissionerID();
+                                            if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(commissionerID)) {
+                                                hide = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hiddenClientList.add(clientEntry);
+                                }
+                                break;
+                            //Build 110 Added School, Agency
+                            case SCHOOLS:
+                                hide = true;
+                                if (client.getCurrentSchoolID() != null) {
+                                    Contact contactDocument = client.getCurrentSchool();
+                                    if (contactDocument != null) {
+                                        // Build 162 - This fixes a very odd bug where SchoolID was null in a
+                                        // Contact Document attached via client.getCurrentSchoolID
+                                        UUID schoolID = contactDocument.getSchoolID();
+                                        if (schoolID != null) {
+                                            // Build 136 - Only show school with end date later than today
+                                            Date now = new Date();
+                                            if (contactDocument.getEndDate() == null ||
+                                                    contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                                    contactDocument.getEndDate().after(now)) {
+                                                if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(schoolID)) {
+                                                    hide = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hiddenClientList.add(clientEntry);
+                                }
+                                break;
+                            case AGENCIES:
+                                hide = true;
+                                if (client.getCurrentAgencyID() != null) {
+                                    Contact contactDocument = client.getCurrentAgency();
+                                    if (contactDocument != null) {
+                                        // Build 162 - This fixes a very odd bug where AgencyID was null in a
+                                        // Contact Document attached via client.getCurrentAgencyID
+                                        UUID agencyID = contactDocument.getAgencyID();
+                                        if (agencyID != null) {
+                                            // Build 136 - Only show agency with end date later than today
+                                            Date now = new Date();
+                                            if (contactDocument.getEndDate() == null ||
+                                                    contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                                    contactDocument.getEndDate().after(now)) {
+                                                if (((ListSessionClients) requireActivity()).getSelectedIDs().contains(agencyID)) {
+                                                    hide = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (hide) {
+                                    hiddenClientList.add(clientEntry);
+                                }
+                                break;
+                        }
                     }
                 }
+                // Now remove the hidden clients from the displayed list.
+                // Note: Cannot do this in the above loop
                 for (ClientEntry clientEntry : hiddenClientList) {
                     displayedClientList.remove(clientEntry);
                 }
-            }
-            displayed = displayedClientList.size();
-            hidden = hiddenClientList.size();
-            // Now sort the clientAdapterList
-            switch (sortMode) {
-                case FIRST_LAST:
-                    Collections.sort(displayedClientList, comparatorCEFirstLast);
-                    break;
-                case LAST_FIRST:
-                    Collections.sort(displayedClientList, comparatorCELastFirst);
-                    break;
-                case AGE:
-                    Collections.sort(displayedClientList, comparatorCEAge);
-                    break;
+
+                // Move entries from displayedList to hiddenList if not in search criteria
+                if (searchText.length() > 0) {
+                    // Note: Can't modify clientAdapterList whilst looping through it so add to
+                    // stored on this pass and remove from clientAdapterlist on next pass
+                    for (ClientEntry clientEntry : displayedClientList) {
+                        if (!clientEntry.getClient().search(searchText)) {
+                            hiddenClientList.add(clientEntry);
+                        }
+                    }
+                    for (ClientEntry clientEntry : hiddenClientList) {
+                        displayedClientList.remove(clientEntry);
+                    }
+                }
+                displayed = displayedClientList.size();
+                hidden = hiddenClientList.size();
+                // Now sort the clientAdapterList
+                switch (sortMode) {
+                    case FIRST_LAST:
+                        Collections.sort(displayedClientList, comparatorCEFirstLast);
+                        break;
+                    case LAST_FIRST:
+                        Collections.sort(displayedClientList, comparatorCELastFirst);
+                        break;
+                    case AGE:
+                        Collections.sort(displayedClientList, comparatorCEAge);
+                        break;
+                }
+            } catch (IllegalStateException ex) {
+                //Build 218 If the user uses back arrow to abandon the fragment, calls to
+                // requireActivity() can raise this exception. Load may simply be abandoned
+                // since fragment doesn't exist.
             }
             return "";
         }

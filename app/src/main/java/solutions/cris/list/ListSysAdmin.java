@@ -15,19 +15,17 @@ package solutions.cris.list;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import static solutions.cris.object.Document.Case;
+
 import androidx.appcompat.app.AlertDialog;
 
-import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.database.Cursor;
 import android.os.AsyncTask;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
 import android.view.Menu;
@@ -47,7 +45,7 @@ import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -56,12 +54,16 @@ import solutions.cris.CRISActivity;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
+import solutions.cris.object.Case;
+import solutions.cris.object.Client;
+import solutions.cris.object.Contact;
 import solutions.cris.object.Document;
 import solutions.cris.object.ListItem;
+import solutions.cris.object.ListType;
 import solutions.cris.object.MyWeek;
 import solutions.cris.object.Note;
 import solutions.cris.object.PdfDocument;
-import solutions.cris.object.Sync;
+import solutions.cris.object.Session;
 import solutions.cris.object.Transport;
 import solutions.cris.object.User;
 import solutions.cris.sync.WebConnection;
@@ -79,6 +81,8 @@ public class ListSysAdmin extends CRISActivity {
     //private Date startTime;
     // build 179
     boolean inProgress = false;
+    // Build 233 Used to differntiate bewteen check mode and migration mode in FSM Migration
+    boolean doMigration = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,10 +108,14 @@ public class ListSysAdmin extends CRISActivity {
             menuItems.add(new CRISMenuItem("Remove Duplicate Notes", "", R.drawable.ic_system_error, null));
             // Build 148 Check for missing MyWeek website records
             menuItems.add(new CRISMenuItem("Check MyWeek Downloads", "", R.drawable.ic_system_error, null));
-            // Build 181
-            //menuItems.add(new CRISMenuItem("Run SQL", "", R.drawable.ic_system_error, null));
             menuItems.add(new CRISMenuItem("Link Session documents", "", R.drawable.ic_system_error, null));
-
+            // Build 228
+            menuItems.add(new CRISMenuItem("Document Counts", "", R.drawable.ic_system_error, null));
+            // Build 233
+            menuItems.add(new CRISMenuItem("Migrate Free School Meals", "", R.drawable.ic_system_error, null));
+            // Build 239
+            menuItems.add(new CRISMenuItem("Link Sticky Notes", "", R.drawable.ic_system_error, null));
+            //menuItems.add(new CRISMenuItem("Fix Sticky Notes", "", R.drawable.ic_system_error, null));
             // Setup the List view listener
             ListView listView = findViewById(R.id.list_view);
             listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -125,7 +133,7 @@ public class ListSysAdmin extends CRISActivity {
                             break;
                         case "Check MyWeek Downloads":
                             if (inProgress) {
-                                inProgressMessage();
+                                inProgressMessage("Check MyWeek Downloads");
                             } else {
                                 inProgress = true;
                                 // Load the data in the background
@@ -133,11 +141,27 @@ public class ListSysAdmin extends CRISActivity {
                             }
                             break;
                         // Build 181
-                        case "Run SQL":
-                            doSQL();
+                        case "Document Counts":
+                            documentCounts();
                             break;
                         case "Link Session documents":
                             linkSessionDocuments();
+                            break;
+                        // Build 239
+                        case "Link Sticky Notes":
+                            linkStickyNotes();
+                            break;
+                        case "Fix Sticky Notes":
+                            fixStickyNotes();
+                            break;
+                        // Build 233
+                        case "Migrate Free School Meals":
+                            if (inProgress) {
+                                inProgressMessage("Migrate Free School Meals");
+                            } else {
+                                inProgress = true;
+                                migrateFreeSchoolMeals();
+                            }
                             break;
                         default:
                             throw new CRISException("Invalid main Menu Option: " + title);
@@ -167,9 +191,9 @@ public class ListSysAdmin extends CRISActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private void inProgressMessage() {
+    private void inProgressMessage(String processName) {
         new AlertDialog.Builder(this)
-                .setTitle("In Progress")
+                .setTitle(processName)
                 .setMessage("The process is still in progress, please wait.")
                 .setPositiveButton("Return", new DialogInterface.OnClickListener() {
                     @Override
@@ -221,7 +245,97 @@ public class ListSysAdmin extends CRISActivity {
         startActivity(intent);
     }
 
-    // Build 181 - Load SessionID field in the database from the SessionID field in teh object
+    // Build 239 To enable sticky notes to be flagged in ListSessionClientsFragment, they are given
+    // a dummy SessionID, if they do not already have one
+    private void linkStickyNotes() {
+        LocalDB localDB = LocalDB.getInstance();
+        String result = "";
+
+        long count = 0;
+        long fixed = 0;
+
+        ArrayList<Document> documents = localDB.getAllDocumentsOfType(Document.Note);
+        for (Document document : documents) {
+            Note note = (Note) document;
+            if (note.isStickyFlag()) {
+                // If not set already. It is possible to set a Session Note as sticky but this
+                // will be over-ridden by the dummy id so that the sticky flag is set for all
+                // sessions
+                // Build 240 - Object needs .equals
+                //if (note.getSessionID() == null || note.getSessionID() != Session.stickyNoteSessionID) {
+                if (note.getSessionID() == null || !note.getSessionID().equals(Session.stickyNoteSessionID)) {
+                    count++;
+                    if (fixed < 400) {
+                        // Build 240 Use the oldest note
+                        UUID createdByID = localDB.getOriginalCreatorID(note.getDocumentID());
+                        if (createdByID != null) {
+                            fixed++;
+                            User noteAuthor = localDB.getUser(createdByID);
+                            note.setSessionID(Document.stickyNoteSessionID);
+                            note.save(false, noteAuthor);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (count == 0) {
+            result = "No un-linked sticky notes found.";
+        } else {
+            result = String.format("Sticky Note: %d of %d linked\n", fixed, count);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Link Sticky Notes")
+                .setMessage(result)
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
+    }
+
+    private void fixStickyNotes() {
+        LocalDB localDB = LocalDB.getInstance();
+        String result = "";
+
+        long count = 0;
+        long fixed = 0;
+
+        ArrayList<Document> documents = localDB.getAllDocumentsOfType(Document.Note);
+        for (Document document : documents) {
+            Note note = (Note) document;
+            if (note.getSessionID() != null && note.getSessionID().equals(Session.stickyNoteSessionID)) {
+                count++;
+                if (fixed < 400) {
+                    // Build 240 Use the oldest note
+                    UUID createdByID = localDB.getOriginalCreatorID(note.getDocumentID());
+                    if (createdByID != null && !note.getCreatedByID().equals(createdByID)) {
+                        fixed++;
+                        User noteAuthor = localDB.getUser(createdByID);
+                        note.save(false, noteAuthor);
+                    }
+                }
+            }
+        }
+
+        if (count == 0) {
+            result = "No un-fixed sticky notes found.";
+        } else {
+            result = String.format("Sticky Note: %d of %d fixed\n", fixed, count);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Fix Sticky Notes")
+                .setMessage(result)
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
+    }
+
+    // Build 181 - Load SessionID field in the database from the SessionID field in the object
     // for Note, MyWeek, Transport and PDF documents. Method is locate the documents to update
     // and re-save them. (Change already made in Save to update the field)
     private void linkSessionDocuments() {
@@ -237,7 +351,7 @@ public class ListSysAdmin extends CRISActivity {
             Transport transport = (Transport) document;
             if (transport.getSessionID() != null && transport.getSessionID().toString().length() > 0) {
                 // Check that SessionID is set in the database
-                if (!localDB.isSessionIDSet(document.getDocumentID())) {
+                if (localDB.notSessionIDSet(document.getDocumentID())) {
                     count++;
                     if (fixed < 400) {
                         fixed++;
@@ -253,7 +367,7 @@ public class ListSysAdmin extends CRISActivity {
                 PdfDocument pdfDocument = (PdfDocument) document;
                 if (pdfDocument.getSessionID() != null && pdfDocument.getSessionID().toString().length() > 0) {
                     // Check that SessionID is set in the database
-                    if (!localDB.isSessionIDSet(document.getDocumentID())) {
+                    if (localDB.notSessionIDSet(document.getDocumentID())) {
                         count++;
                         if (fixed < 400) {
                             fixed++;
@@ -270,7 +384,7 @@ public class ListSysAdmin extends CRISActivity {
                 MyWeek myWeek = (MyWeek) document;
                 if (myWeek.getSessionID() != null && myWeek.getSessionID().toString().length() > 0) {
                     // Check that SessionID is set in the database
-                    if (!localDB.isSessionIDSet(document.getDocumentID())) {
+                    if (localDB.notSessionIDSet(document.getDocumentID())) {
                         count++;
                         if (fixed < 400) {
                             fixed++;
@@ -287,7 +401,7 @@ public class ListSysAdmin extends CRISActivity {
                 Note note = (Note) document;
                 if (note.getSessionID() != null && note.getSessionID().toString().length() > 0) {
                     // Check that SessionID is set in the database
-                    if (!localDB.isSessionIDSet(document.getDocumentID())) {
+                    if (localDB.notSessionIDSet(document.getDocumentID())) {
                         count++;
                         if (fixed < 400) {
                             fixed++;
@@ -312,6 +426,84 @@ public class ListSysAdmin extends CRISActivity {
                     }
                 })
                 .show();
+    }
+
+    private void documentCounts() {
+        LocalDB localDB = LocalDB.getInstance();
+        String result = "";
+
+        ArrayList<Document> documents = localDB.getAllDocumentsOfType(Case);
+        result += String.format("Cases: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.Client);
+        result += String.format("Clients: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.ClientSession);
+        result += String.format("Sessions: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.Contact);
+        result += String.format("Contacts: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.CriteriaAssessmentTool);
+        result += String.format("CATs: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.Image);
+        result += String.format("Images: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.MACAYC18);
+        result += String.format("MACAs: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.MyWeek);
+        result += String.format("MyWeeks: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.Note);
+        result += String.format("Notes: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.PdfDocument);
+        result += String.format("Pdf Documents: %d\n", documents.size());
+        documents = localDB.getAllDocumentsOfType(Document.Transport);
+        result += String.format("Transport Requirements: %d\n", documents.size());
+        ArrayList<ListItem> listItems = localDB.getAllListItems(ListType.AGENCY.toString(), false);
+        result += String.format("Agencies: %d\n", listItems.size());
+        listItems = localDB.getAllListItems(ListType.SCHOOL.toString(), false);
+        result += String.format("Schools: %d\n", listItems.size());
+        listItems = localDB.getAllListItems(ListType.TRANSPORT_ORGANISATION.toString(), false);
+        result += String.format("Transport Organisations: %d\n", listItems.size());
+
+        new AlertDialog.Builder(this)
+                .setTitle("SQL Results")
+                .setMessage(result)
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .show();
+    }
+
+    // Build 233
+    private void migrateFreeSchoolMeals() {
+
+        String message = "The FSM checkbox will be set in each current Case document with a current " +
+                "School Contact document with FSM  checked. This migration is re-runnable " +
+                "since it does not clear the flag in the School Contact record or clear " +
+                "flags in the Case document where the School Contact flag has been unset.";
+        new AlertDialog.Builder(this)
+                .setTitle("Free School Meals - Migration")
+                .setMessage(message)
+                .setNeutralButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                    }
+                })
+                .setNegativeButton("Check Mode", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        doMigration = false;
+                        new doFSMMigration().execute();
+                    }
+                })
+                .setPositiveButton("Migrate", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        doMigration = true;
+                        new doFSMMigration().execute();
+                    }
+                })
+                .show();
+
     }
 
     private void doSQL() {
@@ -464,7 +656,121 @@ public class ListSysAdmin extends CRISActivity {
             intent.putExtra("message", output);
             startActivity(intent);
         }
+    }
 
+    /**
+     * An asynchronous task that handles the loading and processing of the KPI data.
+     * Placing the API calls in their own task ensures the UI stays responsive.
+     */
+    private class doFSMMigration extends AsyncTask<Void, Integer, String> {
+
+        @Override
+        protected String doInBackground(Void... params) {
+            LocalDB localDB = LocalDB.getInstance();
+            int schoolContactCount = 0;
+            int updateCount = 0;
+
+            ArrayList<String> results = new ArrayList<>();
+            // Get a list of current School Contact records
+            ArrayList<Document> documents = localDB.getAllDocumentsOfType(Document.Contact);
+            if (documents.size() > 0) {
+                Contact contact = null;
+                Contact previousSchoolContact = null;
+                UUID previousClientID = null;
+                for (Document document : documents) {
+                    // Only interested in most recent School Contacts
+                    contact = (Contact) document;
+                    if (contact.getContactType() != null &&
+                            contact.getContactType().getItemValue().equals("School Contact")) {
+                        // Look for new clients
+                        if (previousClientID == null || !previousClientID.equals(contact.getClientID())) {
+                            // Client has changed so remember this client
+                            previousClientID = contact.getClientID();
+                            // If not the first time
+                            if (previousSchoolContact != null) {
+                                // Most recent School Contact
+                                String thisResult = doOneFSM(previousSchoolContact, doMigration);
+                                results.add(thisResult);
+                                schoolContactCount++;
+                                if (thisResult.contains("set to FSM.")) {
+                                    updateCount++;
+                                }
+                            }
+                        }
+                        // Remember this contact in case client changes
+                        previousSchoolContact = contact;
+                    }
+                }
+                // Pick up the last one since it must be a
+                if (previousSchoolContact != null) {
+                    String thisResult = doOneFSM(previousSchoolContact, doMigration);
+                    results.add(thisResult);
+                    schoolContactCount++;
+                    if (thisResult.contains("set to FSM.")) {
+                        updateCount++;
+                    }
+                }
+            }
+
+            String output = String.format("Num. School Contacts/Updates: %d/%d\n\n", schoolContactCount, updateCount);
+            results.sort(String::compareTo);
+            for (String result : results) {
+                output += result;
+            }
+            return output;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            // Runs on UI Thread
+
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            inProgress = false;
+            // Runs on UI Thread
+            Intent intent = new Intent(getBaseContext(), AlertAndContinue.class);
+            intent.putExtra("title", String.format("Free School Meals - Migration"));
+            intent.putExtra("message", result);
+            startActivity(intent);
+        }
+
+        // Build 233
+        private String doOneFSM(Contact contact, boolean doMigration) {
+            LocalDB localDB = LocalDB.getInstance();
+            String result = "";
+            Client client = (Client) localDB.getDocument(contact.getClientID());
+            result = String.format("%s-", client.getFullName());
+            // Only interested if the FSM is set in a current school document
+            if (contact.getEndDate().getTime() != Long.MIN_VALUE) {
+                result += "School ended.";
+
+            } else if (!contact.isFreeSchoolMeals()) {
+                result += "No FSM in School.";
+            } else {
+                // Get the most recent case document
+                ArrayList<Document> documents = localDB.getAllDocumentsOfType(contact.getClientID(), Case);
+                if (documents.size() > 0) {
+                    // Get thelatest document in the set
+                    Case latestCase = (Case) documents.get(documents.size() - 1);
+                    if (latestCase.isFreeSchoolMeals()) {
+                        result += "Already FSM.";
+                    } else {
+                        if (doMigration) {
+                            latestCase.setFreeSchoolMeals(true);
+                            latestCase.save(false);
+                            result += "Case set to FSM.";
+                        } else {
+                            result += "Would set to FSM.";
+                        }
+                    }
+                } else {
+                    result += "No Case Found.";
+                }
+            }
+            return result + "\n";
+        }
 
     }
 

@@ -34,6 +34,8 @@ public abstract class Document extends CrisObject implements Serializable, Docum
     // a way that older versions cannot be deserialised.
     private static final long serialVersionUID = CrisObject.SVUID_DOCUMENT;
     public static final UUID nonClientDocumentID = UUID.fromString("a5d087dc-92d2-11e6-ae22-56b6b6499611");
+    // Build 239 - Dummy sessionID for StickNotes
+    public static final UUID stickyNoteSessionID = UUID.fromString("8d458715-9696-4458-b3b4-0d83a24c52e5");
 
     public enum Mode {NEW, READ, EDIT, RESPONSE}
 

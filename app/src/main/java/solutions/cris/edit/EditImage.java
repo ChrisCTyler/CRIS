@@ -15,8 +15,10 @@ package solutions.cris.edit;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -311,8 +313,10 @@ public class EditImage extends Fragment {
             public void onClick(View view) {
                 // Cancel so no need to update list of documents
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         });
         // Save Button
@@ -322,8 +326,10 @@ public class EditImage extends Fragment {
             public void onClick(View view) {
                 if (validate()) {
                     if (save()) {
-                        FragmentManager fragmentManager = getFragmentManager();
-                        fragmentManager.popBackStack();
+                        // Build 200 Use the androidX Fragment class
+                        //FragmentManager fragmentManager = getFragmentManager();
+                        //fragmentManager.popBackStack();
+                        getParentFragmentManager().popBackStack();
                     }
                 }
             }
@@ -407,8 +413,10 @@ public class EditImage extends Fragment {
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     if (save()) {
-                                        FragmentManager fragmentManager = getFragmentManager();
-                                        fragmentManager.popBackStack();
+                                        // Build 200 Use the androidX Fragment class
+                                        //FragmentManager fragmentManager = getFragmentManager();
+                                        //fragmentManager.popBackStack();
+                                        getParentFragmentManager().popBackStack();
                                     }
                                 }
                             }
@@ -427,8 +435,10 @@ public class EditImage extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 if (save()) {
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                 }
             }
         }

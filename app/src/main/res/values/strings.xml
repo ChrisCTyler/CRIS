@@ -12,6 +12,7 @@
     <string name="prompt_additional_information">Additional Information</string>
     <string name="prompt_agency_name">Agency Name*</string>
     <string name="prompt_author">Author*</string>
+    <string name="prompt_attendance_points">Attendance points*</string>
     <string name="prompt_cat_home_situation">Home Situation*</string>
     <string name="prompt_cat_child_status">Status*</string>
     <string name="prompt_cat_cond_mental_health">Mental Health Issues</string>
@@ -27,6 +28,15 @@
     <string name="prompt_cat_person_cared_for">Number and Type of People Cared For</string>
     <string name="prompt_cat_type_of_care">Type of Care Provided*</string>
     <string name="prompt_cat_type_of_conditions">Conditions Suffered by People Cared For*</string>
+    <string name="prompt_pf_pupil_premium">Pupil Premium</string>
+    <string name="prompt_pf_free_school_meals">Free School Meals</string>
+    <string name="prompt_pf_child_protection_plan">Child Protection Plan</string>
+    <string name="prompt_pf_child_in_need_plan">Child In Need Plan</string>
+    <string name="prompt_pf_taf_early_help_plan">TAF/Early Help Plan</string>
+    <string name="prompt_pf_social_services_recommendation">Social ServicesRecommendation</string>
+    <string name="prompt_pf_other_plan_financial_support">Other Plan/Financial Support</string>
+    <string name="prompt_pf_last_review_date">Last Review Date</string>
+    <string name="prompt_pf_last_reviewed_by">Last Reviewed By</string>
     <string name="prompt_toc_domestic1">Domestic - washing, cleaning, preparing food</string>
     <string name="prompt_toc_domestic2">Domestic - assistance with shopping</string>
     <string name="prompt_toc_personal">Personal: assistance with washing person caring for, dressing, administering medication etc.</string>
@@ -135,6 +145,7 @@
     <string name="action_add">Add</string>
     <string name="action_about">About</string>
     <string name="action_authenticating">Authenticating...</string>
+    <string name="action_batch_invite">Invite</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_cancel_changes">Cancel Changes</string>
     <string name="action_continue">Continue</string>
@@ -154,6 +165,7 @@
     <string name="action_resync_30">Re-sync last 30 days</string>
     <string name="action_resync_60">Re-sync last 60 days</string>
     <string name="action_resync_90">Re-sync last 90 days</string>
+    <string name="action_review">  Review  </string>
     <string name="action_save">Save</string>
     <string name="action_send_emails">Send Emails</string>
     <string name="action_send_texts">Send Texts</string>
@@ -190,6 +202,7 @@
     <string name="error_login_failed">Login failed</string>
     <string name="error_number_not_positive">Number must be greater than zero</string>
     <string name="error_number_0_to_5">Number must be between 0 and 5</string>
+    <string name="error_number_0_to_10">Number must be between 0 and 10</string>
     <string name="error_field_required">This field is required</string>
     <string name="error_file_not_found">File not found</string>
     <string name="error_not_connected">No Internet connection, cannot continue/</string>

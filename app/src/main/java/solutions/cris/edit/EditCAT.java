@@ -14,8 +14,10 @@ package solutions.cris.edit;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -574,8 +576,10 @@ public class EditCAT extends Fragment {
             public void onClick(View view) {
                 // Cancel so no need to update list of documents
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         });
         // Save Button
@@ -585,8 +589,10 @@ public class EditCAT extends Fragment {
             public void onClick(View view) {
                 if (validate()) {
                     editDocument.save(isNewMode);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                 }
             }
         });
@@ -715,8 +721,10 @@ public class EditCAT extends Fragment {
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     editDocument.save(isNewMode);
-                                    FragmentManager fragmentManager = getFragmentManager();
-                                    fragmentManager.popBackStack();
+                                    // Build 200 Use the androidX Fragment class
+                                    //FragmentManager fragmentManager = getFragmentManager();
+                                    //fragmentManager.popBackStack();
+                                    getParentFragmentManager().popBackStack();
                                 }
                             }
                         }
@@ -734,8 +742,10 @@ public class EditCAT extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 editDocument.save(isNewMode);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         }
     }

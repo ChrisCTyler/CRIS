@@ -15,16 +15,17 @@ package solutions.cris.read;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.os.Bundle;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
+import androidx.fragment.app.Fragment;
 
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -202,58 +203,94 @@ public class ReadClientHeader extends ListActivity {
     private void doReadDocument() {
         Document thisDocument = getDocument();
         localDB.read(thisDocument, getCurrentUser());
-        FragmentManager fragmentManager = getFragmentManager();
-        FragmentTransaction fragmentTransaction;
+        // Build 200 Use the androidX Fragment class
+        //FragmentManager fragmentManager = getFragmentManager();
+        //FragmentTransaction fragmentTransaction;
         Fragment fragment;
         switch (getDocument().getDocumentType()) {
             case Document.Case:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new ReadCase();
-                fragmentTransaction.replace(R.id.content, fragment);
-                //fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new ReadCase();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                ////fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, ReadCase.class, null )
+                        .commit();
                 break;
             case Document.Client:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new ReadClient();
-                fragmentTransaction.replace(R.id.content, fragment);
-                //fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new ReadClient();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                ////fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, ReadClient.class, null )
+                        .commit();
                 break;
             case Document.Contact:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new ReadContact();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new ReadContact();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, ReadContact.class, null )
+                        .commit();
                 break;
             case Document.CriteriaAssessmentTool:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new ReadCAT();
-                fragmentTransaction.replace(R.id.content, fragment);
-                //fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new ReadCAT();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                ////fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, ReadCAT.class, null )
+                        .commit();
                 break;
             case Document.Image:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new ReadImage();
-                fragmentTransaction.replace(R.id.content, fragment);
-                //fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new ReadImage();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                ////fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, ReadImage.class, null )
+                        .commit();
                 break;
             case Document.MyWeek:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new ReadMyWeek();
-                fragmentTransaction.replace(R.id.content, fragment);
-                //fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new ReadMyWeek();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                ////fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, ReadMyWeek.class, null )
+                        .commit();
                 break;
             case Document.Note:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new EditNote();
-                fragmentTransaction.replace(R.id.content, fragment);
-                //fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new EditNote();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                ////fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, EditNote.class, null )
+                        .commit();
                 break;
             case Document.PdfDocument:
                 PdfDocument.displayPDFDocument((PdfDocument) getDocument(), this);
@@ -265,11 +302,16 @@ public class ReadClientHeader extends ListActivity {
                 }
                 break;
             case Document.Transport:
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new ReadTransport();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new ReadTransport();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getSupportFragmentManager().beginTransaction()
+                        //.addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, ReadTransport.class, null )
+                        .commit();
                 break;
         }
     }

@@ -216,7 +216,9 @@ public class EditGroup extends CRISActivity {
         editGroup.setIsDefault(isDefault.isChecked());
 
         //Keyworker
-        User newKeyworker = keyworkerPickList.getUsers().get(keyworkerSpinner.getSelectedItemPosition());
+        // Build 200 - PickList.getUsers replaced with getObjects
+        //User newKeyworker = keyworkerPickList.getUsers().get(keyworkerSpinner.getSelectedItemPosition());
+        User newKeyworker = (User) keyworkerPickList.getObjects().get(keyworkerSpinner.getSelectedItemPosition());
         // Test for Please select
         if (newKeyworker.getUserID().equals(User.unknownUser)) {
                 TextView errorText = (TextView) keyworkerSpinner.getSelectedView();
@@ -232,7 +234,9 @@ public class EditGroup extends CRISActivity {
         }
 
         //Session Coordinator (Not mandatory)
-        User newSessionCoordinator = sessionCoordinatorPickList.getUsers().get(sessionCoordinatorSpinner.getSelectedItemPosition());
+        // Build 200 - PickList.getUsers replaced with getObjects
+        //User newSessionCoordinator = sessionCoordinatorPickList.getUsers().get(sessionCoordinatorSpinner.getSelectedItemPosition());
+        User newSessionCoordinator = (User) sessionCoordinatorPickList.getObjects().get(sessionCoordinatorSpinner.getSelectedItemPosition());
         if (!newSessionCoordinator.getUserID().equals(User.unknownUser)) {
             editGroup.setSessionCoordinatorID(newSessionCoordinator.getUserID());
             // PickList contained

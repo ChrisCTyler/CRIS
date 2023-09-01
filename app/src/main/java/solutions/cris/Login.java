@@ -315,11 +315,13 @@ public class Login extends CRISActivity {
 
                 }
                 if (deviceManager.isAdminActive(compName)) {
-                    deviceManager.setPasswordQuality(compName, DevicePolicyManager.PASSWORD_QUALITY_SOMETHING);
-                    if (!deviceManager.isActivePasswordSufficient()) {
-                        Intent intent = new Intent(DevicePolicyManager.ACTION_SET_NEW_PASSWORD);
-                        startActivity(intent);
-                    }
+                    // Build 199 limit_password policy has been deprecated and now raises a security exception
+                    // if the following code is run. Have to assume that password has been set
+                    //deviceManager.setPasswordQuality(compName, DevicePolicyManager.PASSWORD_QUALITY_SOMETHING);
+                    //if (!deviceManager.isActivePasswordSufficient()) {
+                    //    Intent intent = new Intent(DevicePolicyManager.ACTION_SET_NEW_PASSWORD);
+                    //    startActivity(intent);
+                    //}
                 }
                 break;
             default:

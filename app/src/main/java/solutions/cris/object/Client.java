@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
+import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
 import solutions.cris.utils.SwipeDetector;
@@ -93,9 +94,9 @@ public class Client extends Document implements Serializable {
             age = now.get(Calendar.YEAR) - dob.get(Calendar.YEAR);
             int monthDOB = dob.get(Calendar.MONTH);
             int monthNow = now.get(Calendar.MONTH);
-            if (monthNow < monthDOB){
+            if (monthNow < monthDOB) {
                 age--;
-            } else if (monthNow == monthDOB){
+            } else if (monthNow == monthDOB) {
                 int dayDOB = dob.get(Calendar.DAY_OF_MONTH);
                 int dayToday = now.get(Calendar.DAY_OF_MONTH);
                 if (dayToday < dayDOB) {
@@ -109,7 +110,7 @@ public class Client extends Document implements Serializable {
     }
 
     // Build 139 - Add Year Group to Export
-    public int getYearGroup(){
+    public int getYearGroup() {
         // Changes for DoB 1st September
         // Year Group 1 = 5 years old on or before 1st Sept
         // Range  is 1 to 14, if child under 5 then 0 if over 19 then 99
@@ -121,17 +122,19 @@ public class Client extends Document implements Serializable {
         Calendar today = Calendar.getInstance();
         today.setTime(CRISUtil.midnightEarlier(new Date()));
         int yearStart = today.get(Calendar.YEAR);
-        if (today.get(Calendar.MONTH) < 8){{
-            yearStart--;
-        }}
+        if (today.get(Calendar.MONTH) < 8) {
+            {
+                yearStart--;
+            }
+        }
         int yearGroup = yearStart - dob.get(Calendar.YEAR);
-        if (dob.get(Calendar.MONTH )>= 8){
+        if (dob.get(Calendar.MONTH) >= 8) {
             yearGroup--;
         }
-        if (yearGroup < 5){
+        if (yearGroup < 5) {
             yearGroup = 0;
         } else {
-            yearGroup = yearGroup -4;
+            yearGroup = yearGroup - 4;
         }
         if (yearGroup > 14) {
             yearGroup = 99;
@@ -310,7 +313,7 @@ public class Client extends Document implements Serializable {
     public Document getCurrentTool() {
         if (currentToolID == null) {
             currentTool = null;
-        } else if (currentTool == null){
+        } else if (currentTool == null) {
             LocalDB localDB = LocalDB.getInstance();
             currentTool = localDB.getDocument(currentToolID);
         }
@@ -335,7 +338,7 @@ public class Client extends Document implements Serializable {
     public Case getCurrentCase() {
         if (currentCaseID == null) {
             currentCase = null;
-        } else if (currentCase == null){
+        } else if (currentCase == null) {
             LocalDB localDB = LocalDB.getInstance();
             currentCase = (Case) localDB.getDocument(currentCaseID);
         }
@@ -395,7 +398,7 @@ public class Client extends Document implements Serializable {
     public solutions.cris.object.Contact getCurrentSchool() {
         if (currentSchoolID == null) {
             currentSchool = null;
-        } else if (currentSchool == null){
+        } else if (currentSchool == null) {
             LocalDB localDB = LocalDB.getInstance();
             currentSchool = (Contact) localDB.getDocument(currentSchoolID);
         }
@@ -420,7 +423,7 @@ public class Client extends Document implements Serializable {
     public solutions.cris.object.Contact getCurrentAgency() {
         if (currentAgencyID == null) {
             currentAgency = null;
-        } else if (currentAgency == null){
+        } else if (currentAgency == null) {
             LocalDB localDB = LocalDB.getInstance();
             currentAgency = (Contact) localDB.getDocument(currentAgencyID);
         }
@@ -533,6 +536,19 @@ public class Client extends Document implements Serializable {
         this.sessionsDNA = sessionsDNA;
     }
 
+    // Build 201 - Added Attendance points to session and score here.
+    // Calculation method changed from load in ListClientDocuments to the method
+    // client.loadSessionExportData()
+    private int attendanceScore;
+
+    public int getAttendanceScore() {
+        return attendanceScore;
+    }
+
+    public void setAttendanceScore(int attendanceScore) {
+        this.attendanceScore = attendanceScore;
+    }
+
     public String lastEntry() {
         String duration = "Unknown";
         if (latestDocument != null) {
@@ -579,7 +595,7 @@ public class Client extends Document implements Serializable {
         return duration;
     }
 
-    public void clear(){
+    public void clear() {
         setCurrentAgency(null);
         setCurrentSchool(null);
         setGender(null);
@@ -672,13 +688,13 @@ public class Client extends Document implements Serializable {
         @Override
         public int compare(Client o1, Client o2) {
             Date o1Start;
-            if (o1.getStartCase() != null){
+            if (o1.getStartCase() != null) {
                 o1Start = o1.getStartCase().getReferenceDate();
             } else {
                 o1Start = new Date(Long.MAX_VALUE);
             }
             Date o2Start;
-            if (o2.getStartCase() != null){
+            if (o2.getStartCase() != null) {
                 o2Start = o2.getStartCase().getReferenceDate();
             } else {
                 o2Start = new Date(Long.MAX_VALUE);
@@ -757,8 +773,7 @@ public class Client extends Document implements Serializable {
         }
     };
 
-    private static List<Object> getExportFieldNames(Activity activity) {
-        final LocalSettings localSettings = LocalSettings.getInstance(activity);
+    public static List<Object> getExportFieldNames(LocalSettings localSettings) {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -795,18 +810,26 @@ public class Client extends Document implements Serializable {
         fNames.add("Sessions Attended");
         fNames.add("Sessions Cancelled");
         fNames.add("Sessions DNA");
+        fNames.add("Attendance Score");
         return fNames;
     }
 
-    public static List<List<Object>> getClientData(ArrayList<Client> adapterList, Activity activity) {
+    /*
+    public static List<List<Object>> getClientData(ArrayList<Client> adapterList,
+                                                   LocalSettings localSettings,
+                                                   LocalDB localDB,
+                                                   Date startDate,
+                                                   Date endDate) {
         List<List<Object>> content = new ArrayList<>();
-        content.add(getExportFieldNames(activity));
+        content.add(getExportFieldNames(localSettings));
         for (Client client : adapterList) {
             content.add(client.getExportData());
         }
         return content;
 
     }
+
+     */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();
@@ -1030,28 +1053,28 @@ public class Client extends Document implements Serializable {
         } else {
             row.add("");
         }
-        if (getStartCase() != null){
+        if (getStartCase() != null) {
             row.add(sDate.format(getStartCase().getReferenceDate()));
         } else {
             row.add("");
         }
-        if (getDaysToFirstSession() == 0){
+        if (getDaysToFirstSession() == 0) {
             row.add("");
         } else {
             row.add(String.format(Locale.UK, "%d", getDaysToFirstSession()));
         }
-        if (getDaysToFirstAttendedSession() == 0){
+        if (getDaysToFirstAttendedSession() == 0) {
             row.add("");
         } else {
             row.add(String.format(Locale.UK, "%d", getDaysToFirstAttendedSession()));
         }
-        if (getCurrentCase() != null && getCurrentCase().getCaseType().equals("Close")){
+        if (getCurrentCase() != null && getCurrentCase().getCaseType().equals("Close")) {
             row.add(sDate.format(getCurrentCase().getReferenceDate()));
 
         } else {
             row.add("");
         }
-        if (isTransportRequired()){
+        if (isTransportRequired()) {
             row.add("TRUE");
         } else {
             row.add("FALSE");
@@ -1062,6 +1085,8 @@ public class Client extends Document implements Serializable {
         row.add(String.format(Locale.UK, "%d", getSessionsAttended()));
         row.add(String.format(Locale.UK, "%d", getSessionsCancelled()));
         row.add(String.format(Locale.UK, "%d", getSessionsDNA()));
+        // Build 201 Added Attendance Points
+        row.add(String.format(Locale.UK, "%d", getAttendanceScore()));
         return row;
     }
 
@@ -1082,7 +1107,7 @@ public class Client extends Document implements Serializable {
             found = text.toLowerCase().contains(searchText.toLowerCase());
             // Build 158 - Removed currentcase search to speed up search (about 4x)
             //if (!found) {
-                // So that search works as expected in ListClients
+            // So that search works as expected in ListClients
             //if (currentCase != null) {
             //    found = currentCase.search(searchText);
             //}
@@ -1118,7 +1143,7 @@ public class Client extends Document implements Serializable {
     }
 
 
-    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action){
+    public static String getChanges(LocalDB localDB, UUID previousRecordID, UUID thisRecordID, SwipeDetector.Action action) {
         Client previousDocument = (Client) localDB.getDocumentByRecordID(previousRecordID);
         Client thisDocument = (Client) localDB.getDocumentByRecordID(thisRecordID);
         String changes = Document.getChanges(previousDocument, thisDocument);
@@ -1134,7 +1159,7 @@ public class Client extends Document implements Serializable {
         changes += CRISUtil.getChanges(previousDocument.getCurrentAgency(), thisDocument.getCurrentAgency(), "Current Agency");
         changes += CRISUtil.getChanges(previousDocument.getCurrentSchool(), thisDocument.getCurrentSchool(), "Current School");
         changes += CRISUtil.getChanges(previousDocument.getCurrentCase(), thisDocument.getCurrentCase());
-        if (changes.length() == 0){
+        if (changes.length() == 0) {
             changes = "No changes found.\n";
         }
         changes += "-------------------------------------------------------------\n";

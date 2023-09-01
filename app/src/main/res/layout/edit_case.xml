@@ -476,6 +476,158 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/plan_finance_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:text="Plans and Financial Support"
+                    android:textSize="@dimen/text_size_spinner_hint" />
+
+                <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:id="@+id/plan_finance_hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_marginLeft="5dp"
+                        android:layout_marginRight="5dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_hint" />
+
+                    <TextView
+                        android:id="@+id/plan_finance_hint_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="0dp"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginRight="10dp"
+                        android:layout_marginBottom="0dp"
+                        android:textSize="@dimen/text_size_hint"
+                        android:textStyle="italic" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/plan_finance_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/spinner_hint_margin"
+                    android:textColor="@color/black"
+                    android:visibility="gone" />
+
+                <CheckBox
+                    android:id="@+id/pf_pupil_premium"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_pf_pupil_premium"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pf_free_school_meals"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_pf_free_school_meals"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pf_child_protection_plan"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_pf_child_protection_plan"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pf_child_in_need_plan"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_pf_child_in_need_plan"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pf_taf_early_help_plan"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_pf_taf_early_help_plan"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pf_social_services_recommendation"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_pf_social_services_recommendation"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <CheckBox
+                    android:id="@+id/pf_other_plan_financial_support"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:checked="false"
+                    android:text="@string/prompt_pf_other_plan_financial_support"
+                    android:textSize="@dimen/text_size_hint" />
+
+                <LinearLayout
+                    android:id="@+id/review_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/review_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/action_review"/>
+
+                    <TextView
+                        android:id="@+id/last_review_date_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="0"
+                        android:layout_marginLeft="@dimen/spinner_hint_margin"
+                        android:textColor="@color/black" />
+
+
+                    <TextView
+                        android:id="@+id/last_reviewed_by_read_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="10"
+                        android:layout_marginLeft="@dimen/spinner_hint_margin"
+                        android:textColor="@color/black" />
+
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/spinner_divider_height"
+                    android:src="@drawable/divider" />
+
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
                     android:id="@+id/transport_required_label_text"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

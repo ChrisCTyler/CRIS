@@ -78,6 +78,10 @@ public class ListKPI extends CRISActivity {
             menuItems = new ArrayList<>();
             menuItems.add(new CRISMenuItem("Total Cases", "", R.drawable.ic_list, null));
             menuItems.add(new CRISMenuItem("Total Cases (Last 12 Months)", "", R.drawable.ic_list, null));
+            // Build 232
+            menuItems.add(new CRISMenuItem("Plan/Fin.Supp. Cases", "", R.drawable.ic_list, null));
+            menuItems.add(new CRISMenuItem("Plan/Fin.Supp. Cases (Last 12 Months)", "", R.drawable.ic_list, null));
+
             menuItems.add(new CRISMenuItem("Total/Active Cases", "", R.drawable.ic_list, null));
             menuItems.add(new CRISMenuItem("Total/Active Cases (Last 12 Months)", "", R.drawable.ic_list, null));
             menuItems.add(new CRISMenuItem("Avg. Session Attendance", "", R.drawable.ic_list, null));
@@ -85,6 +89,9 @@ public class ListKPI extends CRISActivity {
             // Build 157 - Total Attendance KPIs
             menuItems.add(new CRISMenuItem("Total Session Attendance", "", R.drawable.ic_list, null));
             menuItems.add(new CRISMenuItem("Total Session Attendance (Last 12 Months)", "", R.drawable.ic_list, null));
+            // Build 232
+            menuItems.add(new CRISMenuItem("Plan/Fin.Supp. Session Attendance", "", R.drawable.ic_list, null));
+            menuItems.add(new CRISMenuItem("Plan/Fin.Supp. Session Attendance (Last 12 Months)", "", R.drawable.ic_list, null));
 
             // Setup the List view listener
             ListView listView = findViewById(R.id.list_view);

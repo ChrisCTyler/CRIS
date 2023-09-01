@@ -1,6 +1,8 @@
 package solutions.cris.read;
 
-import android.app.Fragment;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+import androidx.fragment.app.Fragment;
 import android.content.Intent;
 import android.os.Bundle;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;

@@ -154,7 +154,7 @@ public class MyWeek extends Status implements Serializable {
         return changes;
     }
 
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -172,6 +172,7 @@ public class MyWeek extends Status implements Serializable {
         return fNames;
     }
 
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getMyWeekData(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -187,6 +188,8 @@ public class MyWeek extends Status implements Serializable {
         }
         return content;
     }
+
+     */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();

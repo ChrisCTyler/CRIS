@@ -15,9 +15,6 @@ package solutions.cris.list;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -36,6 +33,13 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -74,6 +78,7 @@ import solutions.cris.object.User;
 import solutions.cris.utils.CRISExport;
 import solutions.cris.utils.LocalSettings;
 import solutions.cris.utils.PickList;
+import solutions.cris.utils.PickListDialogFragment;
 
 /**
  * Copyright CRIS.Solutions 13/12/2016.
@@ -81,19 +86,24 @@ import solutions.cris.utils.PickList;
 
 public class ListClientsFragment extends Fragment {
 
+    public static final int REVIEW_OVERDUE_THRESHOLD_DAYS = 90;
+
+
     private ListView listView;
     private TextView footer;
     private View parent;
     private LocalDB localDB;
     private User currentUser;
     private LocalSettings localSettings;
-    private SelectMode selectMode = SelectMode.OPEN;
+    // Build 200 Moved to ListActivity to allow PickListDialogFragment to access
+    //private SelectMode selectMode = SelectMode.OPEN;
     private SortMode sortMode = SortMode.LAST_FIRST;
     private SearchView sv;
     private String searchText = "";
     private boolean isSearchIconified = true;
-    private UUID selectedID = null;
-    private String selectedValue = "";
+    // Build 200 Moved to ListActivity to allow PickListDialogFragment to access
+    //private UUID selectedID = null;
+    //private String selectedValue = "";
     ArrayList<Client> clientList;
     private ClientAdapter adapter;
     private String footerText;
@@ -104,9 +114,16 @@ public class ListClientsFragment extends Fragment {
     // Build 160
     boolean myClients = true;
 
-    // Build 110 - Added School, Agency
-    private enum SelectMode {ALL, OPEN, FOLLOWED, GROUP, KEYWORKER, COMMISSIONER, OVERDUE, SCHOOL, AGENCY}
+    // Build 200 - This is called by the event listener in ListClients as a result of a OK
+    // in the PickListDialogFragment
+    public void pickListDialogFragmentOK() {
+        new LoadAdapter().execute();
+    }
 
+    // Build 110 - Added School, Agency
+    // Build 200 - Replaced single selection with checkbox selection for picklists
+    // Build 200 Moved to ListActivity to allow PickListDialogFragment to access
+    //private enum SelectMode {ALL, OPEN, FOLLOWED, GROUP, KEYWORKER, COMMISSIONER, OVERDUE, SCHOOL, AGENCY, GROUPS}
     private enum SortMode {FIRST_LAST, LAST_FIRST, GROUP, KEYWORKER, STATUS, CASE_START, AGE}
 
     @Override
@@ -117,6 +134,10 @@ public class ListClientsFragment extends Fragment {
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.layout_list, container, false);
         footer = getActivity().findViewById(R.id.footer);
+        // Build 200 Instantiate a new SelectdIDs array and set the defualt mode to OPEN
+        ((ListClients) getActivity()).setSelectedIDs(new ArrayList<>());
+        ((ListClients) getActivity()).clearSelectedValues();
+        ((ListActivity) getActivity()).setSelectMode(((ListActivity.SelectMode.OPEN)));
         return parent;
     }
 
@@ -240,6 +261,13 @@ public class ListClientsFragment extends Fragment {
                 }
                 // Load the Adapter since display of updated client needs to be checked.
                 new LoadAdapter().execute();
+            } else {
+                // Build 237 - If the select mode is 'awaiting review' then re-load the
+                // adapter because the review status of the previously selected document
+                // may well have been updated (that's the reason for this select mode
+                if ((((ListActivity) requireActivity()).getSelectMode()) == ListActivity.SelectMode.REVIEW_OVERDUE){
+                    new LoadAdapter().execute();
+                }
             }
             // Clear the document for next time
             ((ListActivity) getActivity()).setDocument(null);
@@ -284,7 +312,12 @@ public class ListClientsFragment extends Fragment {
         }
         // Test explicit select modes
         if (selected) {
-            switch (selectMode) {
+
+            // Build 218 Some users have seen crash here due t0 getActivity() returning null
+            // Replace with requireActivity which raises IllegalStateException which is
+            // trapped in LoadAdapter background task which then exits
+            //switch (((ListActivity) getActivity()).getSelectMode()) {
+            switch (((ListActivity) requireActivity()).getSelectMode()) {
                 case ALL:
                     selected = true;
                     break;
@@ -300,23 +333,7 @@ public class ListClientsFragment extends Fragment {
                 case FOLLOWED:
                     selected = localDB.isFollowing(currentUser.getUserID(), client.getClientID());
                     break;
-                case GROUP:
-                    // New clients (pre-case) have no group
-                    // Build 139 - Second Group
-                    /*
-                    UUID clientID = null;
-
-                    if (client.getCurrentCase() != null) {
-                        Case currentCase = client.getCurrentCase();
-                        if (currentCase.getGroupID() != null &&
-                                !currentCase.getCaseType().equals("Close")) {
-                            clientID = currentCase.getGroupID();
-                        }
-                    }
-                    if (clientID == null || !clientID.equals(selectedID)) {
-                        selected = false;
-                    }
-                    */
+                case GROUPS:
                     boolean match = false;
                     UUID groupID = null;
                     if (client.getCurrentCase() != null) {
@@ -324,13 +341,13 @@ public class ListClientsFragment extends Fragment {
                         if (!currentCase.getCaseType().equals("Close")) {
                             if (currentCase.getGroupID() != null) {
                                 groupID = currentCase.getGroupID();
-                                if (groupID.equals(selectedID)) {
+                                if (((ListClients) requireActivity()).getSelectedIDs().contains(groupID)) {
                                     match = true;
                                 }
                             }
                             if (currentCase.getGroup2ID() != null) {
                                 groupID = currentCase.getGroup2ID();
-                                if (groupID.equals(selectedID)) {
+                                if (((ListClients) requireActivity()).getSelectedIDs().contains(groupID)) {
                                     match = true;
                                 }
                             }
@@ -338,32 +355,64 @@ public class ListClientsFragment extends Fragment {
                     }
                     selected = match;
                     break;
-                case KEYWORKER:
-                    // New clients (pre-case) have no group
-                    UUID clientID = null;
+
+                case KEYWORKERS:
+                    selected = false;
                     if (client.getCurrentCase() != null) {
                         Case currentCase = client.getCurrentCase();
-                        if (currentCase.getKeyWorkerID() != null &&
-                                !currentCase.getCaseType().equals("Close")) {
-                            clientID = currentCase.getKeyWorkerID();
+                        if (!currentCase.getCaseType().equals("Close")) {
+                            if (currentCase.getKeyWorkerID() != null) {
+                                UUID keyworkerID = currentCase.getKeyWorkerID();
+                                if (((ListClients) requireActivity()).getSelectedIDs().contains(keyworkerID)) {
+                                    selected = true;
+                                }
+                            }
                         }
-                    }
-                    if (clientID == null || !clientID.equals(selectedID)) {
-                        selected = false;
                     }
                     break;
-                case COMMISSIONER:
-                    // New clients (pre-case) have no group
-                    clientID = null;
-                    if (client.getCurrentCase() != null) {
-                        Case currentCase = client.getCurrentCase();
-                        if (currentCase.getCommissionerID() != null &&
-                                !currentCase.getCaseType().equals("Close")) {
-                            clientID = currentCase.getCommissionerID();
+
+                // Build 232
+                case REVIEW_OVERDUE:
+                    // Unselect clients who are not due for review
+                    // Build 237 If a review has been carried out in read mode, the
+                    // client.currentCase will not have been updated. Therefore, it is necessary
+                    // to use the localDB.getRelevantCase() even though it will be a bit slower
+                    Case relevantCase = localDB.getRelevantCase(client.getClientID(), new Date());
+                    if (relevantCase == null) {
+                    //if (client.getCurrentCase() == null) {
+                        selected = false;
+                    } else {
+                        //Case currentCase = client.getCurrentCase();
+                        //if (currentCase.getCaseType().equals("Start") ||
+                        //        currentCase.getCaseType().equals("Update")) {
+                        if (relevantCase.getCaseType().equals("Start") ||
+                                relevantCase.getCaseType().equals("Update")) {
+                            Date now = new Date();
+                            long threshold = (now.getTime() / 84600000) - REVIEW_OVERDUE_THRESHOLD_DAYS;
+                            //long overdue = threshold - (currentCase.getlastReviewDate().getTime() / 84600000);
+                            long overdue = threshold - (relevantCase.getlastReviewDate().getTime() / 84600000);
+                            if (overdue <= 0) {
+                                selected = false;
+                            }
+                            // else remain selected
+                        } else {
+                            // Closed and Rejected clients do not appear
+                            selected = false;
                         }
                     }
-                    if (clientID == null || !clientID.equals(selectedID)) {
-                        selected = false;
+                    break;
+                case COMMISSIONERS:
+                    selected = false;
+                    if (client.getCurrentCase() != null) {
+                        Case currentCase = client.getCurrentCase();
+                        if (!currentCase.getCaseType().equals("Close")) {
+                            if (currentCase.getCommissionerID() != null) {
+                                UUID commissionerID = currentCase.getCommissionerID();
+                                if (((ListClients) requireActivity()).getSelectedIDs().contains(commissionerID)) {
+                                    selected = true;
+                                }
+                            }
+                        }
                     }
                     break;
                 case OVERDUE:
@@ -382,59 +431,52 @@ public class ListClientsFragment extends Fragment {
                     }
                     break;
                 //Build 110 Added School, Agency
-                case SCHOOL:
-                    if (client.getCurrentSchoolID() == null) {
-                        selected = false;
-                    } else {
+                case SCHOOLS:
+                    selected = false;
+                    if (client.getCurrentSchoolID() != null) {
                         Contact contactDocument = client.getCurrentSchool();
-                        if (contactDocument == null) {
-                            selected = false;
-                        }
-                        // Build 162 - This fixes a very odd bug where SchoolID was null in a
-                        // Contact Document attached via client.getCurrentSchoolID
-                        else if (contactDocument.getSchoolID() == null) {
-                            selected = false;
-                        } else {
-                            // Build 136 - Only show school with end date later than today
-                            Date now = new Date();
-                            if (contactDocument.getEndDate() != null &&
-                                    contactDocument.getEndDate().getTime() != Long.MIN_VALUE &&
-                                    contactDocument.getEndDate().before(now)) {
-                                selected = false;
-                            }
-                            if (!contactDocument.getSchoolID().equals(selectedID)) {
-                                selected = false;
+                        if (contactDocument != null) {
+                            // Build 162 - This fixes a very odd bug where SchoolID was null in a
+                            // Contact Document attached via client.getCurrentSchoolID
+                            UUID schoolID = contactDocument.getSchoolID();
+                            if (schoolID != null) {
+                                // Build 136 - Only show school with end date later than today
+                                Date now = new Date();
+                                if (contactDocument.getEndDate() == null ||
+                                        contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                        contactDocument.getEndDate().after(now)) {
+                                    if (((ListClients) requireActivity()).getSelectedIDs().contains(schoolID)) {
+                                        selected = true;
+                                    }
+                                }
                             }
                         }
                     }
                     break;
-                case AGENCY:
-                    if (client.getCurrentAgencyID() == null) {
-                        selected = false;
-                    } else {
+                case AGENCIES:
+                    selected = false;
+                    if (client.getCurrentAgencyID() != null) {
                         Contact contactDocument = client.getCurrentAgency();
-                        if (contactDocument == null) {
-                            selected = false;
-                        } // Build 162 - This fixes a very odd bug where AgencyID was null in a
-                        // Contact Document attached via client.getCurrentAgencyID
-                        else if (contactDocument.getAgencyID() == null) {
-                            selected = false;
-                        } else {
-                            // Build 136 - Only show agency with end date later than today
-                            Date now = new Date();
-                            if (contactDocument.getEndDate() != null &&
-                                    contactDocument.getEndDate().getTime() != Long.MIN_VALUE &&
-                                    contactDocument.getEndDate().before(now)) {
-                                selected = false;
-                            }
-                            if (!contactDocument.getAgencyID().equals(selectedID)) {
-                                selected = false;
+                        if (contactDocument != null) {
+                            // Build 162 - This fixes a very odd bug where AgencyID was null in a
+                            // Contact Document attached via client.getCurrentAgencyID
+                            UUID agencyID = contactDocument.getAgencyID();
+                            if (agencyID != null) {
+                                // Build 136 - Only show agency with end date later than today
+                                Date now = new Date();
+                                if (contactDocument.getEndDate() == null ||
+                                        contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                        contactDocument.getEndDate().after(now)) {
+                                    if (((ListClients) requireActivity()).getSelectedIDs().contains(agencyID)) {
+                                        selected = true;
+                                    }
+                                }
                             }
                         }
                     }
                     break;
+
                 default:
-                    // Awaiting Group, Keyworker etc.
                     selected = false;
             }
         }
@@ -447,20 +489,23 @@ public class ListClientsFragment extends Fragment {
     private static final int MENU_SELECT_OPEN_CLIENTS = Menu.FIRST + 3;
     private static final int MENU_SELECT_FOLLOWED_CLIENTS = Menu.FIRST + 4;
     private static final int MENU_SELECT_OVERDUE = Menu.FIRST + 5;
-    private static final int MENU_SELECT_GROUP = Menu.FIRST + 6;
-    private static final int MENU_SELECT_KEYWORKER = Menu.FIRST + 7;
-    private static final int MENU_SELECT_COMMISSIONER = Menu.FIRST + 8;
+    // Build 200 - Replaced single selection with checkbox selection for picklists
+    private static final int MENU_SELECT_GROUPS = Menu.FIRST + 6;
+    private static final int MENU_SELECT_KEYWORKERS = Menu.FIRST + 7;
+    private static final int MENU_SELECT_COMMISSIONERS = Menu.FIRST + 8;
     //Build 110 Added School, Agency
-    private static final int MENU_SELECT_SCHOOL = Menu.FIRST + 9;
-    private static final int MENU_SELECT_AGENCY = Menu.FIRST + 10;
-    private static final int MENU_SORT_FIRST_LAST_NAME = Menu.FIRST + 11;
-    private static final int MENU_SORT_LAST_FIRST_NAME = Menu.FIRST + 12;
-    private static final int MENU_SORT_CASE_START = Menu.FIRST + 13;
-    private static final int MENU_SORT_AGE = Menu.FIRST + 14;
-    private static final int MENU_SORT_GROUP = Menu.FIRST + 15;
-    private static final int MENU_SORT_KEYWORKER = Menu.FIRST + 16;
-    private static final int MENU_SORT_STATUS = Menu.FIRST + 17;
-    private static final int MENU_BROADCAST = Menu.FIRST + 20;
+    private static final int MENU_SELECT_SCHOOLS = Menu.FIRST + 9;
+    private static final int MENU_SELECT_AGENCIES = Menu.FIRST + 10;
+    // Build 232
+    private static final int MENU_SELECT_PLAN_REVIEW_OVERDUE = Menu.FIRST + 20;
+    private static final int MENU_SORT_FIRST_LAST_NAME = Menu.FIRST + 21;
+    private static final int MENU_SORT_LAST_FIRST_NAME = Menu.FIRST + 22;
+    private static final int MENU_SORT_CASE_START = Menu.FIRST + 23;
+    private static final int MENU_SORT_AGE = Menu.FIRST + 24;
+    private static final int MENU_SORT_GROUP = Menu.FIRST + 25;
+    private static final int MENU_SORT_KEYWORKER = Menu.FIRST + 26;
+    private static final int MENU_SORT_STATUS = Menu.FIRST + 27;
+    private static final int MENU_BROADCAST = Menu.FIRST + 28;
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
@@ -473,13 +518,13 @@ public class ListClientsFragment extends Fragment {
             //selectExport.setIcon(ContextCompat.getDrawable(getActivity(), R.drawable.ic_export));
         }
 
-        MenuItem selectAllOption = menu.add(0, MENU_SELECT_ALL_CLIENTS, 4, "Show All Clients");
+        MenuItem selectAllOption = menu.add(0, MENU_SELECT_ALL_CLIENTS, 4, "Select All Clients");
         selectAllOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-        MenuItem selectOpenOption = menu.add(0, MENU_SELECT_OPEN_CLIENTS, 5, "Show Open Clients");
+        MenuItem selectOpenOption = menu.add(0, MENU_SELECT_OPEN_CLIENTS, 5, "Select Open Clients");
         selectOpenOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-        MenuItem selectFollowedOption = menu.add(0, MENU_SELECT_FOLLOWED_CLIENTS, 6, "Show Clients I'm Following");
+        MenuItem selectFollowedOption = menu.add(0, MENU_SELECT_FOLLOWED_CLIENTS, 6, "Select Clients I'm Following");
         selectFollowedOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
         MenuItem sortLastFirstOption = menu.add(0, MENU_SORT_LAST_FIRST_NAME, 20, "Sort by Last Name");
@@ -499,24 +544,29 @@ public class ListClientsFragment extends Fragment {
         // Build 160
         //boolean myClients = ((ListClients) getActivity()).isMyClients();
         if (myClients || currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_CLIENTS)) {
-            MenuItem selectOverdueOption = menu.add(0, MENU_SELECT_OVERDUE, 7, "Show Clients Overdue for Update");
+            MenuItem selectOverdueOption = menu.add(0, MENU_SELECT_OVERDUE, 7, "Select Clients Overdue for Update");
             selectOverdueOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-            MenuItem selectGroupOption = menu.add(0, MENU_SELECT_GROUP, 8, "Show One " + localSettings.Group);
+            // Build 200 - Replaced single selection with checkbox selection for picklists
+            MenuItem selectGroupOption = menu.add(0, MENU_SELECT_GROUPS, 8, String.format("Select %ss", localSettings.Group));
             selectGroupOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-            MenuItem selectKeyworkerOption = menu.add(0, MENU_SELECT_KEYWORKER, 9, "Show One " + localSettings.Keyworker);
+            MenuItem selectKeyworkerOption = menu.add(0, MENU_SELECT_KEYWORKERS, 9, String.format("Select %ss", localSettings.Keyworker));
             selectKeyworkerOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-            MenuItem selectCommissionerOption = menu.add(0, MENU_SELECT_COMMISSIONER, 10, "Show One " + localSettings.Commisioner);
+            MenuItem selectCommissionerOption = menu.add(0, MENU_SELECT_COMMISSIONERS, 10, String.format("Select %ss", localSettings.Commisioner));
             selectCommissionerOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
             //Build 110 Added School, Agency
-            MenuItem selectSchoolOption = menu.add(0, MENU_SELECT_SCHOOL, 11, "Show One School");
+            MenuItem selectSchoolOption = menu.add(0, MENU_SELECT_SCHOOLS, 11, "Select Schools");
             selectSchoolOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
-            MenuItem selectAgencyOption = menu.add(0, MENU_SELECT_AGENCY, 12, "Show One Agency");
+            MenuItem selectAgencyOption = menu.add(0, MENU_SELECT_AGENCIES, 12, "Select Agencies");
             selectAgencyOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+            // Build 232
+            MenuItem selectPlanReviewOverdueOption = menu.add(0, MENU_SELECT_PLAN_REVIEW_OVERDUE, 6, "Select Clients Overdue for Review");
+            selectFollowedOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 
             //MenuItem sortGroupOption = menu.add(0, MENU_SORT_GROUP, 24, "Sort by " + localSettings.Group);
             //sortGroupOption.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -578,6 +628,7 @@ public class ListClientsFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         final LocalSettings localSettings = LocalSettings.getInstance(getActivity());
+        PickListDialogFragment dialog;
         switch (item.getItemId()) {
             case MENU_EXPORT:
                 if (myClients) {
@@ -585,7 +636,7 @@ public class ListClientsFragment extends Fragment {
                 } else {
                     ((ListActivity) getActivity()).setExportListType("All Clients");
                 }
-                switch (selectMode) {
+                switch (((ListActivity) getActivity()).getSelectMode()) {
                     case ALL:
                         ((ListActivity) getActivity()).setExportSelection("All Clients (inc. closed cases)");
                         break;
@@ -598,17 +649,30 @@ public class ListClientsFragment extends Fragment {
                     case OVERDUE:
                         ((ListActivity) getActivity()).setExportSelection("Clients Overdue for Update");
                         break;
-                    case GROUP:
-                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", localSettings.Group, selectedValue));
+                    // Build 232
+                    case REVIEW_OVERDUE:
+                        ((ListActivity) getActivity()).setExportSelection("Clients Overdue for Plan/Fin.Supp. Review");
+
+                    case GROUPS:
+                        ((ListActivity) getActivity()).setExportSelection(
+                                String.format("%s: %s", localSettings.Group,
+                                        ((ListClients) getActivity()).getSelectedValues()));
                         break;
-                    case KEYWORKER:
-                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", localSettings.Keyworker, selectedValue));
+                    case KEYWORKERS:
+                        ((ListActivity) getActivity()).setExportSelection(
+                                String.format("%s: %s", localSettings.Keyworker,
+                                        ((ListClients) getActivity()).getSelectedValues()));
                         break;
-                    case COMMISSIONER:
-                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", localSettings.Commisioner, selectedValue));
+                    case COMMISSIONERS:
+                        ((ListActivity) getActivity()).setExportSelection(
+                                String.format("%s: %s", localSettings.Commisioner,
+                                        ((ListClients) getActivity()).getSelectedValues()));
                         break;
                     default:
-                        ((ListActivity) getActivity()).setExportSelection(String.format("%s: %s", selectMode.toString(), selectedValue));
+                        ((ListActivity) getActivity()).setExportSelection(
+                                String.format("%s: %s",
+                                        ((ListActivity) getActivity()).getSelectMode().toString(),
+                                        ((ListClients) getActivity()).getSelectedValues()));
                 }
                 switch (sortMode) {
                     case FIRST_LAST:
@@ -638,57 +702,106 @@ public class ListClientsFragment extends Fragment {
                     ((ListActivity) getActivity()).setExportSearch(searchText);
                 }
                 listViewState = listView.onSaveInstanceState();
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                Fragment fragment = new CRISExport();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use AndroidX fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //Fragment fragment = new CRISExport();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, CRISExport.class, null)
+                        .commit();
+
                 return true;
 
             case MENU_SELECT_ALL_CLIENTS:
-                selectMode = SelectMode.ALL;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.ALL);
                 //loadAdapter();
                 new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_OPEN_CLIENTS:
-                selectMode = SelectMode.OPEN;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.OPEN);
                 //loadAdapter();
                 new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_FOLLOWED_CLIENTS:
-                selectMode = SelectMode.FOLLOWED;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.FOLLOWED);
                 //loadAdapter();
                 new LoadAdapter().execute();
                 return true;
 
             case MENU_SELECT_OVERDUE:
-                selectMode = SelectMode.OVERDUE;
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.OVERDUE);
                 //loadAdapter();
                 new LoadAdapter().execute();
                 return true;
 
-            case MENU_SELECT_GROUP:
-                selectGroup();
+            // Build 232
+            case MENU_SELECT_PLAN_REVIEW_OVERDUE:
+                ((ListActivity) getActivity()).setSelectMode(ListActivity.SelectMode.REVIEW_OVERDUE);
+                //loadAdapter();
+                new LoadAdapter().execute();
                 return true;
 
-            case MENU_SELECT_KEYWORKER:
-                selectKeyWorker();
+            // Build 200 - Replaced single selection with checkbox selection for picklists
+            case MENU_SELECT_GROUPS:
+                final PickList groups = new PickList(localDB, ListType.GROUP, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", localSettings.Group),
+                        groups, ListActivity.SelectMode.GROUPS);
+                dialog.show(getParentFragmentManager(), null);
                 return true;
 
-            case MENU_SELECT_COMMISSIONER:
-                selectCommissioner();
+            case MENU_SELECT_KEYWORKERS:
+                // Get a list of keyworkers
+                ArrayList<User> users = localDB.getAllUsers();
+                ArrayList<User> keyworkerList = new ArrayList<>();
+                for (User user : users) {
+                    if (user.getRole().hasPrivilege(Role.PRIVILEGE_USER_IS_KEYWORKER)) {
+                        keyworkerList.add(user);
+                    }
+                }
+                Collections.sort(keyworkerList, User.comparator);
+                final PickList keyworkers = new PickList(keyworkerList, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", localSettings.Keyworker),
+                        keyworkers, ListActivity.SelectMode.KEYWORKERS);
+                dialog.show(getParentFragmentManager(), null);
+                return true;
+
+            case MENU_SELECT_COMMISSIONERS:
+                final PickList commissioners = new PickList(localDB, ListType.COMMISSIONER, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", localSettings.Commisioner),
+                        commissioners, ListActivity.SelectMode.COMMISSIONERS);
+                dialog.show(getParentFragmentManager(), null);
                 return true;
 
             //Build 110 Added School, Agency
-            case MENU_SELECT_SCHOOL:
-                selectSchool();
+            case MENU_SELECT_SCHOOLS:
+                final PickList schools = new PickList(localDB, ListType.SCHOOL, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        String.format("Select one or more %ss", "School"),
+                        schools, ListActivity.SelectMode.SCHOOLS);
+                dialog.show(getParentFragmentManager(), null);
                 return true;
 
-            case MENU_SELECT_AGENCY:
-                selectAgency();
+            case MENU_SELECT_AGENCIES:
+                final PickList agencies = new PickList(localDB, ListType.AGENCY, 0);
+                // Build 200 - Replaced single selection with checkbox selection for picklists
+                dialog = new PickListDialogFragment(
+                        "Select one or more Agencies",
+                        agencies, ListActivity.SelectMode.AGENCIES);
+                dialog.show(getParentFragmentManager(), null);
                 return true;
 
             case MENU_SORT_FIRST_LAST_NAME:
@@ -743,12 +856,18 @@ public class ListClientsFragment extends Fragment {
                 ((ListActivity) getActivity()).setBroadcastClientList(broadcastClientList);
                 listViewState = listView.onSaveInstanceState();
                 // Start the Broadcast fragment
-                fragmentManager = getFragmentManager();
-                fragmentTransaction = fragmentManager.beginTransaction();
-                fragment = new BroadcastMessageFragment();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use AndroidX fragment class
+                //fragmentManager = getFragmentManager();
+                //fragmentTransaction = fragmentManager.beginTransaction();
+                //fragment = new BroadcastMessageFragment();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, BroadcastMessageFragment.class, null)
+                        .commit();
                 return true;
             default:
                 return false;
@@ -783,141 +902,6 @@ public class ListClientsFragment extends Fragment {
                 .show();
     }
 
-    private void selectGroup() {
-        // Use local settings for 'local' labels
-        LocalSettings localSettings = LocalSettings.getInstance(getActivity());
-        final PickList groups = new PickList(localDB, ListType.GROUP, 0);
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Show clients from the following :" + localSettings.Group);
-        ArrayList<String> itemList = groups.getOptions();
-        String[] items = itemList.toArray(new String[itemList.size()]);
-
-        builder.setItems(items, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                selectedID = groups.getListItems().get(which).getListItemID();
-                selectedValue = groups.getListItems().get(which).getItemValue();
-                selectMode = SelectMode.GROUP;
-                //loadAdapter();
-                new LoadAdapter().execute();
-            }
-        });
-
-        // Create the AlertDialog
-        AlertDialog dialog = builder.create();
-        dialog.show();
-    }
-
-    private void selectCommissioner() {
-        // Use local settings for 'local' labels
-        LocalSettings localSettings = LocalSettings.getInstance(getActivity());
-        final PickList groups = new PickList(localDB, ListType.COMMISSIONER, 0);
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Show clients for the following :" + localSettings.Commisioner);
-        ArrayList<String> itemList = groups.getOptions();
-        String[] items = itemList.toArray(new String[itemList.size()]);
-
-        builder.setItems(items, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                selectedID = groups.getListItems().get(which).getListItemID();
-                selectedValue = groups.getListItems().get(which).getItemValue();
-                selectMode = SelectMode.COMMISSIONER;
-                //loadAdapter();
-                new LoadAdapter().execute();
-            }
-        });
-
-        // Create the AlertDialog
-        AlertDialog dialog = builder.create();
-        dialog.show();
-    }
-
-    // Build 110 - Added Show One School
-    private void selectSchool() {
-        // Use local settings for 'local' labels
-        final PickList schools = new PickList(localDB, ListType.SCHOOL, 0);
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Show clients for the following School:");
-        ArrayList<String> itemList = schools.getOptions();
-        String[] items = itemList.toArray(new String[itemList.size()]);
-
-        builder.setItems(items, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                selectedID = schools.getListItems().get(which).getListItemID();
-                selectedValue = schools.getListItems().get(which).getItemValue();
-                selectMode = SelectMode.SCHOOL;
-                //loadAdapter();
-                new LoadAdapter().execute();
-            }
-        });
-
-        // Create the AlertDialog
-        AlertDialog dialog = builder.create();
-        dialog.show();
-    }
-
-    // Build 110 - Added Show One Agency
-    private void selectAgency() {
-        // Use local settings for 'local' labels
-        final PickList agencies = new PickList(localDB, ListType.AGENCY, 0);
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Show clients for the following Agency:");
-        ArrayList<String> itemList = agencies.getOptions();
-        String[] items = itemList.toArray(new String[itemList.size()]);
-
-        builder.setItems(items, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                selectedID = agencies.getListItems().get(which).getListItemID();
-                selectedValue = agencies.getListItems().get(which).getItemValue();
-                selectMode = SelectMode.AGENCY;
-                //loadAdapter();
-                new LoadAdapter().execute();
-            }
-        });
-
-        // Create the AlertDialog
-        AlertDialog dialog = builder.create();
-        dialog.show();
-    }
-
-    private void selectKeyWorker() {
-        // Use local settings for 'local' labels
-        LocalSettings localSettings = LocalSettings.getInstance(getActivity());
-
-        // Get a list of keyworkers
-        ArrayList<User> users = localDB.getAllUsers();
-        ArrayList<User> keyworkers = new ArrayList<>();
-        for (User user : users) {
-            if (user.getRole().hasPrivilege(Role.PRIVILEGE_USER_IS_KEYWORKER)) {
-                keyworkers.add(user);
-            }
-        }
-
-        final PickList keyworkersPickList = new PickList(keyworkers);
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("Show clients for the following :" + localSettings.Keyworker);
-        ArrayList<String> itemList = keyworkersPickList.getOptions();
-        String[] items = itemList.toArray(new String[itemList.size()]);
-
-        builder.setItems(items, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                selectedID = keyworkersPickList.getUsers().get(which).getUserID();
-                selectedValue = keyworkersPickList.getUsers().get(which).getFullName();
-                selectMode = SelectMode.KEYWORKER;
-                //loadAdapter();
-                new LoadAdapter().execute();
-            }
-        });
-
-        // Create the AlertDialog
-        AlertDialog dialog = builder.create();
-        dialog.show();
-    }
-
     // Build 116 22 May 2019 Add handler for incoming text via share
     private void doCreateShareNote(int position) {
         ((ListActivity) getActivity()).setMode(Document.Mode.NEW);
@@ -944,13 +928,19 @@ public class ListClientsFragment extends Fragment {
                 // and it used getDocument to establish the client document to be edited.
                 Client client = adapter.getItem(position);
                 listViewState = listView.onSaveInstanceState();
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                Fragment fragment = new EditNote();
-                ((ListActivity) getActivity()).setDocument(new Note(currentUser, client.getClientID()));
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use AndroidX fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //Fragment fragment = new EditNote();
+                //((ListActivity) getActivity()).setDocument(new Note(currentUser, client.getClientID()));
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, EditNote.class, null)
+                        .commit();
             } else {
                 doNoClient();
             }
@@ -1008,12 +998,18 @@ public class ListClientsFragment extends Fragment {
                 listViewState = listView.onSaveInstanceState();
                 // Save this recordID to enable check for change to client
                 oldClientRecordID = client.getRecordID();
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                Fragment fragment = new EditClient();
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                // Build 200 Use AndroidX fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //Fragment fragment = new EditClient();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+                getParentFragmentManager().beginTransaction()
+                        .addToBackStack(null)
+                        .setReorderingAllowed(true)
+                        .replace(R.id.content, EditClient.class, null)
+                        .commit();
             } else {
                 doNoClient();
             }
@@ -1029,12 +1025,18 @@ public class ListClientsFragment extends Fragment {
         ((ListActivity) getActivity()).setDocument(new Client(currentUser));
         // Build 160 - Save te listviewstate in case of cancel
         listViewState = listView.onSaveInstanceState();
-        FragmentManager fragmentManager = getFragmentManager();
-        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        Fragment fragment = new EditClient();
-        fragmentTransaction.replace(R.id.content, fragment);
-        fragmentTransaction.addToBackStack(null);
-        fragmentTransaction.commit();
+        // Build 200 Use AndroidX fragment class
+        //FragmentManager fragmentManager = getFragmentManager();
+        //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        //Fragment fragment = new EditClient();
+        //fragmentTransaction.replace(R.id.content, fragment);
+        //fragmentTransaction.addToBackStack(null);
+        //fragmentTransaction.commit();
+        getParentFragmentManager().beginTransaction()
+                .addToBackStack(null)
+                .setReorderingAllowed(true)
+                .replace(R.id.content, EditClient.class, null)
+                .commit();
         return true;
     }
 
@@ -1060,8 +1062,8 @@ public class ListClientsFragment extends Fragment {
         final private Drawable clientGreen = ContextCompat.getDrawable(getActivity(), R.drawable.ic_client_green);
         final private Drawable clientGrey = ContextCompat.getDrawable(getActivity(), R.drawable.ic_client_grey);
         final private Drawable clientAll = ContextCompat.getDrawable(getActivity(), R.drawable.ic_client_all);
-        final private int textGrey = ContextCompat.getColor(getActivity(), R.color.text_grey);
-        final private int textRed = ContextCompat.getColor(getActivity(), R.color.red);
+        final private int TEXT_GREY = ContextCompat.getColor(getActivity(), R.color.text_grey);
+        final private int TEXT_RED = ContextCompat.getColor(getActivity(), R.color.red);
 
         // Constructor
         ClientAdapter(Context context, List<Client> objects) {
@@ -1106,7 +1108,7 @@ public class ListClientsFragment extends Fragment {
             // (privilege takes preference).
             // Build 160
             //boolean myClients = ((ListClients) getActivity()).isMyClients();
-            int color = textGrey;
+            int color = TEXT_GREY;
             // Additional text depends on sort/select
             String additionalText = "";
             // Unpick the current case
@@ -1184,14 +1186,25 @@ public class ListClientsFragment extends Fragment {
                                     group,
                                     client.lastEntry());
                     }
-                    switch (selectMode) {
+                    switch (((ListActivity) getActivity()).getSelectMode()) {
                         case OVERDUE:
                             // Calculate overdue days
                             Date now = new Date();
                             long threshold = (now.getTime() / 84600000) - currentCase.getOverdueThreshold();
                             long overdue = threshold - (client.getLatestDocument().getTime() / 84600000);
                             if (overdue > 0) {
-                                color = textRed;
+                                color = TEXT_RED;
+                                additionalText = String.format(Locale.UK,
+                                        "%s , Update overdue: %d days", keyworkerName, overdue);
+                            }
+                            // Else only overdue clients are displayed
+                            break;
+                        case REVIEW_OVERDUE:
+                            now = new Date();
+                            threshold = (now.getTime() / 84600000) - REVIEW_OVERDUE_THRESHOLD_DAYS;
+                            overdue = threshold - (currentCase.getlastReviewDate().getTime() / 84600000);
+                            if (overdue > 0) {
+                                color = TEXT_RED;
                                 additionalText = String.format(Locale.UK,
                                         "%s , Update overdue: %d days", keyworkerName, overdue);
                             }
@@ -1221,6 +1234,9 @@ public class ListClientsFragment extends Fragment {
 
     private class LoadAdapter extends AsyncTask<Void, String, String> {
 
+        final private int TEXT_GREY = ContextCompat.getColor(getActivity(), R.color.text_grey);
+        final private int TEXT_RED = ContextCompat.getColor(getActivity(), R.color.red);
+
         private ArrayList<Client> tempAdapterList;
 
         @Override
@@ -1229,72 +1245,78 @@ public class ListClientsFragment extends Fragment {
             String output = "";
             int hidden = 0;
 
-            // Load the clients from the database if first time
-            if (clientList == null) {
-                clientList = localDB.getAllClients();
-            }
-
-            // Get a collection of ClientIS and Latest document date
-            HashMap<UUID, Date> latestDates = localDB.getLatestDocumentDates();
-
-            tempAdapterList = new ArrayList<Client>();
-            for (Client client : clientList) {
-                // Build 158 - Move code int0 if statement to remove spurious calls
-                //client.setLatestDocument(localDB.getLatestDocument(client));
-                if (selectClient(client)) {
-                    // Build 160 - Use alternative SQL to speed up load by loading all of
-                    // the latest dates into a collection in one sql call
-                    //client.setLatestDocument(localDB.getLatestDocument(client));
-                    if (latestDates.containsKey(client.getDocumentID())) {
-                        client.setLatestDocument(latestDates.get(client.getDocumentID()));
-                    } else {
-                        client.setLatestDocument(client.getCreationDate());
-                    }
-
-                    tempAdapterList.add(client);
-                } else {
-                    hidden++;
+            try {
+                // Load the clients from the database if first time
+                if (clientList == null) {
+                    clientList = localDB.getAllClients();
                 }
-            }
 
-            switch (sortMode) {
-                case FIRST_LAST:
-                    //Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorFirstLast);
-                    Collections.sort(tempAdapterList, Client.comparatorFirstLast);
-                    break;
-                case LAST_FIRST:
-                    Collections.sort(tempAdapterList, Client.comparatorLastFirst);
-                    break;
-                case GROUP:
-                    Collections.sort(tempAdapterList, Client.comparatorGroup);
-                    break;
-                case KEYWORKER:
-                    Collections.sort(tempAdapterList, Client.comparatorKeyworker);
-                    break;
-                case STATUS:
-                    Collections.sort(tempAdapterList, Client.comparatorStatus);
-                    break;
-                case CASE_START:
-                    Collections.sort(tempAdapterList, Client.comparatorCaseStart);
-                    break;
-                case AGE:
-                    Collections.sort(tempAdapterList, Client.comparatorAge);
-                    break;
-            }
+                // Get a collection of ClientIS and Latest document date
+                HashMap<UUID, Date> latestDates = localDB.getLatestDocumentDates();
 
-            // Generate the footer text
-            int displayed = tempAdapterList.size();
-            if (displayed > 1) {
-                output = String.format(Locale.UK, "%d clients shown, ", displayed);
-            } else if (displayed == 1) {
-                output = "1 client shown, ";
-            } else {
-                output = "0 clients shown, ";
-            }
-            if (hidden > 0) {
-                output += String.format(Locale.UK, "%d not shown.", hidden);
-            } else {
-                output = String.format(Locale.UK, "All clients shown (%d)", displayed);
+                tempAdapterList = new ArrayList<Client>();
+                for (Client client : clientList) {
+                    // Build 158 - Move code int0 if statement to remove spurious calls
+                    //client.setLatestDocument(localDB.getLatestDocument(client));
+                    if (selectClient(client)) {
+                        // Build 160 - Use alternative SQL to speed up load by loading all of
+                        // the latest dates into a collection in one sql call
+                        //client.setLatestDocument(localDB.getLatestDocument(client));
+                        if (latestDates.containsKey(client.getDocumentID())) {
+                            client.setLatestDocument(latestDates.get(client.getDocumentID()));
+                        } else {
+                            client.setLatestDocument(client.getCreationDate());
+                        }
+
+                        tempAdapterList.add(client);
+                    } else {
+                        hidden++;
+                    }
+                }
+
+                switch (sortMode) {
+                    case FIRST_LAST:
+                        //Collections.sort(((ListActivity) getActivity()).getClientAdapterList(), Client.comparatorFirstLast);
+                        Collections.sort(tempAdapterList, Client.comparatorFirstLast);
+                        break;
+                    case LAST_FIRST:
+                        Collections.sort(tempAdapterList, Client.comparatorLastFirst);
+                        break;
+                    case GROUP:
+                        Collections.sort(tempAdapterList, Client.comparatorGroup);
+                        break;
+                    case KEYWORKER:
+                        Collections.sort(tempAdapterList, Client.comparatorKeyworker);
+                        break;
+                    case STATUS:
+                        Collections.sort(tempAdapterList, Client.comparatorStatus);
+                        break;
+                    case CASE_START:
+                        Collections.sort(tempAdapterList, Client.comparatorCaseStart);
+                        break;
+                    case AGE:
+                        Collections.sort(tempAdapterList, Client.comparatorAge);
+                        break;
+                }
+
+                // Generate the footer text
+                int displayed = tempAdapterList.size();
+                if (displayed > 1) {
+                    output = String.format(Locale.UK, "%d clients shown, ", displayed);
+                } else if (displayed == 1) {
+                    output = "1 client shown, ";
+                } else {
+                    output = "0 clients shown, ";
+                }
+                if (hidden > 0) {
+                    output += String.format(Locale.UK, "%d not shown.", hidden);
+                } else {
+                    output = String.format(Locale.UK, "All clients shown (%d)", displayed);
+                }
+            } catch (IllegalStateException ex) {
+                //Build 218 If the user uses back arrow to abandon the fragment, calls to
+                // requireActivity() can raise this exception. Load may simply be abandoned
+                // since fragment doesn't exist.
             }
             return output;
         }
@@ -1319,6 +1341,12 @@ public class ListClientsFragment extends Fragment {
             if (elapsed > 0) {
                 footer.setText(String.format("%s (%d sec)", footerText, elapsed));
             } else {
+                if (((ListActivity) getActivity()).getSelectMode() == ListActivity.SelectMode.OVERDUE ||
+                        ((ListActivity) getActivity()).getSelectMode() == ListActivity.SelectMode.REVIEW_OVERDUE){
+                    footer.setTextColor(TEXT_RED);
+                } else {
+                    footer.setTextColor(TEXT_GREY);
+                }
                 footer.setText(footerText);
             }
             // Reload the adapter list

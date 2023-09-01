@@ -15,6 +15,7 @@ import com.google.api.services.sheets.v4.model.UpdateDimensionPropertiesRequest;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -204,7 +205,7 @@ public class ClientSession extends Document implements Serializable {
         return changes;
     }
 
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -221,18 +222,21 @@ public class ClientSession extends Document implements Serializable {
         fNames.add("Email");
         fNames.add("Commissioner");
         fNames.add("School");
-        fNames.add("FSM");
+        // Build 233 FSM Moved to Case document
+        //fNames.add("FSM");
         fNames.add("SEND");
         fNames.add("Session Date");
         fNames.add("Attended");
         // Build 110
         fNames.add("Reserved");
         fNames.add("Cancelled");
-        fNames.add("Score");
+        fNames.add("MyWeek Score");
         fNames.add("Group");
         fNames.add("Session");
         fNames.add("Coordinator");
         fNames.add("Postcode");
+        // Build 201 Include the Attendance core to enable scores to be validated
+        fNames.add("Attendance Points");
         fNames.add("Note");
         fNames.add("PdfDocument");
         fNames.add("Transport");
@@ -241,10 +245,20 @@ public class ClientSession extends Document implements Serializable {
         fNames.add("Used");
         fNames.add("Return");
         fNames.add("Used");
+        // Build 232
+        fNames.add("Plan or Support");
+        fNames.add("Pupil Premium");
+        fNames.add("Free School Meals");
+        fNames.add("Child Protection Plan");
+        fNames.add("Child InNeed Plan");
+        fNames.add("TAF or Early Help Plan");
+        fNames.add("Social Services Recommendation");
+        fNames.add("Other PlanFinancial Support");
 
         return fNames;
     }
 
+    /* Build 208 Move to CRISExport
     public static List<List<Object>> getClientSessionData(ArrayList<? extends Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -319,6 +333,8 @@ public class ClientSession extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
@@ -412,13 +428,21 @@ public class ClientSession extends Document implements Serializable {
                                 // Build 155 - Adding Address to Export shifts column to right
                                 // Build 156 - Adding Telephone number to Export shifts column to right
                                 // Build 181 - Inserted an extra 5 fields
-                                .setStartColumnIndex(13)
-                                .setEndColumnIndex(14)
+                                // Build 234 - Removed FSM column from School Info
+                                .setStartColumnIndex(12)
+                                .setEndColumnIndex(13)
                                 .setStartRowIndex(1))));
         return requests;
     }
 
-    public List<Object> getExportData(Client client, Status sessionStatus, Note note, PdfDocument pdfDocument, Transport transport) {
+    // Build 234 Added concept of relevantCase,rather than currentCase (relevant case at the
+    // time of the session
+    public List<Object> getExportData(Client client,
+                                      Status sessionStatus,
+                                      Note note,
+                                      PdfDocument pdfDocument,
+                                      Transport transport,
+                                      Case relevantCase) {
         LocalDB localDB = LocalDB.getInstance();
         SimpleDateFormat sDate = new SimpleDateFormat("dd/MM/yyyy", Locale.UK);
 
@@ -437,10 +461,11 @@ public class ClientSession extends Document implements Serializable {
         row.add("t: " + client.getContactNumber());
         // Build 181 - Add Email, Commissioner, School, FSM, SENCO to export
         row.add(client.getEmailAddress());
-        Case currentCase = client.getCurrentCase();
-        if (currentCase != null) {
-            if (currentCase.getCommissioner() != null) {
-                row.add(currentCase.getCommissioner().getItemValue());
+        // Build 234 currentCase may not be current at time of session
+        //Case currentCase = client.getCurrentCase();
+        if (relevantCase != null) {
+            if (relevantCase.getCommissioner() != null) {
+                row.add(relevantCase.getCommissioner().getItemValue());
             } else {
                 row.add("");    // Commissioner
             }
@@ -451,11 +476,14 @@ public class ClientSession extends Document implements Serializable {
         if (currentSchool != null) {
             if (currentSchool.getSchool() != null) {
                 row.add(currentSchool.getSchool().getItemValue());
+                // Build 233 FSM Moved to Case document
+                /*
                 if (currentSchool.isFreeSchoolMeals()) {
                     row.add("TRUE");
                 } else {
                     row.add("FALSE");
                 }
+                 */
                 // Build 183
                 boolean isSEND = false;
                 if (currentSchool.isSpecialNeeds()) {
@@ -473,12 +501,14 @@ public class ClientSession extends Document implements Serializable {
                 }
             } else {
                 row.add(String.format("Invalid School Contact Document (Not School) - %s", currentSchool.getContactName()));
-                row.add("");    // FSM
+                // Build 233 FSM Moved to Case document
+                //row.add("");    // FSM
                 row.add("");    // SENCO/SEND
             }
         } else {
             row.add("");        // School
-            row.add("");        // FSM
+            // Build 233 FSM Moved to Case document
+            //row.add("");        // FSM
             row.add("");        // SENCO/SEND
         }
         if (getReferenceDate().getTime() != Long.MIN_VALUE) {
@@ -514,16 +544,39 @@ public class ClientSession extends Document implements Serializable {
             row.add("Unknown");
             row.add("Unknown");
             row.add("Unknown");
+            row.add("Unknown");
         } else {
             // Build 171 tidy-up
             //row.add(getItemValue(session.getGroup()));
             row.add(session.getGroup().getItemValue());
-
             row.add(session.getSessionName());
             // Build 171 tidy-up
             //row.add(getFullName(session.getSessionCoordinator()));
             row.add(session.getSessionCoordinator().getFullName());
             row.add(session.getPostcode());
+            // Build 226 Calculate Attendance Score on-the-fly from session attendance points
+            if (session.getAttendancePoints() == 0) {
+                row.add(0);
+            } else {
+                if (getCancelledFlag()) {
+                    row.add(0);
+                } else if (isAttended()) {
+                    row.add(session.getAttendancePoints());
+                } else { // Not attended but Could be in the future
+                    Date today = new Date();
+                    if (getReferenceDate().before(today)) {
+                        if (session.getGroupID().equals(Group.adHocGroupID)) {
+                            // Build 226 - Only score negatively for ad-hoc sessions
+                            row.add(session.getAttendancePoints() * -1);
+                        } else { // Ordinary Group session
+                            row.add(0);
+                        }
+                    } else { // Future session
+                        row.add(0);
+                    }
+                }
+            }
+
         }
         if (note == null) {
             row.add("True");
@@ -546,35 +599,41 @@ public class ClientSession extends Document implements Serializable {
             // Build 171 Tidy up
             //row.add(getItemValue(transport.getTransportOrganisation()));
             row.add(transport.getTransportOrganisation().getItemValue());
-            if (transport.isBooked()) {          // Booked
-                row.add("True");
-            } else {
-                row.add("False");
-            }
+            row.add(displayExportBoolean(transport.isBooked()));
+            row.add(displayExportBoolean(transport.isRequiredOutbound()));
+            row.add(displayExportBoolean(transport.isUsedOutbound()));
+            row.add(displayExportBoolean(transport.isRequiredReturn()));
+            row.add(displayExportBoolean(transport.isUsedReturn()));
 
-            if (transport.isRequiredOutbound()) {// Outbound
-                row.add("True");
-            } else {
-                row.add("False");
-            }
-            if (transport.isUsedOutbound()) {    // Used
-                row.add("True");
-            } else {
-                row.add("False");
-            }
-            if (transport.isRequiredReturn()) {  // Return
-                row.add("True");
-            } else {
-                row.add("False");
-            }
-            if (transport.isUsedReturn()) {      // Used
-                row.add("True");
-            } else {
-                row.add("False");
-            }
         }
+        //Build 232
+        if (relevantCase == null) {
+            row.add("");    // Plan Or Support
+            row.add("");    // Pupil Premium
+            row.add("");    // Free School Meals
+            row.add("");    // Child Protection Plan
+            row.add("");    // Child In Need Plan
+            row.add("");    // TAF / Early Help Plan
+            row.add("");    // Social Services Referral
+            row.add("");    // Other Plan
+        } else {
+            row.add(displayExportBoolean(relevantCase.isPlanOrSupport()));
+            row.add(displayExportBoolean(relevantCase.isPupilPremium()));
+            row.add(displayExportBoolean(relevantCase.isFreeSchoolMeals()));
+            row.add(displayExportBoolean(relevantCase.isChildProtectionPlan()));
+            row.add(displayExportBoolean(relevantCase.isChildInNeedPlan()));
+            row.add(displayExportBoolean(relevantCase.isTafEarlyHelpPlan()));
+            row.add(displayExportBoolean(relevantCase.isSocialServicesRecommendation()));
+            row.add(displayExportBoolean(relevantCase.isOtherPlanFinancialSupport()));
+        }
+
         return row;
 
+    }
+
+    private String displayExportBoolean(boolean value) {
+        if (value) return "True";
+        else return "False";
     }
     // Build 171 See GetExportData()
     /*

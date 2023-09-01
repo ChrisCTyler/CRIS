@@ -507,7 +507,7 @@ public class Transport extends Document implements Serializable {
 
      */
 
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -529,6 +529,7 @@ public class Transport extends Document implements Serializable {
         return fNames;
     }
 
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getTransportData(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -544,4 +545,6 @@ public class Transport extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 }

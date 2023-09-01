@@ -15,8 +15,10 @@ package solutions.cris.edit;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 import android.os.Bundle;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import androidx.core.content.res.ResourcesCompat;
@@ -164,8 +166,10 @@ public class EditClient extends Fragment {
                 // Cancel so no need to update list of documents
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
                 ((ListActivity) getActivity()).setDocument(null);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         });
         // Save Button
@@ -178,8 +182,10 @@ public class EditClient extends Fragment {
                     // Build 144 - Need to update client in calling activity so that
                     // any subsequent changes are saved against theis new client
                     ((ListActivity) getActivity()).setClient(editClient);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                 }
             }
         });

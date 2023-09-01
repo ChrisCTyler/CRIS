@@ -126,7 +126,20 @@ public class Note extends Document implements Serializable {
 
     private boolean stickyFlag;
     public boolean isStickyFlag() {return stickyFlag;}
-    public void setStickyFlag(boolean stickyFlag) {this.stickyFlag = stickyFlag;}
+    public void setStickyFlag(boolean stickyFlag) {
+        // Build 239
+        if (stickyFlag) {
+            // Setting sticky flag, so also set dummy session ID so that sticky flag in
+            // List SessionClientsFragment is shown red
+            this.sessionID = Document.stickyNoteSessionID;
+        } else {
+            if (this.stickyFlag) {
+                // Unsetting a current sticky note so clear the (stickynote)sessionID
+                this.sessionID = null;
+            }
+        }
+        this.stickyFlag = stickyFlag;
+    }
 
     private Date stickyDate;
     public Date getStickyDate() {return stickyDate;}
@@ -184,7 +197,9 @@ public class Note extends Document implements Serializable {
                 author.getFullName(),
                 lines[0]));
 
-        localDB.save(this, isNewMode, User.getCurrentUser());
+        // Build 239 Use author rather than currentUser to maintain original authorship of notes
+        //localDB.save(this, isNewMode, User.getCurrentUser());
+        localDB.save(this, isNewMode, author);
 
         setNoteType(noteType);
         setInitialNote(initialNote);
@@ -277,7 +292,7 @@ public class Note extends Document implements Serializable {
         return changes;
     }
 
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -294,6 +309,7 @@ public class Note extends Document implements Serializable {
         return fNames;
     }
 
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getNoteData(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -309,6 +325,8 @@ public class Note extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();

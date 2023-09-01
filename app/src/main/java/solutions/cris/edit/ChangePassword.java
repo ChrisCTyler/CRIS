@@ -61,35 +61,27 @@ public class ChangePassword extends AppCompatActivity {
             // with the same current user (would cause a constraint exception)
             currentUser = localDB.getUser(currentUser.getUserID());
             setContentView(R.layout.activity_change_password);
-            Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+            Toolbar toolbar = findViewById(R.id.toolbar);
             toolbar.setTitle(getString(R.string.app_name) + " - Change Password");
             setSupportActionBar(toolbar);
 
             // Set up the form.
-            passwordView = (EditText) findViewById(R.id.password);
-            passwordCheckView = (EditText) findViewById(R.id.password_check);
-            hintTextView = (TextView) findViewById(R.id.hint_text);
+            passwordView = findViewById(R.id.password);
+            passwordCheckView = findViewById(R.id.password_check);
+            hintTextView = findViewById(R.id.hint_text);
             hintTextView.setText(getHintText());
-            hintTextView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    toggleHint();
-                }
-            });
+            hintTextView.setOnClickListener(v -> toggleHint());
 
             // Save Button
-            final Button button = (Button) findViewById(R.id.set_new_password);
-            button.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    button.setEnabled(false);
-                    if (validate()) {
-                        if (save()) {
-                            finish();
-                        }
+            final Button button = findViewById(R.id.set_new_password);
+            button.setOnClickListener(view -> {
+                button.setEnabled(false);
+                if (validate()) {
+                    if (save()) {
+                        finish();
                     }
-                    button.setEnabled(true);
                 }
+                button.setEnabled(true);
             });
         }
 

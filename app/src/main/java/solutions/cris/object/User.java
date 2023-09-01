@@ -132,6 +132,14 @@ public class User extends CrisObject implements Serializable {
         return localFullName;
     }
 
+    public static Comparator<User> comparator = new Comparator<User>() {
+        @Override
+        public int compare(User o1, User o2) {
+            return o1.getFullName().compareTo(o2.getFullName());
+        }
+    };
+
+
     //StartDate
     private Date startDate;
 
@@ -228,13 +236,6 @@ public class User extends CrisObject implements Serializable {
     public void setRole(Role role) {
         this.role = role;
     }
-
-    public static Comparator<User> comparator = new Comparator<User>() {
-        @Override
-        public int compare(User o1, User o2) {
-            return o1.getFullName().compareTo(o2.getFullName());
-        }
-    };
 
     private Date passwordExpiryDate;
 

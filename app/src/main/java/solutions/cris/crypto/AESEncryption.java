@@ -117,12 +117,15 @@ public class AESEncryption {
                 //Create the cipher object to perform AES operations.
                 Cipher AESCipher = Cipher.getInstance("AES/CFB/NoPadding");
                 //Initialize the Cipher with the key and initialization vector.
-                if (mode.equals(LOCAL_CIPHER)) {
-                    AESCipher.init(Cipher.ENCRYPT_MODE, localKey, IVSpec);
-                    //throw new CRISException("Code should not get here");
-                } else {
-                    AESCipher.init(Cipher.ENCRYPT_MODE, webKey, IVSpec);
-                }
+                // Build 189 - Remove warnings
+                //if (mode.equals(LOCAL_CIPHER)) {
+                //    AESCipher.init(Cipher.ENCRYPT_MODE, localKey, IVSpec);
+                //    //throw new CRISException("Code should not get here");
+                //} else {
+                //    AESCipher.init(Cipher.ENCRYPT_MODE, webKey, IVSpec);
+                //}
+
+                AESCipher.init(Cipher.ENCRYPT_MODE, webKey, IVSpec);
                 //Encrypt the plaintext data
                 byte[] ciphertext = AESCipher.doFinal(plainText);
                 // Prepend the IV to the ciphertext message so that it's available for decryption
@@ -164,16 +167,23 @@ public class AESEncryption {
                 //Create the IvParameterSpec object from the raw IV
                 IvParameterSpec IVSpec = new IvParameterSpec(IV);
                 //Initialize the Cipher with the key and initialization vector.
-                switch (mode) {
-                    case LOCAL_CIPHER:
-                       // AESCipher.init(Cipher.DECRYPT_MODE, localKey, IVSpec);
-                       //break;
-                       throw new CRISException("Code should not get here");
-                    case OLD_CIPHER:
-                        AESCipher.init(Cipher.DECRYPT_MODE, oldLocalKey, IVSpec);
-                        break;
-                    default:
-                        AESCipher.init(Cipher.DECRYPT_MODE, webKey, IVSpec);
+                // Build 189 - Remove warnings
+                //switch (mode) {
+
+                    //case LOCAL_CIPHER:
+                    //   // AESCipher.init(Cipher.DECRYPT_MODE, localKey, IVSpec);
+                    //   //break;
+                    //   throw new CRISException("Code should not get here");
+                //    case OLD_CIPHER:
+                //        AESCipher.init(Cipher.DECRYPT_MODE, oldLocalKey, IVSpec);
+                //        break;
+                //    default:
+                //        AESCipher.init(Cipher.DECRYPT_MODE, webKey, IVSpec);
+                //}
+                if (mode.equals(OLD_CIPHER)){
+                    AESCipher.init(Cipher.DECRYPT_MODE, oldLocalKey, IVSpec);
+                } else {
+                    AESCipher.init(Cipher.DECRYPT_MODE, webKey, IVSpec);
                 }
                 //Decrypts the ciphertext data
                 plaintext = AESCipher.doFinal(ciphertext);

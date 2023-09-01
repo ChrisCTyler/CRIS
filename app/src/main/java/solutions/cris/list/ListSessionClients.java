@@ -14,8 +14,10 @@ package solutions.cris.list;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
+
+// Build 200 Use the androidX Fragment class
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -27,10 +29,14 @@ import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
+
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -56,8 +62,10 @@ import solutions.cris.object.Session;
 import solutions.cris.object.User;
 import solutions.cris.utils.ExceptionHandler;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.PickList;
+import solutions.cris.utils.PickListDialogFragment;
 
-public class ListSessionClients extends ListActivity {
+public class ListSessionClients extends ListActivity implements PickListDialogFragment.PickListDialogListener {
 
     public static final String EDIT_DOCUMENT = "solutions.cris.EditDocument";
     public static final String DOCUMENT_MODE = "solutions.cris.DocumentMode";
@@ -68,6 +76,73 @@ public class ListSessionClients extends ListActivity {
     private boolean editMyWeek = false;
 
     String keyworkerContact = "";
+
+    // Build 160 - There are error reports where myClients becomes null. I cannot reproduce the
+    // error so don't know why, but try presetting in the declaration to see if it helps
+    //private boolean myClients;
+    private boolean myClients = true;
+
+    // Build 200 Move selectedIDs to here (from ListClientsFragment) and set following
+    // positive button click in PickListDialogFragment
+    private ArrayList<UUID> selectedIDs;
+
+    public ArrayList<UUID> getSelectedIDs() {
+        return selectedIDs;
+    }
+
+    public void setSelectedIDs(ArrayList<UUID> selectedIDs) {
+        this.selectedIDs = selectedIDs;
+    }
+
+    private String selectedValues = "";
+
+    public String getSelectedValues() {
+        return selectedValues;
+    }
+
+    public void clearSelectedValues(){
+        selectedValues = "";
+    }
+
+    public void addToSelectedValues(String selectedValue) {
+        if (selectedValue.length() > 0) {
+            if (this.selectedValues.length() > 0) {
+                this.selectedValues += ", ";
+            }
+            this.selectedValues += selectedValue;
+        }
+    }
+
+    // The picklist dialog fragment receives a reference to this Activity through the
+    // Fragment.onAttach() callback, which it uses to call the following methods
+    // defined by the NoticeDialogFragment.NoticeDialogListener interface
+    @Override
+    public void onDialogPositiveClick(DialogFragment dialog) {
+        // User touched the dialog's positive button
+        setSelectMode(((PickListDialogFragment)dialog).getSelectMode());
+        // Clear and the load the selectedIDs array
+        CheckBox checkBoxes[] = ((PickListDialogFragment)dialog).getCheckBoxes();
+        PickList pickList = ((PickListDialogFragment)dialog).getPickList();
+        selectedIDs.clear();
+        for (int i = 0; i < checkBoxes.length; i++) {
+            if (checkBoxes[i].isChecked()) {
+                // Keyworkers are a special case, list of users, not ListItems
+                if (getSelectMode() == SelectMode.KEYWORKERS){
+                    User keyWorker = ((User)pickList.getObjects().get(i));
+                    selectedIDs.add(keyWorker.getUserID());
+                    addToSelectedValues(keyWorker.getFullName());
+                } else {
+                    ListItem listItem = pickList.getListItems().get(i);
+                    selectedIDs.add(listItem.getListItemID());
+                    addToSelectedValues(listItem.getItemValue());
+                }
+            }
+        }
+        Fragment fragment = getSupportFragmentManager().findFragmentByTag("ListSessionClientsFragment");
+        if (fragment != null && fragment.isVisible()) {
+            ((ListSessionClientsFragment) fragment).pickListDialogFragmentOK();
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -128,11 +203,17 @@ public class ListSessionClients extends ListActivity {
 
             } else {
                 // Start the List Documents fragment
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                ListSessionClientsFragment fragment = new ListSessionClientsFragment();
-                fragmentTransaction.add(R.id.content, fragment);
-                fragmentTransaction.commit();
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //ListSessionClientsFragment fragment = new ListSessionClientsFragment();
+                //fragmentTransaction.add(R.id.content, fragment);
+                //fragmentTransaction.commit();
+                // Build 200 Use androidX fragment class
+                Fragment fragment = new ListSessionClientsFragment();
+                getSupportFragmentManager().beginTransaction()
+                        .setReorderingAllowed(true)
+                        .add(R.id.content, fragment, "ListSessionClientsFragment")
+                        .commit();
                 // V2.0 Preset mode to NEW (not READ) to force the dataload on first pass.
                 setMode(Document.Mode.NEW);
             }

@@ -15,32 +15,30 @@ package solutions.cris.list;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.content.Intent;
+// Build 200 Use the androidX Fragment class
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
-
-import androidx.annotation.NonNull;
-
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
 
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.TextView;
-
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Locale;
+import java.util.UUID;
 
 import solutions.cris.Main;
 import solutions.cris.R;
@@ -56,8 +54,10 @@ import solutions.cris.object.MACAYC18;
 import solutions.cris.object.User;
 import solutions.cris.utils.ExceptionHandler;
 import solutions.cris.utils.LocalSettings;
+import solutions.cris.utils.PickList;
+import solutions.cris.utils.PickListDialogFragment;
 
-public class ListClientHeader extends ListActivity {
+public class ListClientHeader extends ListActivity implements PickListDialogFragment.PickListDialogListener{
 
     private Menu menu;
     private ClientSession[] clientSessions = new ClientSession[5];
@@ -75,6 +75,61 @@ public class ListClientHeader extends ListActivity {
     //TextView contactNumber2View;
     //TextView keyworkerView;
     String keyworkerContact = "";
+
+    // Build 200 Move selectedIDs to here (from ListClientDocumentsFragment) and set following
+    // positive button click in PickListDialogFragment
+    private ArrayList<String> selectedDocuments;
+
+    public ArrayList<String> getSelectedDocuments() {
+        return selectedDocuments;
+    }
+
+    public void setSelectedDocuments(ArrayList<String> selectedDocuments) {
+        this.selectedDocuments = selectedDocuments;
+    }
+
+    private String selectedValues = "";
+
+    public String getSelectedValues() {
+        return selectedValues;
+    }
+
+    public void clearSelectedValues(){
+        selectedValues = "";
+    }
+
+    public void addToSelectedValues(String selectedValue) {
+        if (selectedValue.length() > 0) {
+            if (this.selectedValues.length() > 0) {
+                this.selectedValues += ", ";
+            }
+            this.selectedValues += selectedValue;
+        }
+    }
+
+    // The picklist dialog fragment receives a reference to this Activity through the
+    // Fragment.onAttach() callback, which it uses to call the following methods
+    // defined by the NoticeDialogFragment.NoticeDialogListener interface
+    @Override
+    public void onDialogPositiveClick(DialogFragment dialog) {
+        // User touched the dialog's positive button
+        setSelectMode(((PickListDialogFragment)dialog).getSelectMode());
+        // Clear and the load the selectedIDs array
+        CheckBox checkBoxes[] = ((PickListDialogFragment)dialog).getCheckBoxes();
+        PickList pickList = ((PickListDialogFragment)dialog).getPickList();
+        selectedDocuments.clear();
+        for (int i = 0; i < checkBoxes.length; i++) {
+            if (checkBoxes[i].isChecked()) {
+                String documentType = ((String)pickList.getObjects().get(i));
+                selectedDocuments.add(documentType);
+                addToSelectedValues(documentType);
+            }
+        }
+        Fragment fragment = getSupportFragmentManager().findFragmentByTag("ListClientDocumentsFragment");
+        if (fragment != null && fragment.isVisible()) {
+            ((ListClientDocumentsFragment) fragment).pickListDialogFragmentOK();
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,11 +167,18 @@ public class ListClientHeader extends ListActivity {
                 loadHeader(getClient());
             } else {
                 // Start the List Documents fragment
-                FragmentManager fragmentManager = getFragmentManager();
-                FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-                ListClientDocumentsFragment fragment = new ListClientDocumentsFragment();
-                fragmentTransaction.add(R.id.content, fragment);
-                fragmentTransaction.commit();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+                //ListClientDocumentsFragment fragment = new ListClientDocumentsFragment();
+                //fragmentTransaction.add(R.id.content, fragment);
+                //fragmentTransaction.commit();
+                Fragment fragment = new ListClientDocumentsFragment();
+                getSupportFragmentManager().beginTransaction()
+                        .setReorderingAllowed(true)
+                        .add(R.id.content, fragment, "ListClientDocumentsFragment")
+                        .commit();
+
                 // V2.0 Preset mode to NEW (not READ) to force the dataload on first pass.
                 setMode(Document.Mode.NEW);
             }

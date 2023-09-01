@@ -15,18 +15,11 @@ package solutions.cris.list;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import android.app.Activity;
-import android.app.LauncherActivity;
 import android.content.Context;
-import android.content.Intent;
-import android.database.Cursor;
-import android.graphics.Typeface;
 import android.os.AsyncTask;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
 import android.view.Menu;
@@ -34,27 +27,17 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.ImageView;
 import android.widget.ListView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.google.api.client.repackaged.org.apache.commons.codec.binary.StringUtils;
-
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
 import solutions.cris.CRISActivity;
@@ -63,21 +46,14 @@ import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
 import solutions.cris.object.Case;
-import solutions.cris.object.Client;
 import solutions.cris.object.ClientSession;
-import solutions.cris.object.CrisObject;
 import solutions.cris.object.Document;
 import solutions.cris.object.Group;
 import solutions.cris.object.ListItem;
-import solutions.cris.object.Note;
 import solutions.cris.object.RawDocument;
 import solutions.cris.object.Session;
-import solutions.cris.object.Sync;
 import solutions.cris.object.User;
-import solutions.cris.utils.AlertAndContinue;
 import solutions.cris.utils.CRISKPIItem;
-import solutions.cris.utils.CRISMenuItem;
-import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.ExceptionHandler;
 
 public class ListOneKPI extends CRISActivity {
@@ -87,7 +63,6 @@ public class ListOneKPI extends CRISActivity {
     final static int areaMax = 10;
 
     private ArrayList<CRISKPIItem> kpiItems;
-    private User currentUser;
     private ArrayList<UUID> areaList;
     private String kpiType;
     private Date startTime;
@@ -100,7 +75,7 @@ public class ListOneKPI extends CRISActivity {
         super.onCreate(savedInstanceState);
         // CurrentUser always exists so if this check fails then exception in child
         // // has rendered system inconsistent so exit and let Main start from scratch()
-        currentUser = User.getCurrentUser();
+        User currentUser = User.getCurrentUser();
         if (currentUser == null) {
             finish();
         } else {
@@ -115,7 +90,7 @@ public class ListOneKPI extends CRISActivity {
             kpiHeaderTextView = findViewById(R.id.kpi_header_text);
 
             // Initialise the areaList (columns)
-            areaList = new ArrayList();
+            areaList = new ArrayList<>();
 
             // Initialise the list of KPI Items (rows)
             kpiItems = new ArrayList<>();
@@ -204,12 +179,15 @@ public class ListOneKPI extends CRISActivity {
                     switch (kpiType) {
                         case "Total Cases":
                         case "Total Cases (Last 12 Months)":
+                            // Build 232
+                        case "Plan/Fin.Supp. Cases":
+                        case "Plan/Fin.Supp. Cases (Last 12 Months)":
                             if (kpiMap.containsKey(key)) {
                                 int[] values = kpiMap.get(key);
-                                viewArea[areaCount++].setText(String.format("%d", values[0]));
+                                viewArea[areaCount++].setText(String.format(Locale.UK, "%d", values[0]));
                             } else {
                                 // This area had no values so output zeroes
-                                viewArea[areaCount++].setText(String.format("%d", 0, 0));
+                                viewArea[areaCount++].setText(String.format(Locale.UK, "%d", 0));
                             }
                             break;
 
@@ -217,10 +195,10 @@ public class ListOneKPI extends CRISActivity {
                         case "Total/Active Cases (Last 12 Months)":
                             if (kpiMap.containsKey(key)) {
                                 int[] values = kpiMap.get(key);
-                                viewArea[areaCount++].setText(String.format("%d/%d", values[0], values[1]));
+                                viewArea[areaCount++].setText(String.format(Locale.UK, "%d/%d", values[0], values[1]));
                             } else {
                                 // This area had no values so output zeroes
-                                viewArea[areaCount++].setText(String.format("%d/%d", 0, 0));
+                                viewArea[areaCount++].setText(String.format(Locale.UK, "%d/%d", 0, 0));
                             }
                             break;
                         case "Avg. Session Attendance":
@@ -228,12 +206,15 @@ public class ListOneKPI extends CRISActivity {
                             // Build 157 - Total Attendance KPI
                         case "Total Session Attendance":
                         case "Total Session Attendance (Last 12 Months)":
+                            // Build 232
+                        case "Plan/Fin.Supp. Session Attendance":
+                        case "Plan/Fin.Supp. Session Attendance (Last 12 Months)":
                             if (kpiMap.containsKey(key)) {
                                 int[] values = kpiMap.get(key);
-                                viewArea[areaCount++].setText(String.format("%d/%d/%d", values[0], values[1], values[2]));
+                                viewArea[areaCount++].setText(String.format(Locale.UK, "%d/%d/%d", values[0], values[1], values[2]));
                             } else {
                                 // This area had no values so output zeroes
-                                viewArea[areaCount++].setText(String.format("%d/%d/%d", 0, 0, 0));
+                                viewArea[areaCount++].setText(String.format(Locale.UK, "%d/%d/%d", 0, 0, 0));
                             }
                             break;
                         default:
@@ -267,6 +248,16 @@ public class ListOneKPI extends CRISActivity {
                     initKPIList(12);
                     doTotalActiveCases(kpiType);
                     break;
+                // Build 232
+                case "Plan/Fin.Supp. Cases":
+                    initKPIList(4);
+                    doTotalActiveCases(kpiType);
+                    break;
+                case "Plan/Fin.Supp. Cases (Last 12 Months)":
+                    initKPIList(12);
+                    doTotalActiveCases(kpiType);
+                    break;
+
                 case "Total/Active Cases":
                     initKPIList(4);
                     doTotalActiveCases(kpiType);
@@ -289,6 +280,15 @@ public class ListOneKPI extends CRISActivity {
                     doTotalAttendance(kpiType);
                     break;
                 case "Total Session Attendance (Last 12 Months)":
+                    initKPIList(12);
+                    doTotalAttendance(kpiType);
+                    break;
+                // Build 232
+                case "Plan/Fin.Supp. Session Attendance":
+                    initKPIList(4);
+                    doTotalAttendance(kpiType);
+                    break;
+                case "Plan/Fin.Supp. Session Attendance (Last 12 Months)":
                     initKPIList(12);
                     doTotalAttendance(kpiType);
                     break;
@@ -319,24 +319,38 @@ public class ListOneKPI extends CRISActivity {
                 case "Total Cases (Last 12 Months)":
                     doHeaderSetup("Total Cases");
                     break;
+                // Build 232
+                case "Plan/Fin.Supp. Cases":
+                    doHeaderSetup("Plan/Fin.Supp. Cases");
+                    break;
+                case "Plan/Fin.Supp. Cases (Last 12 Months)":
+                    doHeaderSetup("Plan/Fin.Supp. Cases");
+                    break;
                 case "Total/Active Cases":
-                    doHeaderSetup(String.format("Total Cases/At Least One Attended Session (%d seconds)", elapsed));
+                    doHeaderSetup(String.format(Locale.UK, "Total Cases/At Least One Attended Session (%d seconds)", elapsed));
                     break;
                 case "Total/Active Cases (Last 12 Months)":
-                    doHeaderSetup(String.format("Total Cases/At Least One Attended Session (%d seconds)", elapsed));
+                    doHeaderSetup(String.format(Locale.UK, "Total Cases/At Least One Attended Session (%d seconds)", elapsed));
                     break;
                 case "Avg. Session Attendance":
-                    doHeaderSetup(String.format("Regular/Ad-Hoc/Both (%d seconds)", elapsed));
+                    doHeaderSetup(String.format(Locale.UK, "Regular/Ad-Hoc/Both (%d seconds)", elapsed));
                     break;
                 case "Avg. Session Attendance (Last 12 Months)":
-                    doHeaderSetup(String.format("Regular Session%%/Ad-Hoc Session%%/Both%% (%d seconds)", elapsed));
+                    doHeaderSetup(String.format(Locale.UK, "Regular Session%%/Ad-Hoc Session%%/Both%% (%d seconds)", elapsed));
                     break;
                 // Build 157
                 case "Total Session Attendance":
-                    doHeaderSetup(String.format("Regular/Ad-Hoc/Both (%d seconds)", elapsed));
+                    doHeaderSetup(String.format(Locale.UK, "Regular/Ad-Hoc/Both (%d seconds)", elapsed));
                     break;
                 case "Total Session Attendance (Last 12 Months)":
-                    doHeaderSetup(String.format("Regular Session%%/Ad-Hoc Session%%/Both%% (%d seconds)", elapsed));
+                    doHeaderSetup(String.format(Locale.UK, "Regular Session%%/Ad-Hoc Session%%/Both%% (%d seconds)", elapsed));
+                    break;
+                // Build 232
+                case "Plan/Fin.Supp. Session Attendance":
+                    doHeaderSetup(String.format(Locale.UK, "Regular/Ad-Hoc/Both (%d seconds)", elapsed));
+                    break;
+                case "Plan/Fin.Supp. Session Attendance (Last 12 Months)":
+                    doHeaderSetup(String.format(Locale.UK, "Regular Session%%/Ad-Hoc Session%%/Both%% (%d seconds)", elapsed));
                     break;
                 default:
                     throw new CRISException(String.format("Unknown KPI Type: %s", kpiType));
@@ -348,7 +362,7 @@ public class ListOneKPI extends CRISActivity {
         @Override
         protected void onProgressUpdate(Integer... values) {
             // Runs on UI Thread
-            kpiHeaderTextView.setText(String.format("Processing data... (%d%%)", values[0]));
+            kpiHeaderTextView.setText(String.format(Locale.UK, "Processing data... (%d%%)", values[0]));
         }
 
         private void initKPIList(int size) {
@@ -394,7 +408,7 @@ public class ListOneKPI extends CRISActivity {
         }
 
         private void incrementCount(CRISKPIItem kpiItem, UUID area, int element, int maxSize) {
-            HashMap kpiMap = kpiItem.getKpiMap();
+            HashMap<UUID, int[]> kpiMap = kpiItem.getKpiMap();
             if (kpiMap.containsKey(area)) {
                 int[] values = (int[]) kpiMap.get(area);
                 values[element]++;
@@ -443,22 +457,36 @@ public class ListOneKPI extends CRISActivity {
 
         // Loop through the case documents to get case start and end dates and commissioners
         // then create a mapping for clientID to commissioner/area in each slot (row)
-        private void loadActiveCases() {
+        // Build 232
+        // Added planFinSuppFlag to limit counting to only Plan/Financial Support cases
+        private void loadActiveCases(boolean planFinSuppFlag) {
             LocalDB localDB = LocalDB.getInstance();
             // Get the set of Case documents sorted by ClientID then Reference date
             ArrayList<Document> caseDocuments = localDB.getAllDocumentsOfType(Document.Case);
             UUID clientID = null;
             Date caseStart = new Date(Long.MIN_VALUE);
             UUID area = null;
+            // Build 232 Need to record plan/finSupp when case document starts it and
+            // use it in count when needed
+            boolean currentPlanFinnSupp = false;
             for (Document document : caseDocuments) {
                 Case caseDocument = (Case) document;
                 // Deal with switch to new client by completing previous case with today's date
                 if (clientID != null && !clientID.equals(caseDocument.getClientID())) {
-                    doProcessOneCase(caseStart, new Date(), area, clientID);
+                    if (planFinSuppFlag) {
+                        if (currentPlanFinnSupp) {
+                            // Only count cases with Plans/Financial Support in place
+                            doProcessOneCase(caseStart, new Date(), area, clientID);
+                        }
+                    } else {
+                        // Always count
+                        doProcessOneCase(caseStart, new Date(), area, clientID);
+                    }
                     // Clear the loop variables
                     caseStart = new Date(Long.MIN_VALUE);
                     //area = "";
                     area = null;
+                    currentPlanFinnSupp = false;
                 }
                 // Save the client ID
                 clientID = caseDocument.getClientID();
@@ -468,21 +496,45 @@ public class ListOneKPI extends CRISActivity {
                         // Set some variables
                         caseStart = caseDocument.getReferenceDate();
                         area = caseDocument.getCommissionerID();
+                        currentPlanFinnSupp = caseDocument.isPlanOrSupport();
                         break;
                     case "Update":
                         // Treat as end of one case and start of another with potentially new area
-                        doProcessOneCase(caseStart, caseDocument.getReferenceDate(), area, clientID);
+                        // Build 232
+                        if (planFinSuppFlag) {
+                            if (currentPlanFinnSupp) {
+                                // Only count cases with Plans/Financial Support in place
+                                doProcessOneCase(caseStart, caseDocument.getReferenceDate(), area, clientID);
+                            }
+                        } else {
+                            // Always count
+                            doProcessOneCase(caseStart, caseDocument.getReferenceDate(), area, clientID);
+                        }
+
                         area = caseDocument.getCommissionerID();
                         caseStart = caseDocument.getReferenceDate();
+                        currentPlanFinnSupp = caseDocument.isPlanOrSupport();
                         break;
                     case "Close":
-                        doProcessOneCase(caseStart, caseDocument.getReferenceDate(), area, clientID);
+                        // Build 232
+                        if (planFinSuppFlag) {
+                            if (currentPlanFinnSupp) {
+                                // Only count cases with Plans/Financial Support in place
+                                doProcessOneCase(caseStart, caseDocument.getReferenceDate(), area, clientID);
+                            }
+                        } else {
+                            // Always count
+                            doProcessOneCase(caseStart, caseDocument.getReferenceDate(), area, clientID);
+                        }
+
                         caseStart = new Date(Long.MIN_VALUE);
+                        currentPlanFinnSupp = false;
                         break;
                     case "Reject":
                         // Treat as end of case (case may have been started) then clear existing case
                         // If no start the caseStart will be null so nothing will be processed
                         caseStart = new Date(Long.MIN_VALUE);
+                        currentPlanFinnSupp = false;
                         break;
                     default:
                         throw new CRISException(String.format("Unexpected Case Type: %s", caseDocument.getCaseType()));
@@ -490,7 +542,15 @@ public class ListOneKPI extends CRISActivity {
             }
             // Complete the final client
             if (clientID != null) {
-                doProcessOneCase(caseStart, new Date(), area, clientID);
+                if (planFinSuppFlag) {
+                    if (currentPlanFinnSupp) {
+                        // Only count cases with Plans/Financial Support in place
+                        doProcessOneCase(caseStart, new Date(), area, clientID);
+                    }
+                } else {
+                    // Always count
+                    doProcessOneCase(caseStart, new Date(), area, clientID);
+                }
             }
             publishProgress(5);
         }
@@ -518,8 +578,12 @@ public class ListOneKPI extends CRISActivity {
         // Main load routine for Total Cases and Total/Active Cases
         private void doTotalActiveCases(String kpiType) {
             // Use the case documents to set the client Area mapping in each slot
-            loadActiveCases();
-
+            // Build 232 -- Handle the Plan/Fin.Supp only KPIs
+            if (kpiType.contains("Plan/Fin.Supp.")) {
+                loadActiveCases(true);
+            } else {
+                loadActiveCases(false);
+            }
             // Sort the Area List
             Collections.sort(areaList);
 
@@ -634,7 +698,7 @@ public class ListOneKPI extends CRISActivity {
         private void doAverageAttendance(String kpiType) {
             LocalDB localDB = LocalDB.getInstance();
             // Use the case documents to set the client Area mapping in each slot
-            loadActiveCases();
+            loadActiveCases(false);
             // Sort the Area List
             Collections.sort(areaList);
             // SEt the number of slots (rows) based on the kpiType
@@ -647,11 +711,11 @@ public class ListOneKPI extends CRISActivity {
                 throw new CRISException(String.format("Unexpected kpiType: %s", kpiType));
             }
             // Used to count the progress steps
-            int progressIncrement = 80/(slotMax-1);
+            int progressIncrement = 80 / (slotMax - 1);
             // Get the average attendance for each slot in turn
             for (int i = 0; i < slotMax; i++) {
                 CRISKPIItem kpiItem = kpiItems.get(i);
-                sessionAttendanceLoadOneSlot(kpiItem, progressIncrement,i+1);
+                sessionAttendanceLoadOneSlot(kpiItem, progressIncrement, i + 1);
             }
             // Calculate the averages and the values for the Total column
             for (int i = 0; i < kpiItems.size(); i++) {
@@ -699,14 +763,21 @@ public class ListOneKPI extends CRISActivity {
         private void doTotalAttendance(String kpiType) {
             LocalDB localDB = LocalDB.getInstance();
             // Use the case documents to set the client Area mapping in each slot
-            loadActiveCases();
+            // Build 232 -- Handle the Plan/Fin.Supp only KPIs
+            if (kpiType.contains("Plan/Fin.Supp.")) {
+                loadActiveCases(true);
+            } else {
+                loadActiveCases(false);
+            }
             // Sort the Area List
             Collections.sort(areaList);
             // SEt the number of slots (rows) based on the kpiType
             int slotMax = 0;
-            if (kpiType.equals("Total Session Attendance")) {
+            if (kpiType.equals("Total Session Attendance") ||
+                    kpiType.equals("Plan/Fin.Supp. Session Attendance")) {
                 slotMax = 4;
-            } else if (kpiType.equals("Total Session Attendance (Last 12 Months)")) {
+            } else if (kpiType.equals("Total Session Attendance (Last 12 Months)") ||
+                    kpiType.equals("Plan/Fin.Supp. Session Attendance (Last 12 Months)")) {
                 slotMax = 12;
             } else {
                 throw new CRISException(String.format("Unexpected kpiType: %s", kpiType));

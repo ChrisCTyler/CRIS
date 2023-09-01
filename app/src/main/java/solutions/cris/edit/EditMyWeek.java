@@ -16,8 +16,10 @@ package solutions.cris.edit;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.DialogInterface;
@@ -328,8 +330,10 @@ public class EditMyWeek extends Fragment {
             public void onClick(View view) {
                 // Cancel so no need to update list of documents
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
                 ComponentName compName = ((CRISActivity) getActivity()).getCompName();
                 DevicePolicyManager deviceManager = ((CRISActivity) getActivity()).getDeviceManager();
                 boolean active = deviceManager.isAdminActive(compName);
@@ -349,8 +353,10 @@ public class EditMyWeek extends Fragment {
             public void onClick(View view) {
                 if (validate()) {
                     editDocument.save(isNewMode);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                     ComponentName compName = ((CRISActivity) getActivity()).getCompName();
                     DevicePolicyManager deviceManager = ((CRISActivity) getActivity()).getDeviceManager();
                     boolean active = deviceManager.isAdminActive(compName);
@@ -498,8 +504,10 @@ public class EditMyWeek extends Fragment {
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     editDocument.save(isNewMode);
-                                    FragmentManager fragmentManager = getFragmentManager();
-                                    fragmentManager.popBackStack();
+                                    // Build 200 Use the androidX Fragment class
+                                    //FragmentManager fragmentManager = getFragmentManager();
+                                    //fragmentManager.popBackStack();
+                                    getParentFragmentManager().popBackStack();
 
                                 }
                             }
@@ -518,8 +526,10 @@ public class EditMyWeek extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 editDocument.save(isNewMode);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         }
     }

@@ -799,7 +799,7 @@ public class MACAYC18 extends Document implements Serializable {
         else return "No";
     }
 */
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Completion Date");
         fNames.add("Gender");
@@ -853,6 +853,7 @@ public class MACAYC18 extends Document implements Serializable {
         return fNames;
     }
 
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getMACAYC18Data(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -868,6 +869,8 @@ public class MACAYC18 extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();

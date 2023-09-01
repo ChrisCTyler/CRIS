@@ -14,12 +14,19 @@ package solutions.cris.utils;
 //
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
+
 import android.os.Bundle;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.appcompat.widget.Toolbar;
+
 import android.view.LayoutInflater;
 import android.view.View;
 
@@ -44,7 +51,9 @@ import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
+
 import androidx.annotation.NonNull;
+
 import android.text.TextUtils;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -67,7 +76,6 @@ import java.util.Locale;
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 
-
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.exceptions.CRISException;
@@ -78,6 +86,7 @@ import solutions.cris.object.ClientSession;
 import solutions.cris.object.Contact;
 import solutions.cris.object.CriteriaAssessmentTool;
 import solutions.cris.object.Document;
+import solutions.cris.object.Group;
 import solutions.cris.object.Image;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
@@ -92,6 +101,7 @@ import solutions.cris.object.User;
 import static android.app.Activity.RESULT_OK;
 
 public class CRISExport extends Fragment implements EasyPermissions.PermissionCallbacks {
+//public class CRISExport extends Fragment  {
 
     static final int REQUEST_ACCOUNT_PICKER = 1000;
     static final int REQUEST_AUTHORIZATION = 1001;
@@ -121,6 +131,13 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
     ArrayList<DocumentSelector> documents = new ArrayList<>();
     LocalDB localDB;
     String listType;
+    // Build 209 Pass localSettings directly
+    LocalSettings localSettings;
+
+    // Build 217 - If user cancels the export (Cancel or back arrow) cancel the export task
+    // to prevent getActivity() exception when eport finishes and there is nowhere to go
+    // backk to
+    AsyncTask thisMakeRequestTask;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -131,12 +148,22 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         parent = inflater.inflate(R.layout.cris_export, container, false);
         return parent;
     }
+    // Build 218 Stop the background task if the fragment is ended
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (thisMakeRequestTask != null){
+            thisMakeRequestTask.cancel(true);
+        }
+    }
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
         localDB = LocalDB.getInstance();
+        // Build 209 Pass localSettings directly
+        localSettings = LocalSettings.getInstance();
         Toolbar toolbar = ((ListActivity) getActivity()).getToolbar();
         toolbar.setTitle(getString(R.string.app_name) + " - Export to Google Sheets");
 
@@ -165,7 +192,7 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
 
         // Initialize credentials and service object.
         mCredential = GoogleAccountCredential.usingOAuth2(
-                getActivity().getApplicationContext(), Arrays.asList(SCOPES))
+                        getActivity().getApplicationContext(), Arrays.asList(SCOPES))
                 .setBackOff(new ExponentialBackOff());
         // Get the previous organisation from  shared preferences
         SharedPreferences prefs =
@@ -240,7 +267,8 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         addDocumentType(checkboxLayout, "Note", position++);
         addDocumentType(checkboxLayout, "Contact", position++);
         addDocumentType(checkboxLayout, "ClientSession", position++);
-        addDocumentType(checkboxLayout, "Session", position++);
+        // Build 234 Session is not a client document
+        //addDocumentType(checkboxLayout, "Session", position++);
         addDocumentType(checkboxLayout, "Image", position++);
         addDocumentType(checkboxLayout, "Transport", position++);
 
@@ -257,7 +285,8 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
             public void onClick(View view) {
                 saveButton.setEnabled(false);
                 doExport();
-                saveButton.setEnabled(true);
+                // Build 218 Do not re-enable so that export cannot be done twice
+                //saveButton.setEnabled(true);
             }
         });
 
@@ -266,8 +295,10 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         });
     }
@@ -370,7 +401,7 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
                     for (DocumentSelector document : documents) {
                         document.setChecked(document.getCheckBox().isChecked());
                     }
-                    new MakeRequestTask(mCredential,
+                    thisMakeRequestTask = new MakeRequestTask(mCredential,
                             clientAdapterList,
                             sessionAdapterList,
                             typeView.getText().toString(),
@@ -566,7 +597,7 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
      */
     // Build 179 Enable progress string
     //private class MakeRequestTask extends AsyncTask<Void, Void, String> {
-    private class MakeRequestTask extends AsyncTask<Void, String, String> {
+    public class MakeRequestTask extends AsyncTask<Void, String, String> {
 
         private Exception mLastError = null;
         private CRISSpreadsheet crisSpreadsheet = null;
@@ -606,12 +637,17 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
             }
         }
 
-        private String doSessionList(ArrayList<Session> adapterList) {
+
+        /* Build 220 Added progress bar for session export
+        private String doSessionListOld(ArrayList<Session> adapterList) {
             try {
                 ArrayList<ClientSession> clientDocuments;
                 publishProgress("Creating spreadsheet...");
                 crisSpreadsheet.create(User.getCurrentUser());
                 int sheetID = 1;
+                int docTotal = 0;
+                int docCount = 0;
+                int docDisplay = 0;
                 publishProgress("Exporting session details...");
                 crisSpreadsheet.addSheet("Session", sheetID);
                 crisSpreadsheet.loadSheet("Session",
@@ -621,17 +657,80 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
                 publishProgress("Exporting individual client sessions...");
                 clientDocuments = localDB.getAllClientSessions(adapterList, startDate, endDate);
                 crisSpreadsheet.addSheet("ClientSession", sheetID);
+                List<List<Object>> content = new ArrayList<>();
+                content.add(ClientSession.getExportFieldNames());
+                // Build 217 Correct long-standing MyWeek issue
+                List<List<Object>> myWeekContent = new ArrayList<>();
+                myWeekContent.add(MyWeek.getExportFieldNames());
+                docTotal = clientDocuments.size();
+                for (Document clientDocument : clientDocuments) {
+                    if (docCount++ * 100 / docTotal > docDisplay) {
+                        publishProgress(String.format(Locale.UK, "Exporting-Client Sessions %d%% of %d",
+                                ++docDisplay,
+                                docTotal));
+                    }
+                    ClientSession clientSession = (ClientSession) clientDocument;
+                    // Add each document (needs associated note/pdf/transport documents)
+                    Client client = clientSession.getClient();
+                    if (client != null) {
+                        // Find any associated note / pdf
+                        MyWeek sessionMyWeek = (MyWeek) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.MyWeek, clientSession.getSessionID());
+                        Note sessionNote = (Note) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.Note, clientSession.getSessionID());
+                        PdfDocument sessionPdf = (PdfDocument) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.PdfDocument, clientSession.getSessionID());
+                        Transport sessionTransport = (Transport) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.Transport, clientSession.getSessionID());
+                        content.add(clientSession.getExportData(client,
+                                sessionMyWeek,
+                                sessionNote,
+                                sessionPdf,
+                                sessionTransport));
+                        // Build 217
+                        if (sessionMyWeek != null){
+                            myWeekContent.add(sessionMyWeek.getExportData(client));
+                        }
+                    }
+                }
                 crisSpreadsheet.loadSheet("ClientSession",
-                        ClientSession.getClientSessionData(clientDocuments),
+                        content,
+                        //ClientSession.getClientSessionData(clientDocuments),
                         ClientSession.getExportSheetConfiguration(sheetID));
-                sheetID++;
+
                 publishProgress("Exporting MyWeek records...");
-                ArrayList<Document> myWeekDocuments = localDB.getAllDocumentsOfType(
-                        clientDocuments, Document.MyWeek);
+                sheetID++;
                 crisSpreadsheet.addSheet("MyWeek", sheetID);
                 crisSpreadsheet.loadSheet("MyWeek",
-                        MyWeek.getMyWeekData(myWeekDocuments),
+                        myWeekContent,
                         MyWeek.getExportSheetConfiguration(sheetID));
+                //
+                // Build 217 Correct long-standing MyWeek issue. Only MyWeek associated with
+                // the exported sessions should be exported
+                //publishProgress("Exporting MyWeek records...");
+                //ArrayList<Document> myWeekDocuments = localDB.getAllDocumentsOfType(
+                //        clientDocuments, Document.MyWeek);
+                //crisSpreadsheet.addSheet("MyWeek", sheetID);
+                //content = new ArrayList<>();
+                //content.add(MyWeek.getExportFieldNames());
+                //docTotal = myWeekDocuments.size();
+                //for (Document myWeekDocument : myWeekDocuments) {
+                //    if (docCount++ * 100 / docTotal > docDisplay) {
+                //        publishProgress(String.format(Locale.UK, "Exporting-My Weeks %d%% of %d",
+                //                ++docDisplay,
+                //                docTotal));
+                //    }
+                //    MyWeek thisDocument = (MyWeek) myWeekDocument;
+                //    Client client = (Client) localDB.getDocument(thisDocument.getClientID());
+                //    if (client != null) {
+                //        content.add(thisDocument.getExportData(client));
+                //    }
+                //}
+                //crisSpreadsheet.loadSheet("MyWeek",
+                //        content,
+                //        //MyWeek.getMyWeekData(myWeekDocuments),
+                //        MyWeek.getExportSheetConfiguration(sheetID));
+
                 return String.format("Data exported to: %s", crisSpreadsheet.getSpreadSheetName());
             } catch (Exception e) {
                 mLastError = e;
@@ -640,127 +739,143 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
             }
         }
 
+         */
+
+        private ArrayList<Session> getSessions(ArrayList<Session> adapterList){
+            ArrayList<Session> sessionList = new ArrayList<>();
+            //Build 222 Only export sessions between start and end date
+            for (Session session:adapterList){
+                if (session.getReferenceDate().before(endDate) &&
+                        session.getReferenceDate().after(startDate)){
+                    sessionList.add(session);
+                }
+            }
+            return sessionList;
+        }
+
+        private String doSessionList(ArrayList<Session> adapterList) {
+            try {
+                publishProgress("Creating spreadsheet...");
+                crisSpreadsheet.create(User.getCurrentUser());
+                int sheetID = 1;
+                int docTotal = 0;
+                int docCount = 0;
+                int docDisplay = 0;
+                publishProgress("Exporting session details...");
+                ArrayList<Session> sessionList = getSessions(adapterList);
+                crisSpreadsheet.addSheet("Session", sheetID);
+                docTotal = sessionList.size();
+                List<List<Object>> content = new ArrayList<>();
+                content.add(Session.getExportFieldNames(localSettings));
+                for (Session session : sessionList) {
+                    if (docTotal > 100) {
+                        if (docCount++ * 100 / docTotal > docDisplay) {
+                            publishProgress(String.format(Locale.UK, "Exporting-Sessions %d%% of %d",
+                                       ++docDisplay,
+                                    docTotal));
+                        }
+                    }
+                    content.add(session.getExportData());
+                }
+                crisSpreadsheet.loadSheet("Session",
+                        content,
+                        Session.getExportSheetConfiguration(sheetID));
+                sheetID++;
+                publishProgress("Exporting individual client sessions...");
+                ArrayList<ClientSession> clientDocuments = localDB.getAllClientSessions(sessionList, startDate, endDate);
+                crisSpreadsheet.addSheet("ClientSession", sheetID);
+                content = new ArrayList<>();
+                content.add(ClientSession.getExportFieldNames());
+                // Build 217 Correct long-standing MyWeek issue
+                List<List<Object>> myWeekContent = new ArrayList<>();
+                myWeekContent.add(MyWeek.getExportFieldNames());
+                docTotal = clientDocuments.size();
+                for (Document clientDocument : clientDocuments) {
+                    if (docTotal > 100) {
+                        if (docCount++ * 100 / docTotal > docDisplay) {
+                            publishProgress(String.format(Locale.UK, "Exporting-Client Sessions %d%% of %d",
+                                    ++docDisplay,
+                                    docTotal));
+                        }
+                    }
+                    ClientSession clientSession = (ClientSession) clientDocument;
+                    // Add each document (needs associated note/pdf/transport documents)
+                    Client client = clientSession.getClient();
+                    if (client != null) {
+                        Case relevantCase = localDB.getRelevantCase(clientDocument.getClientID(), clientSession.getReferenceDate());
+                        // Find any associated note / pdf
+                        MyWeek sessionMyWeek = (MyWeek) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.MyWeek, clientSession.getSessionID());
+                        Note sessionNote = (Note) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.Note, clientSession.getSessionID());
+                        PdfDocument sessionPdf = (PdfDocument) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.PdfDocument, clientSession.getSessionID());
+                        Transport sessionTransport = (Transport) localDB.getSessionDocumentsOfType(
+                                client.getClientID(), Document.Transport, clientSession.getSessionID());
+                        content.add(clientSession.getExportData(client,
+                                sessionMyWeek,
+                                sessionNote,
+                                sessionPdf,
+                                sessionTransport,
+                                relevantCase));
+                        // Build 217
+                        if (sessionMyWeek != null){
+                            myWeekContent.add(sessionMyWeek.getExportData(client));
+                        }
+                    }
+                }
+                crisSpreadsheet.loadSheet("ClientSession",
+                        content,
+                        //ClientSession.getClientSessionData(clientDocuments),
+                        ClientSession.getExportSheetConfiguration(sheetID));
+
+                publishProgress("Exporting MyWeek records...");
+                sheetID++;
+                crisSpreadsheet.addSheet("MyWeek", sheetID);
+                crisSpreadsheet.loadSheet("MyWeek",
+                        myWeekContent,
+                        MyWeek.getExportSheetConfiguration(sheetID));
+
+                return String.format("Data exported to: %s", crisSpreadsheet.getSpreadSheetName());
+            } catch (Exception e) {
+                mLastError = e;
+                cancel(true);
+                return String.format("ERROR: %s", e.getMessage());
+            }
+        }
         private String doClientList(ArrayList<Client> adapterList) {
             try {
-                ArrayList<Document> clientDocuments;
                 publishProgress("Creating spreadsheet...");
                 crisSpreadsheet.create(User.getCurrentUser());
                 int sheetID = 0;
                 for (DocumentSelector document : documents) {
                     if (document.isChecked()) {
                         sheetID++;
-                        publishProgress(String.format("Exporting-%s", Document.getDocumentTypeString(document.getDocumentType())));
-                        switch (document.getDocumentType()) {
-                            case Document.Client:
-                                crisSpreadsheet.addSheet("Client", sheetID);
-                                // If start and end dates are set, limit the clients
-
-                                if (startDate.getTime() == Long.MIN_VALUE && endDate.getTime() == Long.MAX_VALUE) {
-                                    crisSpreadsheet.loadSheet("Client",
-                                            Client.getClientData(adapterList, getActivity()),
-                                            Client.getExportSheetConfiguration(sheetID));
-                                } else {
-                                    ArrayList<Client> clientList = new ArrayList<>();
-                                    for (Client client : adapterList) {
-                                        boolean include = false;
-                                        // Include case if open before end date and close after start date (or still open)
-                                        if (client.getStartCase() != null) {
-                                            if (client.getStartCase().getReferenceDate().before(endDate)) {
-                                                if (client.getCurrentCase() != null) {
-                                                    Case currentCase = client.getCurrentCase();
-                                                    if (currentCase.getCaseType().equals("Close")) {
-                                                        if (currentCase.getReferenceDate().after(startDate)) {
-                                                            include = true;
-                                                        }
-                                                    } else {
-                                                        // Case still in progress
-                                                        include = true;
-                                                    }
-                                                } else {
-                                                    // Current Case should always exist (=Start Case if no newer case record)
-                                                    include = true;
-                                                }
-                                            }
-                                        }
-                                        if (include){
-                                            clientList.add(client);
-                                        }
+                        publishProgress(String.format("Exporting-%ss", Document.getDocumentTypeString(document.getDocumentType())));
+                        if (document.getDocumentType() == Document.Client) {
+                            crisSpreadsheet.addSheet("Client", sheetID);
+                            ArrayList<Client> clientList = doClients(adapterList);
+                            int docCount = 0;
+                            int docDisplay = 0;
+                            int docTotal = clientList.size();
+                            List<List<Object>> content = new ArrayList<>();
+                            content.add(Client.getExportFieldNames(localSettings));
+                            for (Client client : clientList) {
+                                if (docTotal > 100) {
+                                    if (docCount++ * 100 / docTotal > docDisplay) {
+                                        publishProgress(String.format(Locale.UK, "Exporting-%ss %d%% of %d",
+                                                Document.getDocumentTypeString(document.getDocumentType()),
+                                                ++docDisplay,
+                                                docTotal));
                                     }
-                                        crisSpreadsheet.loadSheet("Client",
-                                                Client.getClientData(clientList, getActivity()),
-                                                Client.getExportSheetConfiguration(sheetID));
                                 }
-                                break;
-                            case Document.ClientSession:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.ClientSession, startDate, endDate);
-                                crisSpreadsheet.addSheet("ClientSession", sheetID);
-                                crisSpreadsheet.loadSheet("ClientSession",
-                                        ClientSession.getClientSessionData(clientDocuments),
-                                        ClientSession.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.Case:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.Case, startDate, endDate);
-                                crisSpreadsheet.addSheet("Case", sheetID);
-                                crisSpreadsheet.loadSheet("Case",
-                                        Case.getCaseData(clientDocuments, getActivity()),
-                                        Case.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.CriteriaAssessmentTool:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.CriteriaAssessmentTool, startDate, endDate);
-                                crisSpreadsheet.addSheet("CriteriaAssessmentTool", sheetID);
-                                crisSpreadsheet.loadSheet("CriteriaAssessmentTool",
-                                        CriteriaAssessmentTool.getCATData(clientDocuments),
-                                        CriteriaAssessmentTool.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.Contact:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.Contact, startDate, endDate);
-                                crisSpreadsheet.addSheet("Contact", sheetID);
-                                crisSpreadsheet.loadSheet("Contact",
-                                        Contact.getContactData(clientDocuments),
-                                        Contact.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.Image:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.Image, startDate, endDate);
-                                crisSpreadsheet.addSheet("Image", sheetID);
-                                crisSpreadsheet.loadSheet("Image",
-                                        Image.getImageData(clientDocuments),
-                                        Image.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.MACAYC18:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.MACAYC18, startDate, endDate);
-                                crisSpreadsheet.addSheet("MACA-YC18", sheetID);
-                                crisSpreadsheet.loadSheet("MACA-YC18",
-                                        MACAYC18.getMACAYC18Data(clientDocuments),
-                                        MACAYC18.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.MyWeek:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.MyWeek, startDate, endDate);
-                                crisSpreadsheet.addSheet("MyWeek", sheetID);
-                                crisSpreadsheet.loadSheet("MyWeek",
-                                        MyWeek.getMyWeekData(clientDocuments),
-                                        MyWeek.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.Note:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.Note, startDate, endDate);
-                                crisSpreadsheet.addSheet("Note", sheetID);
-                                crisSpreadsheet.loadSheet("Note",
-                                        Note.getNoteData(clientDocuments),
-                                        Note.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.PdfDocument:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.PdfDocument, startDate, endDate);
-                                crisSpreadsheet.addSheet("PdfDocument", sheetID);
-                                crisSpreadsheet.loadSheet("PdfDocument",
-                                        PdfDocument.getPdfDocumentData(clientDocuments, adapterList),
-                                        PdfDocument.getExportSheetConfiguration(sheetID));
-                                break;
-                            case Document.Transport:
-                                clientDocuments = localDB.getAllDocumentsOfType(adapterList, Document.Transport, startDate, endDate);
-                                crisSpreadsheet.addSheet("Transport", sheetID);
-                                crisSpreadsheet.loadSheet("Transport",
-                                        Transport.getTransportData(clientDocuments),
-                                        Transport.getExportSheetConfiguration(sheetID));
-                                break;
+                                content.add(client.getExportData());
+                            }
+                            crisSpreadsheet.loadSheet("Client",
+                                    content,
+                                    Client.getExportSheetConfiguration(sheetID));
+                        } else {
+                            loadContent(adapterList, document, sheetID);
                         }
                     }
                 }
@@ -772,23 +887,265 @@ public class CRISExport extends Fragment implements EasyPermissions.PermissionCa
             }
         }
 
-        // Build 179 Removed redundant code
-        /*
-        protected String doInBackgroundTest(Void... params) {
-            try {
-                Spreadsheet spreadsheet = crisSpreadsheet.test();
-                String locale = spreadsheet.getProperties().getLocale();
-                String timeZone = spreadsheet.getProperties().getTimeZone();
+        private void loadContent(ArrayList<Client> adapterList,
+                                 DocumentSelector document,
+                                 int sheetID) throws java.io.IOException {
+            ArrayList<Document> clientDocuments = localDB.getAllDocumentsOfType(
+                    adapterList, document.getDocumentType(), startDate, endDate);
+            List<List<Object>> content = new ArrayList<>();
+            int docCount = 0;
+            int docDisplay = 0;
+            int docTotal = clientDocuments.size();
+            for (Document clientDocument : clientDocuments) {
+                if (docTotal > 100) {
+                    if (docCount++ * 100 / docTotal > docDisplay) {
+                        publishProgress(String.format(Locale.UK, "Exporting-%ss %d%% of %d",
+                                Document.getDocumentTypeString(document.getDocumentType()),
+                                ++docDisplay,
+                                docTotal));
+                    }
+                }
+                Client client = (Client) localDB.getDocument(clientDocument.getClientID());
+                if (client != null) {
+                    switch (document.getDocumentType()) {
+                        case Document.ClientSession:
+                            ClientSession clientSession = (ClientSession) clientDocument;
+                            Case relevantCase = localDB.getRelevantCase(clientDocument.getClientID(), clientSession.getReferenceDate());
+                            // Find any associated note / pdf
+                            MyWeek sessionMyWeek = (MyWeek) localDB.getSessionDocumentsOfType(
+                                    client.getClientID(), Document.MyWeek, clientSession.getSessionID());
+                            Note sessionNote = (Note) localDB.getSessionDocumentsOfType(
+                                    client.getClientID(), Document.Note, clientSession.getSessionID());
+                            PdfDocument sessionPdf = (PdfDocument) localDB.getSessionDocumentsOfType(
+                                    client.getClientID(), Document.PdfDocument, clientSession.getSessionID());
+                            Transport sessionTransport = (Transport) localDB.getSessionDocumentsOfType(
+                                    client.getClientID(), Document.Transport, clientSession.getSessionID());
+                            content.add(clientSession.getExportData(client,
+                                    sessionMyWeek,
+                                    sessionNote,
+                                    sessionPdf,
+                                    sessionTransport,
+                                    relevantCase));
+                            break;
+                        case Document.Case:
+                            Case caseDocument = (Case) clientDocument;
+                            content.add(caseDocument.getExportData(client));
+                            break;
+                        case Document.CriteriaAssessmentTool:
+                            CriteriaAssessmentTool toolDocument = (CriteriaAssessmentTool) clientDocument;
+                            content.add(toolDocument.getExportData(client));
+                            break;
+                        case Document.Contact:
+                            Contact contactDocument = (Contact) clientDocument;
+                            content.add(contactDocument.getExportData(client));
+                            break;
+                        case Document.Image:
+                            Image imageDocument = (Image) clientDocument;
+                            content.add(imageDocument.getExportData(client));
+                            break;
+                        case Document.MACAYC18:
+                            MACAYC18 macayc18Document = (MACAYC18) clientDocument;
+                            content.add(macayc18Document.getExportData(client));
+                            break;
+                        case Document.MyWeek:
+                            MyWeek myWeekDocument = (MyWeek) clientDocument;
+                            content.add(myWeekDocument.getExportData(client));
+                            break;
+                        case Document.Note:
+                            Note noteDocument = (Note) clientDocument;
+                            content.add(noteDocument.getExportData(client));
+                            break;
+                        case Document.PdfDocument:
+                            PdfDocument pdfDocument = (PdfDocument) clientDocument;
+                            content.add(pdfDocument.getExportData(client));
+                            break;
+                        case Document.Transport:
+                            Transport transportDocument = (Transport) clientDocument;
+                            content.add(transportDocument.getExportData(client));
+                            break;
+                    }
 
-                return String.format("Locale: %s - TimeZone: %s", locale, timeZone);
-            } catch (Exception e) {
-                mLastError = e;
-                cancel(true);
-                return String.format("ERROR: %s", e.getMessage());
+                }
+            }
+            switch (document.getDocumentType()) {
+                case Document.ClientSession:
+                    content.add(0, ClientSession.getExportFieldNames());
+                    crisSpreadsheet.addSheet("ClientSession", sheetID);
+                    crisSpreadsheet.loadSheet("ClientSession",
+                            content,
+                            ClientSession.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.Case:
+                    content.add(0, Case.getExportFieldNames(localSettings));
+                    crisSpreadsheet.addSheet("Case", sheetID);
+                    crisSpreadsheet.loadSheet("Case",
+                            content,
+                            Case.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.CriteriaAssessmentTool:
+                    content.add(0, CriteriaAssessmentTool.getExportFieldNames());
+                    crisSpreadsheet.addSheet("CriteriaAssessmentTool", sheetID);
+                    crisSpreadsheet.loadSheet("CriteriaAssessmentTool",
+                            content,
+                            CriteriaAssessmentTool.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.Contact:
+                    content.add(0, Contact.getExportFieldNames());
+                    crisSpreadsheet.addSheet("Contact", sheetID);
+                    crisSpreadsheet.loadSheet("Contact",
+                            content,
+                            Contact.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.Image:
+                    content.add(0, Image.getExportFieldNames());
+                    crisSpreadsheet.addSheet("Image", sheetID);
+                    crisSpreadsheet.loadSheet("Image",
+                            content,
+                            Image.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.MACAYC18:
+                    content.add(0, MACAYC18.getExportFieldNames());
+                    crisSpreadsheet.addSheet("MACA-YC18", sheetID);
+                    crisSpreadsheet.loadSheet("MACA-YC18",
+                            content,
+                            MACAYC18.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.MyWeek:
+                    content.add(0, MyWeek.getExportFieldNames());
+                    crisSpreadsheet.addSheet("MyWeek", sheetID);
+                    crisSpreadsheet.loadSheet("MyWeek",
+                            content,
+                            MyWeek.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.Note:
+                    content.add(0, Note.getExportFieldNames());
+                    crisSpreadsheet.addSheet("Note", sheetID);
+                    crisSpreadsheet.loadSheet("Note",
+                            content,
+                            Note.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.PdfDocument:
+                    content.add(0, PdfDocument.getExportFieldNames());
+                    crisSpreadsheet.addSheet("PdfDocument", sheetID);
+                    crisSpreadsheet.loadSheet("PdfDocument",
+                            content,
+                            PdfDocument.getExportSheetConfiguration(sheetID));
+                    break;
+                case Document.Transport:
+                    content.add(0, Transport.getExportFieldNames());
+                    crisSpreadsheet.addSheet("Transport", sheetID);
+                    crisSpreadsheet.loadSheet("Transport",
+                            content,
+                            Transport.getExportSheetConfiguration(sheetID));
+                    break;
             }
         }
 
-         */
+        // Build 201 Addition of Attendance Points requires calculation of session
+        // fields in client documents
+        private ArrayList<Client> doClients(ArrayList<Client> adapterList) {
+            ArrayList<Client> clientList = new ArrayList<>();
+            int docTotal = adapterList.size();
+            int docCount = 0;
+            int docDisplay = 0;
+            for (Client client : adapterList) {
+                if (docCount++ * 100 / docTotal > docDisplay) {
+                    publishProgress(String.format(Locale.UK, "Calculating Session Totals %d%% of %d Clients",
+                            ++docDisplay,
+                            docTotal));
+                }
+                boolean include = false;
+                // If no date range set then all clients should be included
+                if (startDate.getTime() == Long.MIN_VALUE && endDate.getTime() == Long.MAX_VALUE) {
+                    include = true;
+                } else {
+                    // Include case if open before end date and close after start date (or still open)
+                    if (client.getStartCase() != null) {
+                        if (client.getStartCase().getReferenceDate().before(endDate)) {
+                            if (client.getCurrentCase() != null) {
+                                Case currentCase = client.getCurrentCase();
+                                if (currentCase.getCaseType().equals("Close")) {
+                                    if (currentCase.getReferenceDate().after(startDate)) {
+                                        include = true;
+                                    }
+                                } else {
+                                    // Case still in progress
+                                    include = true;
+                                }
+                            } else {
+                                // Current Case should always exist (=Start Case if no newer case record)
+                                include = true;
+                            }
+                        }
+                    }
+                }
+                if (include) {
+                    updateSessionTotals(client);
+                    clientList.add(client);
+                }
+            }
+
+            return clientList;
+        }
+
+        private void updateSessionTotals(Client client) {
+
+            client.setSessionsOffered(0);
+            client.setSessionsAttended(0);
+            client.setSessionsCancelled(0);
+            client.setSessionsDNA(0);
+            client.setAttendanceScore(0);
+            // Get the client sessions for the adapterList clients (ordered by ClientID)
+            ArrayList<ClientSession> clientSessions =
+                    localDB.getAllClientSessions(client, startDate, endDate);
+            if (clientSessions.size() > 0) {
+                // Initialise the counters
+                boolean startCaseFound = false;
+                Case startCase = client.getStartCase();
+                if (startCase != null) {
+                    startCaseFound = true;
+                }
+                int sessionsOffered = 0;
+                int sessionsAttended = 0;
+                int sessionsCancelled = 0;
+                int sessionsDNA = 0;
+                int attendanceScore = 0;
+                Date today = new Date();
+                for (ClientSession clientSession : clientSessions) {
+                    // Build 208 Ignore spurious ClientSession documents without a linked session.
+                    Session session = clientSession.getSession();
+                    if (session != null) {
+                        // Process this session
+                        // Offered counter only counts sessions prior to Case Start
+                        if (!startCaseFound || startCase.getReferenceDate().after(clientSession.getReferenceDate())) {
+                            sessionsOffered++;
+                        }
+                        if (clientSession.getCancelledFlag()) {
+                            sessionsCancelled++;
+                        } else if (clientSession.isAttended()) {
+                            sessionsAttended++;
+                            attendanceScore += clientSession.getSession().getAttendancePoints();
+                        } else {
+                            // Could be in the future
+                            if (clientSession.getReferenceDate().before(today)) {
+                                // Build 226 - Only score negatively for ad-hoc sessions
+                                if (session.getGroupID().equals(Group.adHocGroupID)) {
+                                    sessionsDNA++;
+                                    attendanceScore -= clientSession.getSession().getAttendancePoints();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                client.setSessionsOffered(sessionsOffered);
+                client.setSessionsAttended(sessionsAttended);
+                client.setSessionsCancelled(sessionsCancelled);
+                client.setSessionsDNA(sessionsDNA);
+                client.setAttendanceScore(attendanceScore);
+            }
+
+        }
 
 
         @Override

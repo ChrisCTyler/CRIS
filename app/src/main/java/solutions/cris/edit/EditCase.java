@@ -16,8 +16,10 @@ package solutions.cris.edit;
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
@@ -40,6 +42,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -73,6 +76,8 @@ import solutions.cris.utils.LocalSettings;
 import solutions.cris.utils.PickList;
 
 public class EditCase extends Fragment {
+
+    public static final String PLAN_FINANCE_HINT_DISPLAYED = "solutions.cris.PlanFinanceHintDisplayed";
 
     private static final SimpleDateFormat sDate = new SimpleDateFormat("dd.MM.yyyy", Locale.UK);
     // MENU BLOCK
@@ -116,10 +121,24 @@ public class EditCase extends Fragment {
     private PickList commissionerPickList;
     private TextView hintTextView;
     private boolean hintTextDisplayed = true;
+    // Build 232 Add Plan/FinSupp Hint
+    private TextView planFinanceHintTextView;
+    private boolean planFinanceHintTextDisplayed = true;
     // Build 110 - Add to existing sessions
     private UUID oldGroupID;
     // Build 139 - Second Group
     private UUID oldGroup2ID;
+    // Build 232
+    private CheckBox pupilPremium;
+    private CheckBox freeSchoolMeals;
+    private CheckBox childProtectionPlan;
+    private CheckBox childInNeedPlan;
+    private CheckBox tafEarlyHelpPlan;
+    private CheckBox socialServicesRecommendation;
+    private CheckBox otherPlanFinancialSupport;
+    private TextView lastReviewedBy;
+    private TextView lastReviewDateView;
+    private boolean enableAutoReviewDate = false;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -168,6 +187,21 @@ public class EditCase extends Fragment {
             }
         });
 
+        // Set up the Plan/Finance hint text
+        planFinanceHintTextView = getActivity().findViewById(R.id.plan_finance_hint_text);
+        planFinanceHintTextView.setText(getPlanFinanceHintText());
+        // Restore value of hintDisplayed (Set to opposite, toggle to come
+        if (savedInstanceState != null) {
+            planFinanceHintTextDisplayed = !savedInstanceState.getBoolean(PLAN_FINANCE_HINT_DISPLAYED);
+        }
+        togglePlanFinanceHint();
+        planFinanceHintTextView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                togglePlanFinanceHint();
+            }
+        });
+
         // Get the document to be edited from the activity
         client = ((ListActivity) getActivity()).getClient();
         editDocument = (Case) ((ListActivity) getActivity()).getDocument();
@@ -210,7 +244,29 @@ public class EditCase extends Fragment {
         doNotInviteCheckbox = parent.findViewById(R.id.do_not_invite_flag);
         // Build 139 - Second Group
         doNotInvite2Checkbox = parent.findViewById(R.id.do_not_invite2_flag);
+        // Build 232
+        pupilPremium = parent.findViewById(R.id.pf_pupil_premium);
+        freeSchoolMeals = parent.findViewById(R.id.pf_free_school_meals);
+        childProtectionPlan = parent.findViewById(R.id.pf_child_protection_plan);
+        childInNeedPlan = parent.findViewById(R.id.pf_child_in_need_plan);
+        tafEarlyHelpPlan = parent.findViewById(R.id.pf_taf_early_help_plan);
+        socialServicesRecommendation = parent.findViewById(R.id.pf_social_services_recommendation);
+        otherPlanFinancialSupport = parent.findViewById(R.id.pf_other_plan_financial_support);
+        lastReviewedBy = (TextView) parent.findViewById(R.id.last_reviewed_by_read_text);
+        lastReviewDateView = (TextView) parent.findViewById(R.id.last_review_date_text);
+        // Button will produce am explanatory popup
+        Button reviewButton = (Button) parent.findViewById(R.id.review_button);
 
+        if (!isNewMode){
+            reviewButton.setTextColor(ContextCompat.getColor(getActivity(), R.color.grey));
+        }  else {
+            reviewButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    reviewPopup();
+                }
+            });
+        }
         // Set the 'local' labels
         final LocalSettings localSettings = LocalSettings.getInstance(getActivity());
         TextView tierLabel = parent.findViewById(R.id.tier_label_text);
@@ -273,6 +329,99 @@ public class EditCase extends Fragment {
                     caseSummaryView.setText(currentText + currentCase.getCaseSummary());
                 }
                 return true;
+            }
+        });
+
+        // Build 232
+        pupilPremium.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                editDocument.setPupilPremium(b);
+                // Build 232 Automatically set the reviewer and review date unless the user is in Edit mode
+                if (enableAutoReviewDate) {
+                    updateReviewByandDate();
+                }
+                // Request focus to ensure end focus called on edit text fields to register updates
+                compoundButton.requestFocus();
+                compoundButton.requestFocusFromTouch();
+            }
+        });
+        freeSchoolMeals.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                editDocument.setFreeSchoolMeals(b);
+                // Build 232 Automatically set the reviewer and review date unless the user is in Edit mode
+                if (enableAutoReviewDate) {
+                    updateReviewByandDate();
+                }
+                // Request focus to ensure end focus called on edit text fields to register updates
+                compoundButton.requestFocus();
+                compoundButton.requestFocusFromTouch();
+            }
+        });
+        childProtectionPlan.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                editDocument.setChildProtectionPlan(b);
+                // Build 232 Automatically set the reviewer and review date unless the user is in Edit mode
+                if (enableAutoReviewDate) {
+                    updateReviewByandDate();
+                }
+                // Request focus to ensure end focus called on edit text fields to register updates
+                compoundButton.requestFocus();
+                compoundButton.requestFocusFromTouch();
+            }
+        });
+        childInNeedPlan.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                editDocument.setChildInNeedPlan(b);
+                // Build 232 Automatically set the reviewer and review date unless the user is in Edit mode
+                if (enableAutoReviewDate) {
+                    updateReviewByandDate();
+                }
+                // Request focus to ensure end focus called on edit text fields to register updates
+                compoundButton.requestFocus();
+                compoundButton.requestFocusFromTouch();
+            }
+        });
+        tafEarlyHelpPlan.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                editDocument.setTafEarlyHelpPlan(b);
+                // Build 232 Automatically set the reviewer and review date unless the user is in Edit mode
+                if (enableAutoReviewDate) {
+                    updateReviewByandDate();
+                }
+                // Request focus to ensure end focus called on edit text fields to register updates
+                compoundButton.requestFocus();
+                compoundButton.requestFocusFromTouch();
+            }
+        });
+        socialServicesRecommendation.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                editDocument.setSocialServicesRecommendation(b);
+                // Build 232 Automatically set the reviewer and review date unless the user is in Edit mode
+                if (enableAutoReviewDate) {
+                    updateReviewByandDate();
+                }
+                // Request focus to ensure end focus called on edit text fields to register updates
+                compoundButton.requestFocus();
+                compoundButton.requestFocusFromTouch();
+            }
+        });
+        otherPlanFinancialSupport.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                editDocument.setOtherPlanFinancialSupport(b);
+                // Build 232 Automatically set the reviewer and review date unless the user is in Edit mode
+                if (enableAutoReviewDate) {
+                    updateReviewByandDate();
+                }
+                // Request focus to ensure end focus called on edit text fields to register updates
+                compoundButton.requestFocus();
+                compoundButton.requestFocusFromTouch();
             }
         });
 
@@ -393,8 +542,10 @@ public class EditCase extends Fragment {
             public void onClick(View view) {
                 // Cancel so no need to update list of documents
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();;
             }
         });
         // Save Button
@@ -574,39 +725,51 @@ public class EditCase extends Fragment {
 
                                                     }
                                                     editDocument.save(isNewMode);
-                                                    FragmentManager fragmentManager = getFragmentManager();
-                                                    fragmentManager.popBackStack();
+                                                    // Build 200 Use the androidX Fragment class
+                                                    //FragmentManager fragmentManager = getFragmentManager();
+                                                    //fragmentManager.popBackStack();
+                                                    getParentFragmentManager().popBackStack();
                                                 }
                                             })
                                             .setNegativeButton("Do Not Invite", new DialogInterface.OnClickListener() {
                                                 @Override
                                                 public void onClick(DialogInterface dialog, int which) {
                                                     editDocument.save(isNewMode);
-                                                    FragmentManager fragmentManager = getFragmentManager();
-                                                    fragmentManager.popBackStack();
+                                                    // Build 200 Use the androidX Fragment class
+                                                    //FragmentManager fragmentManager = getFragmentManager();
+                                                    //fragmentManager.popBackStack();
+                                                    getParentFragmentManager().popBackStack();
                                                 }
                                             })
                                             .show();
                                 } else {
                                     editDocument.save(isNewMode);
-                                    FragmentManager fragmentManager = getFragmentManager();
-                                    fragmentManager.popBackStack();
+                                    // Build 200 Use the androidX Fragment class
+                                    //FragmentManager fragmentManager = getFragmentManager();
+                                    //fragmentManager.popBackStack();
+                                    getParentFragmentManager().popBackStack();
                                 }
                             } else {
                                 editDocument.save(isNewMode);
-                                FragmentManager fragmentManager = getFragmentManager();
-                                fragmentManager.popBackStack();
+                                // Build 200 Use the androidX Fragment class
+                                //FragmentManager fragmentManager = getFragmentManager();
+                                //fragmentManager.popBackStack();
+                                getParentFragmentManager().popBackStack();
                             }
                         } else {
                             editDocument.save(isNewMode);
-                            FragmentManager fragmentManager = getFragmentManager();
-                            fragmentManager.popBackStack();
+                            // Build 200 Use the androidX Fragment class
+                            //FragmentManager fragmentManager = getFragmentManager();
+                            //fragmentManager.popBackStack();
+                            getParentFragmentManager().popBackStack();
                         }
 
                     } else {
                         editDocument.save(isNewMode);
-                        FragmentManager fragmentManager = getFragmentManager();
-                        fragmentManager.popBackStack();
+                        // Build 200 Use the androidX Fragment class
+                        //FragmentManager fragmentManager = getFragmentManager();
+                        //fragmentManager.popBackStack();
+                        getParentFragmentManager().popBackStack();
                     }
                 }
             }
@@ -623,6 +786,9 @@ public class EditCase extends Fragment {
             photographyConsentCheckbox.setChecked(false);
             doNotInviteCheckbox.setChecked(false);
             doNotInvite2Checkbox.setChecked(false);
+            // This is the first Case document so assume it's also a Plan and Fin.Supp. review
+            enableAutoReviewDate = true;
+            updateReviewByandDate();
         } else {
             if (isNewMode) {
                 referenceDateView.setText(sDate.format(today));
@@ -667,6 +833,7 @@ public class EditCase extends Fragment {
                                 clientStatus = Case.GREEN;
                                 clientGreenIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_client_green));
                         }
+
                         break;
                     case "Close":
                     case "Reject":
@@ -674,6 +841,20 @@ public class EditCase extends Fragment {
                         doNotInviteCheckbox.setChecked(false);
                         caseTypeSpinner.setSelection(caseTypeAdapter.getPosition("Start"));
                 }
+                // Build 232 The Plan/Fin.Supp. information is carried through even in the Close
+                // and Reject cases in case the cases are re-opened. These cases do not appear in
+                // the Overdue view
+                pupilPremium.setChecked(currentCase.isPupilPremium());
+                freeSchoolMeals.setChecked(currentCase.isFreeSchoolMeals());
+                childProtectionPlan.setChecked(currentCase.isChildProtectionPlan());
+                childInNeedPlan.setChecked(currentCase.isChildInNeedPlan());
+                tafEarlyHelpPlan.setChecked(currentCase.isTafEarlyHelpPlan());
+                socialServicesRecommendation.setChecked(currentCase.isSocialServicesRecommendation());
+                otherPlanFinancialSupport.setChecked(currentCase.isOtherPlanFinancialSupport());
+                lastReviewedBy.setText(currentCase.getLastReviewedBy().getFullName());
+                lastReviewDateView.setText(String.format("%s, ", sDate.format(currentCase.getlastReviewDate())));
+                // Now that initial checkbox values have been set, enable auto update
+                enableAutoReviewDate = true;
             } else {
                 // Edit Mode
                 // Build 171 - Handle unexpected null ListItem ID
@@ -716,6 +897,18 @@ public class EditCase extends Fragment {
                 }
                 transportRequiredSpinner.setSelection(transportRequiredAdapter.getPosition(editDocument.getTransportRequired()));
                 specialInstructionsView.setText(editDocument.getTransportSpecialInstructions());
+                // Build 232
+                pupilPremium.setChecked(editDocument.isPupilPremium());
+                freeSchoolMeals.setChecked(editDocument.isFreeSchoolMeals());
+                childProtectionPlan.setChecked(editDocument.isChildProtectionPlan());
+                childInNeedPlan.setChecked(editDocument.isChildInNeedPlan());
+                tafEarlyHelpPlan.setChecked(editDocument.isTafEarlyHelpPlan());
+                socialServicesRecommendation.setChecked(editDocument.isSocialServicesRecommendation());
+                otherPlanFinancialSupport.setChecked(editDocument.isOtherPlanFinancialSupport());
+                lastReviewedBy.setText(editDocument.getLastReviewedBy().getFullName());
+                lastReviewDateView.setText(String.format("%s, ", sDate.format(editDocument.getlastReviewDate())));
+                // enable auto update false in edit mode
+                enableAutoReviewDate = false;
             }
         }
     }
@@ -772,8 +965,10 @@ public class EditCase extends Fragment {
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     editDocument.save(isNewMode);
-                                    FragmentManager fragmentManager = getFragmentManager();
-                                    fragmentManager.popBackStack();
+                                    // Build 200 Use the androidX Fragment class
+                                    //FragmentManager fragmentManager = getFragmentManager();
+                                    //fragmentManager.popBackStack();
+                                    getParentFragmentManager().popBackStack();
                                 }
                             }
                         }
@@ -791,8 +986,10 @@ public class EditCase extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 editDocument.save(isNewMode);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         }
     }
@@ -815,6 +1012,17 @@ public class EditCase extends Fragment {
         }
     }
 
+    // Build 232
+    private void togglePlanFinanceHint() {
+        if (planFinanceHintTextDisplayed) {
+            planFinanceHintTextView.setMaxLines(2);
+            planFinanceHintTextDisplayed = false;
+        } else {
+            planFinanceHintTextDisplayed = true;
+            planFinanceHintTextView.setMaxLines(planFinanceHintTextView.getLineCount());
+        }
+    }
+
     private void referenceDatePicker() {
         Calendar newCalendar = Calendar.getInstance();
         DatePickerDialog startDatePickerDialog = new DatePickerDialog(getActivity(), new DatePickerDialog.OnDateSetListener() {
@@ -827,6 +1035,38 @@ public class EditCase extends Fragment {
 
         }, newCalendar.get(Calendar.YEAR), newCalendar.get(Calendar.MONTH), newCalendar.get(Calendar.DAY_OF_MONTH));
         startDatePickerDialog.show();
+    }
+
+    private void updateReviewByandDate(){
+        // Set The Reviewed By and Review Date
+        editDocument.setLastReviewDate(new Date());
+        User currentUser = User.getCurrentUser();
+        editDocument.setLastReviewedByID(currentUser.getUserID());
+        // Must also set lastReviewedBy since it is sticky and will not show the new user
+        editDocument.setLastReviewedBy(currentUser);
+        lastReviewDateView.setText(String.format("%s, ", sDate.format(editDocument.getlastReviewDate())));
+        lastReviewedBy.setText(editDocument.getLastReviewedBy().getFullName());
+    }
+
+    private void reviewPopup() {
+        String reviewMessage = "Click Save to " +
+                "record that you have carried out a review of the Plans and Financial Support.";
+        new AlertDialog.Builder(getActivity())
+                .setTitle("Review of Plans and Financial Support")
+                .setMessage(reviewMessage)
+                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        updateReviewByandDate();
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // Do Nothing
+                    }
+                })
+                .show();
     }
 
     // Validate the document
@@ -973,7 +1213,9 @@ public class EditCase extends Fragment {
         editDocument.setDoNotInvite2Flag(doNotInvite2Checkbox.isChecked());
 
         //Keyworker
-        User newKeyworker = keyworkerPickList.getUsers().get(keyworkerSpinner.getSelectedItemPosition());
+        // Build 200 - getUsers replaced by getObjects the cast to User
+        //User newKeyworker = keyworkerPickList.getUsers().get(keyworkerSpinner.getSelectedItemPosition());
+        User newKeyworker = (User) keyworkerPickList.getObjects().get(keyworkerSpinner.getSelectedItemPosition());
         // Test for Please select
         if (newKeyworker.getUserID().equals(User.unknownUser)) {
             if (newCaseType.equals("Close") || newCaseType.equals("Reject")) {
@@ -993,7 +1235,9 @@ public class EditCase extends Fragment {
         }
 
         //Coworker 1 (Not mandatory)
-        User newCoworker1 = coworker1PickList.getUsers().get(coworker1Spinner.getSelectedItemPosition());
+        // Build 200 - getUsers replaced by getObjects the cast to User
+        //User newCoworker1 = coworker1PickList.getUsers().get(coworker1Spinner.getSelectedItemPosition());
+        User newCoworker1 = (User) coworker1PickList.getObjects().get(coworker1Spinner.getSelectedItemPosition());
         if (!newCoworker1.getUserID().equals(User.unknownUser)) {
             editDocument.setCoWorker1ID(newCoworker1.getUserID());
             // PickList contained
@@ -1001,7 +1245,9 @@ public class EditCase extends Fragment {
         }
 
         //Coworker 2 (Not mandatory)
-        User newCoworker2 = coworker2PickList.getUsers().get(coworker2Spinner.getSelectedItemPosition());
+        // Build 200 - getUsers replaced by getObjects the cast to User
+        //User newCoworker2 = coworker2PickList.getUsers().get(coworker2Spinner.getSelectedItemPosition());
+        User newCoworker2 = (User) coworker2PickList.getObjects().get(coworker2Spinner.getSelectedItemPosition());
         if (!newCoworker2.getUserID().equals(User.unknownUser)) {
             editDocument.setCoWorker2ID(newCoworker2.getUserID());
             // PickList contained
@@ -1052,6 +1298,16 @@ public class EditCase extends Fragment {
                 "Note: this is different to the 'Last entry' value which is also shown on " +
                 "these two views. The Last entry is based on documents of any type, whereas " +
                 "the overdue facility only checks for 'note' documents.";
+
+    }
+
+    private String getPlanFinanceHintText() {
+        return "Press for Review instructions. \n\n" +
+                "If the client's Plans and Financial Support are still the same, click the " +
+                "review button to update the reviewed by and date fields.\n\n" +
+                "HOWEVER, if the information needs to be changed, you must create a new Case document, set it to " +
+                "Case Update, make the changes and then click the review button to update " +
+                "the reviewed by and date fields. In this way, the previous history is retained.\n\n";
 
     }
 }

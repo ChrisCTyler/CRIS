@@ -1,6 +1,5 @@
 package solutions.cris.db;
 
-import android.app.LauncherActivity;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -77,10 +76,14 @@ import solutions.cris.utils.SwipeDetector;
 
 public class LocalDB {
 
-    private SQLiteDatabase database;
-    private String databaseName;
-    private LocalDBOpenHelper openHelper;
+    // Blobs
+    // Android has a limit on Cursor of 1Mbyte. Therefore large blobs (pdf/images) must
+    // be stored in chunks. The chunk size has been chosen (aritrarily) as 500K
+    private static final UUID BLOB_LAST_CHUNK = UUID.fromString("16f29bd0-abf1-11e6-80f5-76304dec7eb7");
     private static volatile LocalDB instance;
+    private final String databaseName;
+    private final LocalDBOpenHelper openHelper;
+    private SQLiteDatabase database;
 
     private LocalDB(Context context, String databaseName, String organisation) {
 
@@ -94,10 +97,6 @@ public class LocalDB {
             throw new CRISException("Database has not been opened yet.");
         }
         return instance;
-    }
-
-    public String getDatabaseName() {
-        return databaseName;
     }
 
     public static synchronized LocalDB getInstance(Context context, String organisation) throws CRISBadOrgException {
@@ -119,6 +118,10 @@ public class LocalDB {
             cursor.close();
         }
         return instance;
+    }
+
+    public String getDatabaseName() {
+        return databaseName;
     }
 
     // Build 178 - If an upgrade occurs, return the latest version and reset
@@ -241,6 +244,8 @@ public class LocalDB {
         cursor.close();
     }
 
+    // SYSTEM ADMIN
+
     private byte[] serialize(Serializable obj, String cipherMode) {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         try {
@@ -257,21 +262,18 @@ public class LocalDB {
         return serialised;
     }
 
-    // SYSTEM ADMIN
-
-    public Cursor rawSQL(String query, String[] selectionArgs) {
-        String output = "Running SQL...\n";
-        LocalDB localDB = LocalDB.getInstance();
-        Cursor cursor = database.rawQuery(query, selectionArgs);
-        return cursor;
-    }
-
     // READ AUDIT
     //ReadByID CHAR(36) NOT NULL
     //DocumentID CHAR(36) NOT NULL
     //SyncID CHAR(36)
     //ReadDate INTEGER NOT NULL
     //PRIMARY KEY (ReadByID, DocumentID)
+
+    public Cursor rawSQL(String query, String[] selectionArgs) {
+        String output = "Running SQL...\n";
+        LocalDB localDB = LocalDB.getInstance();
+        return database.rawQuery(query, selectionArgs);
+    }
 
     public void read(Document document, User currentUser) {
         ContentValues values = new ContentValues();
@@ -428,11 +430,6 @@ public class LocalDB {
         return names.length() - 1;
     }
 
-    // Blobs
-    // Android has a limit on Cursor of 1Mbyte. Therefore large blobs (pdf/images) must
-    // be stored in chunks. The chunk size has been chosen (aritrarily) as 500K
-    private static final UUID BLOB_LAST_CHUNK = UUID.fromString("16f29bd0-abf1-11e6-80f5-76304dec7eb7");
-
     public UUID saveBlob(byte[] buffer) {
         int chunkSize = 500000;
         ArrayList<byte[]> chunks = new ArrayList<>();
@@ -547,9 +544,11 @@ public class LocalDB {
                             syncActivity.appendLog(String.format(Locale.UK,
                                     "Blob insert failed: %s", ex.getMessage()));
                         }
-                    } else {
-                        //Build 178 if record exists ALWAYS leave it alone
+                    }
+                    //Build 178 if record exists ALWAYS leave it alone
                         /*
+                    else {
+
                         // Record already exists so simply replace the contents
                         if (action == SyncAdapter.ADD) {
                             try {
@@ -563,8 +562,9 @@ public class LocalDB {
                         } else {
                             // In RECHECK case, if the record already exists, leave it alone
                         }
-                         */
+
                     }
+                     */
                 }
             }
             // Save the sync
@@ -633,8 +633,7 @@ public class LocalDB {
         // Get these rows in a cursor
         String[] tableColumns = new String[]{"*"};
         String whereClause = String.format("SyncID = '%s'", newSyncID.toString());
-        Cursor unsyncedRecords = database.query(tableName, tableColumns, whereClause, null, null, null, null);
-        return unsyncedRecords;
+        return database.query(tableName, tableColumns, whereClause, null, null, null, null);
     }
 
     public Cursor getUnsyncedRecords(String tableName, UUID newSyncID) {
@@ -644,8 +643,7 @@ public class LocalDB {
         // Get these rows in a cursor
         String[] tableColumns = new String[]{"*"};
         String whereClause = String.format("SyncID = '%s'", newSyncID.toString());
-        Cursor unsyncedRecords = database.query(tableName, tableColumns, whereClause, null, null, null, null);
-        return unsyncedRecords;
+        return database.query(tableName, tableColumns, whereClause, null, null, null, null);
     }
 
     public void nullSyncID(String tableName, UUID syncID) {
@@ -890,7 +888,7 @@ public class LocalDB {
                                 // Get the local current User
                                 UUID userUUID = UUID.fromString(row.getString("UserID"));
                                 User user = getUser(userUUID);
-                                Long downloadCreationDate = row.getLong("CreationDate");
+                                long downloadCreationDate = row.getLong("CreationDate");
                                 if (user != null) {
                                     // The older of the two needs the addition of a history date
                                     if (user.getCreationDate().getTime() > downloadCreationDate) {
@@ -949,9 +947,11 @@ public class LocalDB {
                                         "User insert failed (Not Constraint error): %s", ex.getMessage()));
                             }
                         }
-                    } else {
-                        //Build 178 if record exists ALWAYS leave it alone
-                        /*
+                    }
+                    //Build 178 if record exists ALWAYS leave it alone
+                    /*
+                    else {
+
                         // Record already exists so simply replace the contents
                         if (action == SyncAdapter.ADD) {
                             try {
@@ -965,10 +965,10 @@ public class LocalDB {
                         } else {
                             // In RECHECK case, if the record already exists, leave it alone
                         }
-                         */
-                    }
-                }
 
+                    }
+                    */
+                }
             }
 
             // Save the sync
@@ -1032,16 +1032,13 @@ public class LocalDB {
                     newDocument = clientSession;
                     break;
                 case Document.CriteriaAssessmentTool:
-                    CriteriaAssessmentTool cat = (CriteriaAssessmentTool) o.readObject();
-                    newDocument = cat;
+                    newDocument = (CriteriaAssessmentTool) o.readObject();
                     break;
                 case Document.Image:
-                    Image image = (Image) o.readObject();
-                    newDocument = image;
+                    newDocument = (Image) o.readObject();
                     break;
                 case Document.MACAYC18:
-                    MACAYC18 macayc18 = (MACAYC18) o.readObject();
-                    newDocument = macayc18;
+                    newDocument = (MACAYC18) o.readObject();
                     break;
                 case Document.MyWeek:
                     MyWeek newMyWeek = (MyWeek) o.readObject();
@@ -1113,14 +1110,8 @@ public class LocalDB {
         ArrayList<Document> documents = new ArrayList<>();
 
         // Build 158 - Optimisation
-        boolean readAllDocuments = false;
-        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS)) {
-            readAllDocuments = true;
-        }
-        boolean readNotes = false;
-        if (currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES)) {
-            readNotes = true;
-        }
+        boolean readAllDocuments = currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_ALL_DOCUMENTS);
+        boolean readNotes = currentUser.getRole().hasPrivilege(Role.PRIVILEGE_READ_NOTES);
         // Build 151 - Belt and braces
         try {
             //Cursor cursor = database.rawQuery(query, selectionArgs);
@@ -1308,13 +1299,13 @@ public class LocalDB {
     public ArrayList<ClientSession> getAllClientSessions(ArrayList<Session> sessions) {
         ArrayList<ClientSession> clientSessions = new ArrayList<>();
         String[] tableColumns = new String[]{"SerialisedObject"};
-        String whereClause = "DocumentType = ? AND HistoryDate = ? AND SessionID IN (";
+        StringBuilder whereClause = new StringBuilder("DocumentType = ? AND HistoryDate = ? AND SessionID IN (");
         for (Session session : sessions) {
-            whereClause += String.format("'%s',", session.getDocumentID());
+            whereClause.append(String.format("'%s',", session.getDocumentID()));
         }
-        whereClause = whereClause.substring(0, whereClause.length() - 1) + ")";
+        whereClause = new StringBuilder(whereClause.substring(0, whereClause.length() - 1) + ")");
         String[] whereArgs = new String[]{Integer.toString(Document.ClientSession), Long.toString(Long.MIN_VALUE)};
-        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        Cursor cursor = database.query("Document", tableColumns, whereClause.toString(), whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
             while (!cursor.isAfterLast()) {
@@ -1330,13 +1321,13 @@ public class LocalDB {
     public ArrayList<ClientSession> getAllClientSessions(ArrayList<Session> sessions, Date startDate, Date endDate) {
         ArrayList<ClientSession> clientSessions = new ArrayList<>();
         String[] tableColumns = new String[]{"SerialisedObject"};
-        String whereClause = "DocumentType = ? AND HistoryDate = ? AND SessionID IN (";
+        StringBuilder whereClause = new StringBuilder("DocumentType = ? AND HistoryDate = ? AND SessionID IN (");
         for (Session session : sessions) {
-            whereClause += String.format("'%s',", session.getDocumentID());
+            whereClause.append(String.format("'%s',", session.getDocumentID()));
         }
-        whereClause = whereClause.substring(0, whereClause.length() - 1) + ")";
+        whereClause = new StringBuilder(whereClause.substring(0, whereClause.length() - 1) + ")");
         String[] whereArgs = new String[]{Integer.toString(Document.ClientSession), Long.toString(Long.MIN_VALUE)};
-        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        Cursor cursor = database.query("Document", tableColumns, whereClause.toString(), whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
             while (!cursor.isAfterLast()) {
@@ -1344,6 +1335,53 @@ public class LocalDB {
                 if (clientSession.getReferenceDate().after(startDate) && clientSession.getReferenceDate().before(endDate)) {
                     clientSessions.add(clientSession);
                 }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return clientSessions;
+    }
+
+    public ArrayList<ClientSession> getAllClientSessionsFromClientList(ArrayList<Client> clients, Date startDate, Date endDate) {
+        ArrayList<ClientSession> clientSessions = new ArrayList<>();
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        StringBuilder whereClause = new StringBuilder("DocumentType = ? AND HistoryDate = ? AND ClientID IN (");
+        String orderBy = "ClientID";
+        for (Client client : clients) {
+            whereClause.append(String.format("'%s',", client.getDocumentID()));
+        }
+        whereClause = new StringBuilder(whereClause.substring(0, whereClause.length() - 1) + ")");
+        String[] whereArgs = new String[]{Integer.toString(Document.ClientSession), Long.toString(Long.MIN_VALUE)};
+        Cursor cursor = database.query("Document", tableColumns, whereClause.toString(), whereArgs, null, null, orderBy);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                ClientSession clientSession = (ClientSession) deSerializeDocument(cursor.getBlob(0), Document.ClientSession);
+                if (clientSession.getReferenceDate().after(startDate) && clientSession.getReferenceDate().before(endDate)) {
+                    clientSessions.add(clientSession);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return clientSessions;
+    }
+
+    public ArrayList<ClientSession> getAllClientSessions(Client client, Date startDate, Date endDate) {
+        ArrayList<ClientSession> clientSessions = new ArrayList<>();
+        String[] tableColumns = new String[]{"SerialisedObject"};
+        StringBuilder whereClause = new StringBuilder("DocumentType = ? AND HistoryDate = ? AND ClientID = ? AND ReferenceDate > ? AND ReferenceDate < ?");
+        String[] whereArgs = new String[]{Integer.toString(Document.ClientSession),
+                Long.toString(Long.MIN_VALUE),
+                client.getClientID().toString(),
+                Long.toString(startDate.getTime()),
+                Long.toString(endDate.getTime())};
+        Cursor cursor = database.query("Document", tableColumns, whereClause.toString(), whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                ClientSession clientSession = (ClientSession) deSerializeDocument(cursor.getBlob(0), Document.ClientSession);
+                clientSessions.add(clientSession);
                 cursor.moveToNext();
             }
         }
@@ -1422,8 +1460,9 @@ public class LocalDB {
     }
 
     // Build 181
-    public boolean isSessionIDSet(UUID documentID) {
-        boolean isSet = false;
+    // Build 189 Inverted isSessionIDSet
+    public boolean notSessionIDSet(UUID documentID) {
+        boolean notSet = true;
         Document newDocument = null;
         String[] tableColumns = new String[]{"SessionID"};
         String whereClause;
@@ -1435,11 +1474,11 @@ public class LocalDB {
             cursor.moveToFirst();
             String sessionID = cursor.getString(0);
             if (sessionID.length() > 0) {
-                isSet = true;
+                notSet = false;
             }
         }
         cursor.close();
-        return isSet;
+        return notSet;
     }
 
     public ArrayList<RawDocument> getAllRawDocumentsOfType(int documentType) {
@@ -1465,10 +1504,7 @@ public class LocalDB {
                 UUID createdByID = UUID.fromString(cursor.getString(2));
                 UUID documentID = UUID.fromString(cursor.getString(3));
                 int cancelledInt = cursor.getInt(4);
-                boolean cancelledFlag = false;
-                if (cancelledInt == 1) {
-                    cancelledFlag = true;
-                }
+                boolean cancelledFlag = cancelledInt == 1;
                 UUID clientID = UUID.fromString(cursor.getString(5));
                 Date referenceDate = new Date();
                 referenceDate.setTime(cursor.getLong(6));
@@ -1493,8 +1529,8 @@ public class LocalDB {
         whereArgs = new String[]{clientID.toString(),
                 Long.toString(Long.MIN_VALUE),
                 Integer.toString(documentType),
-                String.format("%d", startDate.getTime()),
-                String.format("%d", endDate.getTime()),
+                String.format(Locale.UK, "%d", startDate.getTime()),
+                String.format(Locale.UK, "%d", endDate.getTime()),
         };
         Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
@@ -1512,6 +1548,29 @@ public class LocalDB {
         return documents;
     }
 
+    //Build 234 Get the Case document that is current at a given reference date
+    public Case getRelevantCase(UUID clientID, Date referenceDate) {
+        Case document = null;
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        String orderBy = "ReferenceDate DESC";
+        whereClause = "ClientID = ? AND HistoryDate = ? AND DocumentType = ? AND " +
+                "ReferenceDate < ? ";
+        whereArgs = new String[]{clientID.toString(),
+                Long.toString(Long.MIN_VALUE),
+                Integer.toString(Document.Case),
+                String.format(Locale.UK, "%d", referenceDate.getTime()),
+        };
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, orderBy);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            document = (Case) deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+        }
+        cursor.close();
+        return document;
+    }
+
     public ArrayList<Document> getRangeOfDocumentsOfType(int documentType, Date startDate, Date endDate) {
         ArrayList<Document> documents = new ArrayList<>();
         String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
@@ -1522,8 +1581,8 @@ public class LocalDB {
                 "ReferenceDate > ? AND ReferenceDate < ? ";
         whereArgs = new String[]{Integer.toString(documentType),
                 Long.toString(Long.MIN_VALUE),
-                String.format("%d", startDate.getTime()),
-                String.format("%d", endDate.getTime()),
+                String.format(Locale.UK, "%d", startDate.getTime()),
+                String.format(Locale.UK, "%d", endDate.getTime()),
         };
         Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
@@ -1548,7 +1607,10 @@ public class LocalDB {
         String[] whereArgs;
         whereClause = "ClientID = ? AND HistoryDate = ? AND DocumentType = ? ";
         whereArgs = new String[]{clientID.toString(), Long.toString(Long.MIN_VALUE), Integer.toString(documentType)};
-        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        // Build 232
+        String orderBy = "ReferenceDate";
+        //Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, orderBy);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
             while (!cursor.isAfterLast()) {
@@ -1588,6 +1650,24 @@ public class LocalDB {
         return documents;
     }
 
+    // Build 208
+    public Document getSessionDocumentsOfType(UUID clientID, int documentType, UUID sessionID) {
+        Document document = null;
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "ClientID = ? AND HistoryDate = ? AND DocumentType = ? AND SessionID = ?";
+        whereArgs = new String[]{clientID.toString(), Long.toString(Long.MIN_VALUE), Integer.toString(documentType), sessionID.toString()};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, null);
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+        }
+        cursor.close();
+        return document;
+    }
+
+
     // Build 128 Duplicate Note Fix
     public ArrayList<Note> getAllBroadcastNotes() {
         ArrayList<Note> notes = new ArrayList<>();
@@ -1614,15 +1694,15 @@ public class LocalDB {
     public ArrayList<Document> getAllDocumentsOfType(ArrayList<ClientSession> clientSessions, int documentType) {
         ArrayList<Document> documents = new ArrayList<>();
         String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
-        String whereClause;
+        StringBuilder whereClause;
         String[] whereArgs;
-        whereClause = "HistoryDate = ? AND DocumentType = ? AND ClientID IN (";
+        whereClause = new StringBuilder("HistoryDate = ? AND DocumentType = ? AND ClientID IN (");
         for (ClientSession clientSession : clientSessions) {
-            whereClause += String.format("'%s',", clientSession.getClientID());
+            whereClause.append(String.format("'%s',", clientSession.getClientID()));
         }
-        whereClause = whereClause.substring(0, whereClause.length() - 1) + ")";
+        whereClause = new StringBuilder(whereClause.substring(0, whereClause.length() - 1) + ")");
         whereArgs = new String[]{Long.toString(Long.MIN_VALUE), Integer.toString(documentType)};
-        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, "ClientID");
+        Cursor cursor = database.query("Document", tableColumns, whereClause.toString(), whereArgs, null, null, "ClientID");
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
             while (!cursor.isAfterLast()) {
@@ -1638,18 +1718,19 @@ public class LocalDB {
         return documents;
     }
 
+    /*
     public ArrayList<Document> getAllDocumentsOfType(ArrayList<Client> clients, int documentType, Date startDate, Date endDate) {
         ArrayList<Document> documents = new ArrayList<>();
         String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
-        String whereClause;
+        StringBuilder whereClause;
         String[] whereArgs;
-        whereClause = "HistoryDate = ? AND DocumentType = ? AND ClientID IN (";
+        whereClause = new StringBuilder("HistoryDate = ? AND DocumentType = ? AND ClientID IN (");
         for (Client client : clients) {
-            whereClause += String.format("'%s',", client.getClientID());
+            whereClause.append(String.format("'%s',", client.getClientID()));
         }
-        whereClause = whereClause.substring(0, whereClause.length() - 1) + ")";
+        whereClause = new StringBuilder(whereClause.substring(0, whereClause.length() - 1) + ")");
         whereArgs = new String[]{Long.toString(Long.MIN_VALUE), Integer.toString(documentType)};
-        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, "ClientID");
+        Cursor cursor = database.query("Document", tableColumns, whereClause.toString(), whereArgs, null, null, "ClientID");
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
             while (!cursor.isAfterLast()) {
@@ -1667,6 +1748,36 @@ public class LocalDB {
         return documents;
     }
 
+     */
+    public ArrayList<Document> getAllDocumentsOfType(ArrayList<Client> clients, int documentType, Date startDate, Date endDate) {
+        ArrayList<Document> documents = new ArrayList<>();
+        String[] tableColumns = new String[]{"DocumentType", "SerialisedObject"};
+        StringBuilder whereClause;
+        String[] whereArgs;
+        whereClause = new StringBuilder("HistoryDate = ? AND DocumentType = ? AND ReferenceDate > ? AND ReferenceDate < ? AND ClientID IN (");
+        for (Client client : clients) {
+            whereClause.append(String.format("'%s',", client.getClientID()));
+        }
+        whereClause = new StringBuilder(whereClause.substring(0, whereClause.length() - 1) + ")");
+        whereArgs = new String[]{Long.toString(Long.MIN_VALUE),
+                Integer.toString(documentType),
+                Long.toString(startDate.getTime()),
+                Long.toString(endDate.getTime())};
+        Cursor cursor = database.query("Document", tableColumns, whereClause.toString(), whereArgs, null, null, "ClientID");
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                Document document = deSerializeDocument(cursor.getBlob(1), cursor.getInt(0));
+                // New document types (post this version) will return as null documents, ignore.
+                if (document != null) {
+                    documents.add(document);
+                }
+                cursor.moveToNext();
+            }
+        }
+        cursor.close();
+        return documents;
+    }
 
     public Document getDocument(UUID documentID) {
         Document newDocument = null;
@@ -1682,6 +1793,28 @@ public class LocalDB {
         }
         cursor.close();
         return newDocument;
+    }
+
+    // Build 239 Get Original Creator
+    public UUID getOriginalCreatorID(UUID documentID) {
+        UUID createdByID = null;
+        String[] tableColumns = new String[]{"CreatedByID"};
+        String whereClause;
+        String[] whereArgs;
+        whereClause = "DocumentID = ?";
+        whereArgs = new String[]{documentID.toString()};
+        Cursor cursor = database.query("Document", tableColumns, whereClause, whereArgs, null, null, "HistoryDate ASC");
+        // Oroginal document is either the only document or the second oldest
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            if (cursor.getCount() > 1) {
+                // ignore the first since it is the most recent
+                cursor.moveToNext();
+            }
+            createdByID = UUID.fromString(cursor.getString(0));
+        }
+        cursor.close();
+        return createdByID;
     }
 
     public Document getDocumentByRecordID(UUID recordID) {
@@ -1748,7 +1881,7 @@ public class LocalDB {
                         content += String.format("Synced on %s:\n", sDateTime.format(sync.getSyncDate()));
                     }
                 }
-                Long historyDate = cursor.getLong(4);
+                long historyDate = cursor.getLong(4);
                 if (historyDate != Long.MIN_VALUE) {
                     content += String.format("Superceded On: %s\n", sDateTime.format(historyDate));
                 }
@@ -2030,7 +2163,7 @@ public class LocalDB {
                                 // Get the local current document
                                 UUID documentUUID = UUID.fromString(row.getString("DocumentID"));
                                 Document document = getDocument(documentUUID);
-                                Long downloadCreationDate = row.getLong("CreationDate");
+                                long downloadCreationDate = row.getLong("CreationDate");
                                 if (document != null) {
                                     // The older of the two needs the addition of a history date
                                     if (document.getCreationDate().getTime() > downloadCreationDate) {
@@ -2088,9 +2221,11 @@ public class LocalDB {
                                         "Document insert failed (Not Constraint error): %s", ex.getMessage()));
                             }
                         }
-                    } else {
-                        //Build 178 if record exists ALWAYS leave it alone
-                        /*
+                    }
+                    //Build 178 if record exists ALWAYS leave it alone
+                    /*
+                        else {
+
                         // Record already exists so simply replace the contents
                         if (action == SyncAdapter.ADD) {
                             try {
@@ -2104,8 +2239,8 @@ public class LocalDB {
                         } else {
                             // In RECHECK case, if the record already exists, leave it alone
                         }
-                         */
-                    }
+                      }
+                  */
                 }
             }
             // Save the sync
@@ -2164,10 +2299,10 @@ public class LocalDB {
                     String clientID = row.getString("ClientID");
                     String sessionID = row.getString("SessionID");
                     // PHP Dates are seconds.milliseconds from epoch start
-                    Long creationDate = row.getLong("CreationDate") * 1000;
-                    Integer schoolScore = row.getInt("SchoolScore");
-                    Integer friendshipScore = row.getInt("FriendshipScore");
-                    Integer familyScore = row.getInt("FamilyScore");
+                    long creationDate = row.getLong("CreationDate") * 1000;
+                    int schoolScore = row.getInt("SchoolScore");
+                    int friendshipScore = row.getInt("FriendshipScore");
+                    int familyScore = row.getInt("FamilyScore");
                     // Build 148 - Need to encode/decode the Notes to sort out spurious characters
                     //byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
                     //String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
@@ -2217,8 +2352,6 @@ public class LocalDB {
 
         } catch (JSONException ex) {
             throw new CRISException("Error parsing JSON data: " + ex.getMessage());
-        } catch (Exception ex) {
-            throw ex;
         }
         return names.length() - 1;
     }
@@ -2244,10 +2377,7 @@ public class LocalDB {
             UUID createdByID = UUID.fromString(cursor.getString(2));
             UUID documentID = UUID.fromString(cursor.getString(3));
             int cancelledInt = cursor.getInt(4);
-            boolean cancelledFlag = false;
-            if (cancelledInt == 1) {
-                cancelledFlag = true;
-            }
+            boolean cancelledFlag = cancelledInt == 1;
             UUID clientID = UUID.fromString(cursor.getString(5));
             Date referenceDate = new Date();
             referenceDate.setTime(cursor.getLong(6));
@@ -2258,7 +2388,7 @@ public class LocalDB {
     }
 
     public String checkWebsiteMyWeeks(JSONObject jsonOutput) {
-        String output = "";
+        StringBuilder output = new StringBuilder();
         int missing = 0;
         // This is similar to a standard download, but builds a MyWeek document
         // from the record in the myweek table of teh MyWeek website
@@ -2292,10 +2422,10 @@ public class LocalDB {
                     String clientID = row.getString("ClientID");
                     String sessionID = row.getString("SessionID");
                     // PHP Dates are seconds.milliseconds from epoch start
-                    Long creationDate = row.getLong("CreationDate") * 1000;
-                    Integer schoolScore = row.getInt("SchoolScore");
-                    Integer friendshipScore = row.getInt("FriendshipScore");
-                    Integer familyScore = row.getInt("FamilyScore");
+                    long creationDate = row.getLong("CreationDate") * 1000;
+                    int schoolScore = row.getInt("SchoolScore");
+                    int friendshipScore = row.getInt("FriendshipScore");
+                    int familyScore = row.getInt("FamilyScore");
                     // Build 148 - Need to encode/decode the Notes to sort out spurious characters
                     //byte[] bNotes = Base64.decode(row.getString("Notes"), Base64.DEFAULT);
                     //String notes = new String(bNotes,StandardCharsets.ISO_8859_1);
@@ -2307,16 +2437,16 @@ public class LocalDB {
                         clientUUID = UUID.fromString(clientID);
                         clients = getAllDocumentsOfType(clientUUID, Document.Client);
                     } catch (Exception ex) {
-                        output += String.format("%d. Client had bad UUID string: %s\n", i, clientID);
+                        output.append(String.format(Locale.UK, "%d. Client had bad UUID string: %s\n", i, clientID));
                     }
                     if (clients == null || clients.size() == 0) {
-                        output += String.format("%d. Client not found: %s\n", i, clientID);
+                        output.append(String.format(Locale.UK, "%d. Client not found: %s\n", i, clientID));
                     } else {
                         Client client = (Client) clients.get(0);
                         // Check whether the record already exists
                         RawDocument document = getRawDocument(Document.MyWeek, clientID, creationDate);
                         if (document == null) {
-                            output += String.format("%d. Missing MyWeek for %s ", i, client.getFullName());
+                            output.append(String.format(Locale.UK, "%d. Missing MyWeek for %s ", i, client.getFullName()));
                             missing++;
                             // Now add the missing MyWeek document
                             MyWeek myWeek = new MyWeek(theClient, UUID.fromString(clientID));
@@ -2333,27 +2463,27 @@ public class LocalDB {
                                 myWeek.setNote(notes);
                                 // and save it
                                 myWeek.save(true);
-                                output += " ... Added\n";
+                                output.append(" ... Added\n");
                             } catch (Exception ex) {
-                                output += String.format("%d. Exception decoding note for %s\n", i, client.getFullName());
+                                output.append(String.format(Locale.UK, "%d. Exception decoding note for %s\n", i, client.getFullName()));
                             }
                         } else {
-                            output += String.format("%d. Found MyWeek for %s\n", i, client.getFullName());
+                            output.append(String.format(Locale.UK, "%d. Found MyWeek for %s\n", i, client.getFullName()));
                         }
                     }
                 } else {
-                    output += String.format("%s. Found row with name: ", name);
+                    output.append(String.format("%s. Found row with name: ", name));
                 }
             }
-            output += String.format("Missing/Added MyWeek documents =  %d\n", missing);
+            output.append(String.format(Locale.UK, "Missing/Added MyWeek documents =  %d\n", missing));
         } catch (
                 JSONException ex) {
-            output += "checkWebsiteMyWeeks() JSON Error: " + ex.getMessage();
+            output.append("checkWebsiteMyWeeks() JSON Error: ").append(ex.getMessage());
         } catch (
                 Exception ex) {
-            output += "checkWebsiteMyWeeks() Error: " + ex.getMessage();
+            output.append("checkWebsiteMyWeeks() Error: ").append(ex.getMessage());
         }
-        return output;
+        return output.toString();
     }
 
 
@@ -2384,8 +2514,7 @@ public class LocalDB {
                     // Groups created before V1.2 were simple ListItems so need to spoof the record
                     try {
                         newListItem = (ListItem) o.readObject();
-                        Group newGroup = (Group) newListItem;
-                        newListItem = newGroup;
+                        newListItem = (Group) newListItem;
                     } catch (ClassCastException ex) {
                         if (newListItem != null) {
                             User creator = getUser(newListItem.getCreatedByID());
@@ -2416,8 +2545,7 @@ public class LocalDB {
                         //Build 121 - Build 119 added some rogue NoteTypes as ListItems which cannot be
                         // cast to NoteType which is a complex type. They need to be consigned to history
                         newListItem = (ListItem) o.readObject();
-                        NoteType newNoteType = (NoteType) newListItem;
-                        newListItem = newNoteType;
+                        newListItem = (NoteType) newListItem;
                     } catch (ClassCastException ex) {
                         if (newListItem != null) {
                             ContentValues values = new ContentValues();
@@ -2511,13 +2639,14 @@ public class LocalDB {
             }
         }
         cursor.close();
-        if (listItem == null) {
-            // This may be because a new version has introduced a new list item but the
-            // new item should not be called in an older version of the code. One exception
-            // to this rule may be a list item which is promoted from simple to complex (such
-            // as the Group)
-            //throw new CRISException("Error deserializing object. ListType = " + listType);
-        }
+        // Build 189 Removed if statement because throw already commented out
+        //if (listItem == null) {
+        // This may be because a new version has introduced a new list item but the
+        // new item should not be called in an older version of the code. One exception
+        // to this rule may be a list item which is promoted from simple to complex (such
+        // as the Group)
+        //throw new CRISException("Error deserializing object. ListType = " + listType);
+        //}
         return listItem;
     }
 
@@ -2533,13 +2662,14 @@ public class LocalDB {
             listItem = deSerializeListItem(cursor.getBlob(0), listType.toString());
         }
         cursor.close();
-        if (listItem == null) {
-            // This may be because a new version has introduced a new list item but the
-            // new item should not be called in an older version of the code. One exception
-            // to this rule may be a list item which is promoted from simple to complex (such
-            // as the Group)
-            //throw new CRISException("Error deserializing object. ListType = " + listType);
-        }
+        // Build 189 Removed if statement because throw already commented out
+        //if (listItem == null) {
+        // This may be because a new version has introduced a new list item but the
+        // new item should not be called in an older version of the code. One exception
+        // to this rule may be a list item which is promoted from simple to complex (such
+        // as the Group)
+        //throw new CRISException("Error deserializing object. ListType = " + listType);
+        //}
         return listItem;
     }
 
@@ -2635,7 +2765,7 @@ public class LocalDB {
         Cursor cursor = database.query("ListItem", tableColumns, whereClause, whereArgs, null, null, null);
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
-            Long historyDate = cursor.getLong(4);
+            long historyDate = cursor.getLong(4);
             String userName = "Unknown User";
             User user = getUser(UUID.fromString(cursor.getString(0)));
             if (user != null) {
@@ -2744,13 +2874,13 @@ public class LocalDB {
 
     private String displayListItemHistory(ListItem listItem) {
         //Loop through all instances of the document gathering data
-        String history = "";
+        StringBuilder history = new StringBuilder();
         ArrayList<UUID> recordIDs = getRecordIDs(listItem);
         //ArrayList<UUID> recordIDs = getListItemRecordIDsByValue(listItem);
         for (int i = 0; i < recordIDs.size(); i++) {
-            history += getListItemMetaData(recordIDs.get(i));
+            history.append(getListItemMetaData(recordIDs.get(i)));
         }
-        return history;
+        return history.toString();
     }
 
 
@@ -2805,7 +2935,7 @@ public class LocalDB {
                                 // Get the local current ListItemListItem
                                 UUID listItemUUID = UUID.fromString(row.getString("ListItemID"));
                                 ListItem listItem = getListItem(listItemUUID);
-                                Long downloadCreationDate = row.getLong("CreationDate");
+                                long downloadCreationDate = row.getLong("CreationDate");
                                 if (listItem != null) {
                                     // The older of the two needs the addition of a history date
                                     if (listItem.getCreationDate().getTime() > downloadCreationDate) {
@@ -2894,10 +3024,12 @@ public class LocalDB {
                                         "ListItem insert failed (Not Constraint error): %s", ex.getMessage()));
                             }
                         }
-                    } else {
-                        // Build 178 - if the record already exists, leave it alone in ADD case well
-                        // This code can modify the ListItems unexpectedly
+                    }
+                    // Build 178 - if the record already exists, leave it alone in ADD case well
+                    // This code can modify the ListItems unexpectedly
                         /*
+                        else {
+
                         // Record already exists so simply replace the contents
                         if (action == SyncAdapter.ADD) {
                             try {
@@ -2911,9 +3043,8 @@ public class LocalDB {
                         } else {
                             // In RECHECK case, if the record already exists, leave it alone
                         }
-
-                         */
                     }
+                    */
                 }
             }
             // Save the sync
@@ -3102,9 +3233,11 @@ public class LocalDB {
                             syncActivity.appendLog(String.format(Locale.UK,
                                     "System Error insert failed: %s", ex.getMessage()));
                         }
-                    } else {
-                        //Build 178 if record exists ALWAYS leave it alone
-                        /*
+                    }
+                    //Build 178 if record exists ALWAYS leave it alone
+                    /*
+                        else {
+
                         // Record already exists so simply replace the contents
                         if (action == SyncAdapter.ADD) {
                             try {
@@ -3118,8 +3251,9 @@ public class LocalDB {
                         } else {
                             // In RECHECK case, if the record already exists, leave it alone
                         }
-                         */
                     }
+
+                    */
                 }
             }
             // Save the sync

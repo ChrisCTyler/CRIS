@@ -1,18 +1,14 @@
 package solutions.cris.db;
 
 import android.content.Context;
-import android.content.Intent;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.os.AsyncTask;
 
 import java.util.ArrayList;
-import java.util.UUID;
 
 import solutions.cris.object.ListItem;
 import solutions.cris.object.ListType;
 import solutions.cris.object.User;
-import solutions.cris.utils.AlertAndContinue;
 
 //        CRIS - Client Record Information System
 //        Copyright (C) 2018  Chris Tyler, CRIS.Solutions
@@ -38,7 +34,7 @@ public class LocalDBOpenHelper extends SQLiteOpenHelper {
     // Build 140 - Version 23 added index on DocumentType, HistoryDate,ReferenceDate
     // Build 178 - Run the fitItemID code on upgrade(version = 28)
     private static final int VERSION = 29;
-    private String organisation;
+    private final String organisation;
     private int oldVersion = 0;
     private int newVersion = 0;
 

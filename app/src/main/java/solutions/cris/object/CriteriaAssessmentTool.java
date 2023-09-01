@@ -594,7 +594,7 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         else return "No";
     }
 
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -631,6 +631,7 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         return fNames;
     }
 
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getCATData(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -646,6 +647,8 @@ public class CriteriaAssessmentTool extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();

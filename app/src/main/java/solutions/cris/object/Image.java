@@ -102,7 +102,7 @@ public class Image extends Document implements Serializable {
     }
 
 
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -116,6 +116,7 @@ public class Image extends Document implements Serializable {
         return fNames;
     }
 
+        /* Build 208 Moved to CRISExport
     public static List<List<Object>> getImageData(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -131,6 +132,8 @@ public class Image extends Document implements Serializable {
         }
         return content;
     }
+
+         */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();

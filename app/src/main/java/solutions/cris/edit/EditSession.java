@@ -15,8 +15,6 @@ package solutions.cris.edit;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
 import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -47,6 +45,11 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.TimePicker;
 
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -61,12 +64,19 @@ import solutions.cris.Main;
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
+import solutions.cris.list.ListClients;
+import solutions.cris.list.ListSessions;
+import solutions.cris.object.Case;
+import solutions.cris.object.Client;
+import solutions.cris.object.ClientSession;
+import solutions.cris.object.Contact;
 import solutions.cris.object.Document;
 import solutions.cris.object.Group;
 import solutions.cris.object.ListItem;
 import solutions.cris.object.Role;
 import solutions.cris.object.Session;
 import solutions.cris.object.User;
+import solutions.cris.utils.BatchInviteDialogFragment;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.GroupPickList;
 import solutions.cris.utils.LocalSettings;
@@ -91,12 +101,13 @@ public class EditSession extends Fragment {
     private ListView otherStaffListView;
     private TextView durationView;
     private EditText additionalInformationView;
+    // Build 200 new field, add points if attended, minus points if DNA
+    private TextView attendancePointsView;
 
     private LocalDB localDB;
     private View parent;
     private boolean isNewMode;
     private ArrayList<User> otherStaffList;
-
 
     private GroupPickList groupPickList;
     private PickList keyworkerPickList;
@@ -105,7 +116,176 @@ public class EditSession extends Fragment {
     private TextView hintTextView;
     private boolean hintTextDisplayed = true;
 
+    // Build 217 If session date is changed, change the date in the client sessions
+    boolean dateChanged = false;
 
+    // Build 200 - This is called by the event listener in ListClients as a result of a OK
+    // in the BatchInviteDialogFragment
+    public void pickListDialogFragmentOK() {
+        // SelectedIDs contains the batch invite list
+        ArrayList<Client>inviteeList = new ArrayList<>();
+        ArrayList<Client> clients = localDB.getAllClients();
+
+        switch (((ListActivity) getActivity()).getSelectMode()){
+            case NONE:
+                // Save with no invitees
+                break;
+            case GROUPS:
+                boolean match = false;
+                UUID groupID = null;
+                for (Client client : clients) {
+                    // Build 238 match needs to be set false on every interation of this for loop
+                    // otherwise first match will then include everyone else
+                    match = false;
+                    if (client.getCurrentCase() != null) {
+                        Case currentCase = client.getCurrentCase();
+                        if (!currentCase.getCaseType().equals("Close")) {
+                            if (currentCase.getGroupID() != null) {
+                                groupID = currentCase.getGroupID();
+                                if (((ListSessions) getActivity()).getSelectedIDs().contains(groupID)) {
+                                    match = true;
+                                }
+                            }
+                            if (currentCase.getGroup2ID() != null) {
+                                groupID = currentCase.getGroup2ID();
+                                if (((ListSessions) getActivity()).getSelectedIDs().contains(groupID)) {
+                                    match = true;
+                                }
+                            }
+                        }
+                    }
+                    if (match){
+                        inviteeList.add(client);
+                    }
+                }
+                break;
+
+            case KEYWORKERS:
+                for (Client client : clients) {
+                    if (client.getCurrentCase() != null) {
+                        Case currentCase = client.getCurrentCase();
+                        if (!currentCase.getCaseType().equals("Close")) {
+                            if (currentCase.getKeyWorkerID() != null) {
+                                UUID keyworkerID = currentCase.getKeyWorkerID();
+                                if (((ListSessions) getActivity()).getSelectedIDs().contains(keyworkerID)) {
+                                    inviteeList.add(client);
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            case COMMISSIONERS:
+                for (Client client : clients) {
+                    if (client.getCurrentCase() != null) {
+                        Case currentCase = client.getCurrentCase();
+                        if (!currentCase.getCaseType().equals("Close")) {
+                            if (currentCase.getCommissionerID() != null) {
+                                UUID commissionerID = currentCase.getCommissionerID();
+                                if (((ListSessions) getActivity()).getSelectedIDs().contains(commissionerID)) {
+                                    inviteeList.add(client);
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+
+            case SCHOOLS:
+                for (Client client : clients) {
+                    if (client.getCurrentSchoolID() != null) {
+                        Contact contactDocument = client.getCurrentSchool();
+                        if (contactDocument != null) {
+                            // Build 162 - This fixes a very odd bug where SchoolID was null in a
+                            // Contact Document attached via client.getCurrentSchoolID
+                            UUID schoolID = contactDocument.getSchoolID();
+                            if (schoolID != null) {
+                                // Build 136 - Only show school with end date later than today
+                                Date now = new Date();
+                                if (contactDocument.getEndDate() == null ||
+                                        contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                        contactDocument.getEndDate().after(now)) {
+                                    if (((ListSessions) getActivity()).getSelectedIDs().contains(schoolID)) {
+                                        inviteeList.add(client);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            case AGENCIES:
+                for (Client client : clients) {
+                    if (client.getCurrentAgencyID() != null) {
+                        Contact contactDocument = client.getCurrentAgency();
+                        if (contactDocument != null) {
+                            // Build 162 - This fixes a very odd bug where AgencyID was null in a
+                            // Contact Document attached via client.getCurrentAgencyID
+                            UUID agencyID = contactDocument.getAgencyID();
+                            if (agencyID != null) {
+                                // Build 136 - Only show agency with end date later than today
+                                Date now = new Date();
+                                if (contactDocument.getEndDate() == null ||
+                                        contactDocument.getEndDate().getTime() == Long.MIN_VALUE ||
+                                        contactDocument.getEndDate().after(now)) {
+                                    if (((ListSessions) getActivity()).getSelectedIDs().contains(agencyID)) {
+                                        inviteeList.add(client);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+        }
+        if (inviteeList.size() > 0){
+            new AlertDialog.Builder(getActivity())
+                    .setTitle("Batch Invite Wizard")
+                    .setMessage(String.format("%d clients will be invited to this session. " +
+                            "Are you sure you wish to continue?", inviteeList.size()))
+                    .setPositiveButton("Continue", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            editDocument.save(isNewMode, inviteeList);
+                            // Build 200 Use the androidX Fragment class
+                            //FragmentManager fragmentManager = getFragmentManager();
+                            //fragmentManager.popBackStack();
+                            getParentFragmentManager().popBackStack();
+                        }
+                    })
+                    .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            // Do nothing
+                        }
+                    })
+                    .show();
+        } else {
+            new AlertDialog.Builder(getActivity())
+                    .setTitle("Batch Invite Wizard")
+                    .setMessage("No clients have been selected. Do you wish to save the " +
+                            "session anyway?")
+                    .setPositiveButton("Save Session", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            editDocument.save(isNewMode, inviteeList);
+                            // Build 200 Use the androidX Fragment class
+                            //FragmentManager fragmentManager = getFragmentManager();
+                            //fragmentManager.popBackStack();
+                            getParentFragmentManager().popBackStack();
+                        }
+                    })
+                    .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            // Do nothing
+                        }
+                    })
+                    .show();
+        }
+
+
+    }
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -113,6 +293,8 @@ public class EditSession extends Fragment {
         setHasOptionsMenu(true);
         // Inflate the layout for this fragment
         parent = inflater.inflate(R.layout.edit_session, container, false);
+        ((ListSessions) getActivity()).setSelectedIDs(new ArrayList<>());
+        ((ListActivity) getActivity()).setSelectMode(((ListActivity.SelectMode.NONE)));
         return parent;
     }
 
@@ -132,6 +314,10 @@ public class EditSession extends Fragment {
         } else {
             toolbar.setTitle(getString(R.string.app_name) + " - Edit Session");
         }
+
+        // Build 225 - Declare the Batch Invite button so that its visibility can
+        // be controlled by teh Group Spinner handler
+        Button batchInviteButton = (Button) parent.findViewById(R.id.batch_invite_button);
 
         // Hide the FAB
         FloatingActionButton fab = ((ListActivity) getActivity()).getFab();
@@ -176,6 +362,8 @@ public class EditSession extends Fragment {
         timeView = (EditText) parent.findViewById(R.id.session_time);
         durationView = (EditText) parent.findViewById(R.id.duration);
         additionalInformationView = (EditText) parent.findViewById(R.id.additional_information);
+        // Build 200 new field, add points if attended, minus points if DNA
+        attendancePointsView = (EditText) parent.findViewById(R.id.attendance_points);
 
         final LocalSettings localSettings = LocalSettings.getInstance(getActivity());
         TextView groupLabel = (TextView) parent.findViewById(R.id.group_label_text);
@@ -215,6 +403,8 @@ public class EditSession extends Fragment {
         groupSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int position, long id) {
+                // Build 225 - Hide the Batch Invite button visible, only show if adHocGroup
+                batchInviteButton.setVisibility(View.GONE);
                 if (position != 0 && isNewMode) {
                     Group selected = (Group) groupPickList.getListItems().get(position);
                     if (selected.getListItemID() != Group.adHocGroupID) {
@@ -263,6 +453,9 @@ public class EditSession extends Fragment {
                                 }
                             }
                         }
+                    } else {
+                        // Build 225 - Make the Batch Invite button visible
+                        batchInviteButton.setVisibility(View.VISIBLE);
                     }
                 }
             }
@@ -327,7 +520,9 @@ public class EditSession extends Fragment {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int position, long l) {
                 // Add the new staff member to the other staff list
-                User otherStaff = staffPicklist.getUsers().get(position);
+                // Build 200 - PickList.getUsers replaced with getObjects
+                //User otherStaff = staffPicklist.getUsers().get(position);
+                User otherStaff = (User) staffPicklist.getObjects().get(position);
                 if (!otherStaff.getUserID().equals(User.unknownUser)) {
                     boolean found = false;
                     for (User otherStaffMember : otherStaffList) {
@@ -354,8 +549,21 @@ public class EditSession extends Fragment {
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
+            }
+        });
+        // Build 225 - Batch Invite Button
+        batchInviteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (validate()) {
+                    // Display the Batch Invite wizard
+                    BatchInviteDialogFragment dialog = new BatchInviteDialogFragment(localDB, localSettings);
+                    dialog.show(getParentFragmentManager(), "BatchInvite");
+                }
             }
         });
         // Save Button
@@ -364,9 +572,48 @@ public class EditSession extends Fragment {
             @Override
             public void onClick(View view) {
                 if (validate()) {
-                    editDocument.save(isNewMode);
-                        FragmentManager fragmentManager = getFragmentManager();
-                        fragmentManager.popBackStack();
+                    // Build 200 Batch Invite
+                    UUID groupID = editDocument.getGroupID();
+                    if (isNewMode) {
+                        ArrayList<Client>inviteeList = new ArrayList<>();
+                        if (!groupID.equals(Group.adHocGroupID)) {
+                            // Normal group, so build an invitee list for the group
+                            ArrayList<Client> clients = localDB.getAllClients();
+                            for (Client client : clients) {
+                                if (client.getCurrentCase() != null) {
+                                    if (client.getCurrentCase().getCaseType().equals("Start") ||
+                                            client.getCurrentCase().getCaseType().equals("Update")){
+                                        if (client.getCurrentCase().getGroupID().equals(groupID) &&
+                                                !client.getCurrentCase().isDoNotInviteFlag()) {
+                                            inviteeList.add(client);
+                                        } else if (client.getCurrentCase().getGroup2ID() != null){
+                                            if (client.getCurrentCase().getGroup2ID().equals(groupID) &&
+                                                    !client.getCurrentCase().isDoNotInvite2Flag()) {
+                                                inviteeList.add(client);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        editDocument.save(isNewMode, inviteeList);
+                    } else {
+                        // editMode so just save the session document
+                        editDocument.save(isNewMode, null);
+                        if (dateChanged) {
+                            // Build 217 Save all of the Client Sessions to update their ReferenceDate
+                            ArrayList<ClientSession> clirentSessions =
+                                    localDB.getAllClientSessions(editDocument);
+                            for (ClientSession clientSession : clirentSessions) {
+                                clientSession.save(false);
+                            }
+
+                        }
+                    }
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                 }
             }
         });
@@ -386,6 +633,8 @@ public class EditSession extends Fragment {
             timeView.setText(sTime.format(editDocument.getReferenceDate()));
             durationView.setText(String.format(Locale.UK, "%d", editDocument.getDuration()));
             additionalInformationView.setText(editDocument.getAdditionalInformation());
+            // Build 200 new field, add points if attended, minus points if DNA
+            attendancePointsView.setText(String.format(Locale.UK, "%d", editDocument.getAttendancePoints()));
             if (editDocument.getOtherStaffIDList() != null) {
                 for (UUID otherStaffID : editDocument.getOtherStaffIDList()) {
                     otherStaffList.add(localDB.getUser(otherStaffID));
@@ -466,9 +715,12 @@ public class EditSession extends Fragment {
                                 editDocument.setCancelledByID(((ListActivity) getActivity()).getCurrentUser().getUserID());
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
-                                    editDocument.save(isNewMode);
-                                        FragmentManager fragmentManager = getFragmentManager();
-                                        fragmentManager.popBackStack();
+                                    // Build 200 - No inviteeList
+                                    editDocument.save(isNewMode, null);
+                                    // Build 200 Use the androidX Fragment class
+                                    //FragmentManager fragmentManager = getFragmentManager();
+                                    //fragmentManager.popBackStack();
+                                    getParentFragmentManager().popBackStack();
                                  }
                             }
                         }
@@ -485,9 +737,12 @@ public class EditSession extends Fragment {
             editDocument.setCancellationDate(new Date(Long.MIN_VALUE));
             editDocument.setCancelledByID(null);
             if (validate()) {
-                editDocument.save(isNewMode);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                // Build 200 - No inviteeList
+                editDocument.save(isNewMode, null);
+// Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         }
     }
@@ -609,7 +864,9 @@ public class EditSession extends Fragment {
             }
 
             //Keyworker
-            User newKeyworker = keyworkerPickList.getUsers().get(keyworkerSpinner.getSelectedItemPosition());
+            // Build 200 - PickList.getUsers replaced with getObjects
+            //User newKeyworker = keyworkerPickList.getUsers().get(keyworkerSpinner.getSelectedItemPosition());
+            User newKeyworker = (User) keyworkerPickList.getObjects().get(keyworkerSpinner.getSelectedItemPosition());
             // Test for Please select
             if (newKeyworker.getUserID().equals(User.unknownUser)) {
                 TextView errorText = (TextView) keyworkerSpinner.getSelectedView();
@@ -624,7 +881,9 @@ public class EditSession extends Fragment {
             }
 
             // Session Coordinator
-            User newSessionCoordinator = staffPicklist.getUsers().get(sessionCoordinatorSpinner.getSelectedItemPosition());
+            // Build 200 - PickList.getUsers replaced with getObjects
+            //User newSessionCoordinator = staffPicklist.getUsers().get(sessionCoordinatorSpinner.getSelectedItemPosition());
+            User newSessionCoordinator = (User) staffPicklist.getObjects().get(sessionCoordinatorSpinner.getSelectedItemPosition());
             // Test for Please select
             if (newSessionCoordinator.getUserID().equals(User.unknownUser)) {
                 TextView errorText = (TextView) sessionCoordinatorSpinner.getSelectedView();
@@ -689,6 +948,12 @@ public class EditSession extends Fragment {
                 Date dDateTime;
                 try {
                     dDateTime = sdf.parse(String.format("%s %s", sDate, sTime));
+                    // Build 217
+                    if (!isNewMode){
+                        if (!editDocument.getReferenceDate().equals(dDateTime)){
+                            dateChanged = true;
+                        }
+                    }
                     editDocument.setReferenceDate(dDateTime);
                 } catch (ParseException ex) {
                     dateView.setError(getString(R.string.error_invalid_date));
@@ -700,7 +965,11 @@ public class EditSession extends Fragment {
             // Duration
             String sDuration = durationView.getText().toString().trim();
             if (TextUtils.isEmpty(sDuration)) {
-                editDocument.setDuration(0);
+                // Build 201 Duration must be non-zero
+                //editDocument.setDuration(0);
+                durationView.setError(getString(R.string.error_number_not_positive));
+                focusView = durationView;
+                success = false;
 
             } else {
                 int duration;
@@ -725,6 +994,34 @@ public class EditSession extends Fragment {
             String sAdditionalInformation = additionalInformationView.getText().toString().trim();
             if (!TextUtils.isEmpty(sAdditionalInformation)) {
                 editDocument.setAdditionalInformation(additionalInformationView.getText().toString().trim());
+            }
+
+            // Build 200 new field, add points if attended, minus points if DNA
+            String sAttendancePoints = attendancePointsView.getText().toString().trim();
+            if (TextUtils.isEmpty(sAttendancePoints)) {
+                // Build 201 Duration must be non-zero
+                //editDocument.setAttendancePoints(0);
+                attendancePointsView.setError(getString(R.string.error_number_0_to_10));
+                focusView = attendancePointsView;
+                success = false;
+
+            } else {
+                int attendancePoints;
+                try {
+                    attendancePoints = Integer.parseInt(sAttendancePoints);
+                    if (attendancePoints < 0 || attendancePoints > 10) {
+                        attendancePointsView.setError(getString(R.string.error_number_0_to_10));
+                        focusView = attendancePointsView;
+                        success = false;
+                    } else {
+                        editDocument.setAttendancePoints(attendancePoints);
+                    }
+                } catch (Exception ex) {
+                    attendancePointsView.setError(getString(R.string.error_invalid_integer));
+                    focusView = attendancePointsView;
+                    success = false;
+                }
+
             }
         }
 

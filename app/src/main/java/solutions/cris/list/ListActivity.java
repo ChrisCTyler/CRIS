@@ -1,9 +1,11 @@
 package solutions.cris.list;
 
 import android.Manifest;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+//import android.app.FragmentTransaction;
+import androidx.fragment.app.Fragment;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -28,10 +30,12 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.UUID;
 
 import solutions.cris.CRISActivity;
 import solutions.cris.Main;
 import solutions.cris.R;
+import solutions.cris.edit.EditCase;
 import solutions.cris.edit.EditImage;
 import solutions.cris.edit.EditPdfDocument;
 import solutions.cris.exceptions.CRISException;
@@ -216,6 +220,22 @@ public abstract class ListActivity extends CRISActivity {
         this.broadcastClientList = broadcastClientList;
     }
 
+    // Build 200 - Replaced single selection with checkbox selection for picklists
+    // Build 232 - Added REVIEW_OVERDUE
+    public enum SelectMode {ALL, OPEN, FOLLOWED, OVERDUE, UNCANCELLED, GROUPS, KEYWORKERS,
+        COMMISSIONERS, SCHOOLS, AGENCIES, CONTACT_DOCUMENTS, DOCUMENT_TYPES, FUTURE,
+        SESSION_COORDINATORS, NONE, REVIEW_OVERDUE}
+
+    private SelectMode selectMode = SelectMode.OPEN;
+
+    public SelectMode getSelectMode() {
+        return selectMode;
+    }
+
+    public void setSelectMode(SelectMode selectMode) {
+        this.selectMode = selectMode;
+    }
+
     // Build 116 22 May 2019 Add handler for incoming text via share. Trigger is non-empty
     // text on shareText. Which must be accessible in ListClientFragment and EditNote.
     // EditNote fragment may be invoked from ListSessionClients as well as ListClients(Header)
@@ -244,26 +264,38 @@ public abstract class ListActivity extends CRISActivity {
     }
 
     private boolean doEditFileDocument() {
-        FragmentManager fragmentManager = getFragmentManager();
-        FragmentTransaction fragmentTransaction;
-        Fragment fragment;
+        // Build 200 Use AndroidX fragment class
+        //FragmentManager fragmentManager = getFragmentManager();
+        //FragmentTransaction fragmentTransaction;
+        //Fragment fragment;
         switch (getMode()) {
             case NEW:
             case EDIT:
-                fragmentTransaction = fragmentManager.beginTransaction();
+                //fragmentTransaction = fragmentManager.beginTransaction();
                 if (docType == Document.PdfDocument) {
-                    fragment = new EditPdfDocument();
+                    //fragment = new EditPdfDocument();
+                    getSupportFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, EditPdfDocument.class, null)
+                            .commit();
                 } else if (docType == Document.Image) {
-                    fragment = new EditImage();
+                    //fragment = new EditImage();
+                    getSupportFragmentManager().beginTransaction()
+                            .addToBackStack(null)
+                            .setReorderingAllowed(true)
+                            .replace(R.id.content, EditImage.class, null)
+                            .commit();
                 } else {
                     throw new CRISException(
                             String.format(Locale.UK,
                                     "Call of doEditFileDocument in ListClientHeader with docType = %d",
                                     docType));
                 }
-                fragmentTransaction.replace(R.id.content, fragment);
-                fragmentTransaction.addToBackStack(null);
-                fragmentTransaction.commit();
+                //fragmentTransaction.replace(R.id.content, fragment);
+                //fragmentTransaction.addToBackStack(null);
+                //fragmentTransaction.commit();
+
                 break;
             default:
                 throw new CRISException(

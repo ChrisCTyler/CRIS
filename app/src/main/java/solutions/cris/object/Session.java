@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 import solutions.cris.db.LocalDB;
+import solutions.cris.list.ListActivity;
 import solutions.cris.utils.CRISUtil;
 import solutions.cris.utils.LocalSettings;
 import solutions.cris.utils.SwipeDetector;
@@ -48,7 +49,6 @@ public class Session extends Document implements Serializable {
     // Note: version should only be incremented if the class is changed in such
     // a way that older versions cannot be deserialised.
     private static final long serialVersionUID = CrisObject.SVUID_SESSION;
-
 
     public Session(User currentUser) {
         super(currentUser, Document.nonClientDocumentID, Document.Session);
@@ -226,6 +226,17 @@ public class Session extends Document implements Serializable {
         this.additionalInformation = additionalInformation;
     }
 
+    // Build 200 new field, add points if attended, minus points if DNA
+    private int attendancePoints;
+
+    public int getAttendancePoints() {
+        return attendancePoints;
+    }
+
+    public void setAttendancePoints(int attendancePoints) {
+        this.attendancePoints = attendancePoints;
+    }
+
     public void clear(){
         setGroup(null);
         setKeyWorker(null);
@@ -233,7 +244,7 @@ public class Session extends Document implements Serializable {
     }
 
     // Save the document
-    public void save(boolean isNewMode) {
+    public void save(boolean isNewMode, ArrayList<Client> inviteeList) {
         LocalDB localDB = LocalDB.getInstance();
         // Save the groupID to pass to createClientSedssionDocuments in case the user
         // has changed the Session Name and this becomes an AdHoc session
@@ -261,37 +272,50 @@ public class Session extends Document implements Serializable {
         setKeyWorker(keyworker);
         setSessionCoordinator(sessionCoordinator);
 
+        // Build 200 - Extend the block invite concept to Ad-Hoc Sessions
         // Create the ClientSession documents
-        if (isNewMode && !groupID.equals(Group.adHocGroupID)) {
-            createClientSessions(localDB, groupID);
+        //if (isNewMode && !groupID.equals(Group.adHocGroupID)) {
+        //      createClientSessions(localDB, groupID);
+        //}
+        if (inviteeList != null && inviteeList.size() > 0){
+            User currentUser = User.getCurrentUser();
+            for (Client client:inviteeList){
+                ClientSession clientSession = new ClientSession(currentUser, client.getClientID());
+                clientSession.setSessionID(getDocumentID());
+                clientSession.setReferenceDate(getReferenceDate());
+                clientSession.setSummary(getSessionName());
+                clientSession.setSession(this);
+                clientSession.save(true);
+            }
         }
     }
 
+    /* Build 200 - Moved to EditSession
     private void createClientSessions(LocalDB localDB, UUID groupID) {
         // Get the list of clients
         ArrayList<Client> clients = localDB.getAllClients();
         User currentUser = User.getCurrentUser();
         for (Client client : clients) {
             // Build 139 - Second Group, Test both groups when deciding whether to create Client Session
-            /*
-            if (client.getCurrentCase() != null && client.getCurrentCase().getGroupID() != null) {
-                //if (client.getCurrentCase().getGroupID().equals(getGroupID()) &&
-                // Use original groupID in case user has changed the name, creating AdHoc Session
-                if (client.getCurrentCase().getGroupID().equals(groupID) &&
-                        (client.getCurrentCase().getCaseType().equals("Start") ||
-                                client.getCurrentCase().getCaseType().equals("Update"))) {
-                    // Build 105
-                    if (!client.getCurrentCase().isDoNotInviteFlag()) {
-                        ClientSession clientSession = new ClientSession(currentUser, client.getClientID());
-                        clientSession.setSessionID(getDocumentID());
-                        clientSession.setReferenceDate(getReferenceDate());
-                        clientSession.setSummary(getSessionName());
-                        clientSession.setSession(this);
-                        clientSession.save(true);
-                    }
-                }
-            }
-            */
+            //
+            //if (client.getCurrentCase() != null && client.getCurrentCase().getGroupID() != null) {
+            //    //if (client.getCurrentCase().getGroupID().equals(getGroupID()) &&
+            //    // Use original groupID in case user has changed the name, creating AdHoc Session
+            //    if (client.getCurrentCase().getGroupID().equals(groupID) &&
+            //            (client.getCurrentCase().getCaseType().equals("Start") ||
+            //                    client.getCurrentCase().getCaseType().equals("Update"))) {
+            //        // Build 105
+            //        if (!client.getCurrentCase().isDoNotInviteFlag()) {
+            //            ClientSession clientSession = new ClientSession(currentUser, client.getClientID());
+            //            clientSession.setSessionID(getDocumentID());
+            //            clientSession.setReferenceDate(getReferenceDate());
+            //            clientSession.setSummary(getSessionName());
+            //            clientSession.setSession(this);
+            //            clientSession.save(true);
+            //        }
+            //    }
+            //}
+            //
             boolean addSession = false;
             if (client.getCurrentCase() != null) {
                 if (client.getCurrentCase().getCaseType().equals("Start") ||
@@ -317,6 +341,8 @@ public class Session extends Document implements Serializable {
             }
         }
     }
+
+     */
 
     public static Comparator<Session> comparatorAZ = new Comparator<Session>() {
         @Override
@@ -365,8 +391,7 @@ public class Session extends Document implements Serializable {
         return summary;
     }
 
-    private static List<Object> getExportFieldNames(Activity activity) {
-        final LocalSettings localSettings = LocalSettings.getInstance(activity);
+    public static List<Object> getExportFieldNames(LocalSettings localSettings) {
         List<Object> fNames = new ArrayList<>();
         fNames.add(localSettings.Group);
         fNames.add("Session");
@@ -377,9 +402,12 @@ public class Session extends Document implements Serializable {
         fNames.add("Address");
         fNames.add("Postcode");
         fNames.add("Duration (Minutes)");
+        // Build 201 Added Attendance Points
+        fNames.add("Attendance Points");
         return fNames;
     }
 
+    /* Build 218 Move to CRISExport
     public static List<List<Object>> getSessionData(ArrayList<Session> sessions, Activity activity) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -392,6 +420,8 @@ public class Session extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
@@ -454,6 +484,8 @@ public class Session extends Document implements Serializable {
         row.add(getAddress());
         row.add(getPostcode());
         row.add(getDuration());
+        // Build 201 Added Attendance Points
+        row.add(getAttendancePoints());
         return row;
     }
 

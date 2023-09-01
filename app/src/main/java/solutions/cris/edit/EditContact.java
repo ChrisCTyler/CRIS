@@ -15,8 +15,10 @@ package solutions.cris.edit;
 //        You should have received a copy of the GNU General Public License
 //        along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import android.app.DatePickerDialog;
-import android.app.Fragment;
-import android.app.FragmentManager;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+//import android.app.FragmentManager;
+import androidx.fragment.app.Fragment;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -233,8 +235,9 @@ public class EditContact extends Fragment {
                             addressView.setText("");
                             postcodeView.setText("");
                             // Build 181
-                            freeSchoolMealsLayoutView.setVisibility(View.GONE);
-                            freeSchoolMeals.setVisibility(View.GONE);
+                            // Build 233 FSM moved to Case Document
+                            //freeSchoolMealsLayoutView.setVisibility(View.GONE);
+                            //freeSchoolMeals.setVisibility(View.GONE);
                             // Build 183
                             specialNeedsLayoutView.setVisibility(View.GONE);
                             specialNeeds.setVisibility(View.GONE);
@@ -249,11 +252,12 @@ public class EditContact extends Fragment {
                             addressView.setText("");
                             postcodeView.setText("");
                             // Build 181
-                            freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
-                            freeSchoolMeals.setVisibility(View.VISIBLE);
-                            // Build 181
-                            freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
-                            freeSchoolMeals.setVisibility(View.VISIBLE);
+                            // Build 233 FSM moved to Case Document
+                            //freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
+                            //freeSchoolMeals.setVisibility(View.VISIBLE);
+                            // Build 233 Fixed bug, following code was missing
+                            specialNeedsLayoutView.setVisibility(View.VISIBLE);
+                            specialNeeds.setVisibility(View.VISIBLE);
                             break;
                         default:
                             schoolLayout.setVisibility(View.GONE);
@@ -370,8 +374,10 @@ public class EditContact extends Fragment {
             public void onClick(View view) {
                 // Cancel so no need to update list of documents
                 ((ListActivity) getActivity()).setMode(Document.Mode.READ);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         });
         // Save Button
@@ -381,8 +387,10 @@ public class EditContact extends Fragment {
             public void onClick(View view) {
                 if (validate()) {
                     editDocument.save(isNewMode);
-                    FragmentManager fragmentManager = getFragmentManager();
-                    fragmentManager.popBackStack();
+                    // Build 200 Use the androidX Fragment class
+                    //FragmentManager fragmentManager = getFragmentManager();
+                    //fragmentManager.popBackStack();
+                    getParentFragmentManager().popBackStack();
                 }
             }
         });
@@ -392,7 +400,8 @@ public class EditContact extends Fragment {
 
         if (isNewMode) {
             // Build 181 - Default to Free School Meals
-            freeSchoolMeals.setChecked(true);
+            // Build 233 Moved FSM to Case document
+            //freeSchoolMeals.setChecked(true);
             // Build 183 - Default to Free School Meals
             specialNeeds.setChecked(false);
             startDateView.setText(sDate.format(today));
@@ -445,9 +454,10 @@ public class EditContact extends Fragment {
                         addressLayout.setVisibility(View.GONE);
                         schoolSpinner.setSelection(schoolPickList.getPosition(editDocument.getSchool()));
                         // Build 181
-                        freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
-                        freeSchoolMeals.setVisibility(View.VISIBLE);
-                        freeSchoolMeals.setChecked(editDocument.isFreeSchoolMeals());
+                        // Build 233
+                        //freeSchoolMealsLayoutView.setVisibility(View.VISIBLE);
+                        //freeSchoolMeals.setVisibility(View.VISIBLE);
+                        //freeSchoolMeals.setChecked(editDocument.isFreeSchoolMeals());
                         // Build 183
                         specialNeedsLayoutView.setVisibility(View.VISIBLE);
                         specialNeeds.setVisibility(View.VISIBLE);
@@ -546,8 +556,10 @@ public class EditContact extends Fragment {
                                 editDocument.setCancelledFlag(true);
                                 if (validate()) {
                                     editDocument.save(isNewMode);
-                                    FragmentManager fragmentManager = getFragmentManager();
-                                    fragmentManager.popBackStack();
+                                    // Build 200 Use the androidX Fragment class
+                                    //FragmentManager fragmentManager = getFragmentManager();
+                                    //fragmentManager.popBackStack();
+                                    getParentFragmentManager().popBackStack();
                                 }
                             }
                         }
@@ -565,8 +577,10 @@ public class EditContact extends Fragment {
             editDocument.setCancelledByID(null);
             if (validate()) {
                 editDocument.save(isNewMode);
-                FragmentManager fragmentManager = getFragmentManager();
-                fragmentManager.popBackStack();
+                // Build 200 Use the androidX Fragment class
+                //FragmentManager fragmentManager = getFragmentManager();
+                //fragmentManager.popBackStack();
+                getParentFragmentManager().popBackStack();
             }
         }
     }
@@ -615,7 +629,8 @@ public class EditContact extends Fragment {
         additionalInformationView.setError(null);
 
         // Build 181 - In case School Contact changed to other contact type, set FSM false here
-        editDocument.setFreeSchoolMeals(false);
+        // Build 233 FSM moved to Case Document
+        //editDocument.setFreeSchoolMeals(false);
         // Build 183 - In case Special Needs changed to other contact type, set FSM false here
         editDocument.setSpecialNeeds(false);
 
@@ -673,7 +688,8 @@ public class EditContact extends Fragment {
                     // PickList contained
                     editDocument.setSchool(localDB.getListItem(editDocument.getSchoolID()));
                     // Build 181
-                    editDocument.setFreeSchoolMeals(freeSchoolMeals.isChecked());
+                    // Build 233 Moved FSM to Case document
+                    //editDocument.setFreeSchoolMeals(freeSchoolMeals.isChecked());
                     // Build 183
                     editDocument.setSpecialNeeds(specialNeeds.isChecked());
                 }

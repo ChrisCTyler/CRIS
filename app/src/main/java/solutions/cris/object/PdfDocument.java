@@ -372,6 +372,7 @@ public class PdfDocument extends Document implements Serializable {
 
      */
 
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getPdfDocumentData(ArrayList<Document> documents, ArrayList<Client> adapterList) {
         List<List<Object>> content = new ArrayList<>();
         content.add(getExportFieldNames());
@@ -386,5 +387,7 @@ public class PdfDocument extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
 }

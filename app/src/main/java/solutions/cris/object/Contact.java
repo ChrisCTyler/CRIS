@@ -162,6 +162,7 @@ public class Contact extends Document implements Serializable {
     // Build 181 - Added Free School Meals
     private boolean freeSchoolMeals;
 
+    // Build 232 Free School Meals checkbox moved to Case object
     public boolean isFreeSchoolMeals() {
         return freeSchoolMeals;
     }
@@ -169,6 +170,7 @@ public class Contact extends Document implements Serializable {
     public void setFreeSchoolMeals(boolean freeSchoolMeals) {
         this.freeSchoolMeals = freeSchoolMeals;
     }
+
 
     // Build 183 - Added SEND
     private boolean specialNeeds;
@@ -378,8 +380,9 @@ public class Contact extends Document implements Serializable {
                 summary += "School Contact: " + getContactName() + "\n";
                 summary += "Relationship: " + getRelationshipType().getItemValue() + "\n";
                 // Build 181
-                summary += String.format("Free School Meals: %s\n",
-                        displayBoolean(freeSchoolMeals));
+                // Build 232 Free School Meals checkbox moved to Case object
+                //summary += String.format("Free School Meals: %s\n",
+                //        displayBoolean(freeSchoolMeals));
                 // Build 183
                 summary += String.format("Special Educational Needs and Disabilities: %s\n",
                         displayBoolean(specialNeeds));
@@ -426,7 +429,8 @@ public class Contact extends Document implements Serializable {
                     changes += CRISUtil.getChanges(previousDocument.getContactName(), thisDocument.getContactName(), "Contact Name");
                     changes += CRISUtil.getChanges(previousDocument.getRelationshipType(), thisDocument.getRelationshipType(), "Relationship Type");
                     // Build 181
-                    changes += CRISUtil.getChanges(previousDocument.isFreeSchoolMeals(), thisDocument.isFreeSchoolMeals(), "Free School Meals");
+                    // Build 232 Free School Meals checkbox moved to Case object
+                    //changes += CRISUtil.getChanges(previousDocument.isFreeSchoolMeals(), thisDocument.isFreeSchoolMeals(), "Free School Meals");
                     // Build 183
                     changes += CRISUtil.getChanges(previousDocument.isSpecialNeeds(), thisDocument.isSpecialNeeds(), "Special Educational Needs and Disabilities");
                     break;
@@ -454,7 +458,7 @@ public class Contact extends Document implements Serializable {
         return changes;
     }
 
-    private static List<Object> getExportFieldNames() {
+    public static List<Object> getExportFieldNames() {
         List<Object> fNames = new ArrayList<>();
         fNames.add("Firstnames");
         fNames.add("Lastname");
@@ -471,11 +475,13 @@ public class Contact extends Document implements Serializable {
         fNames.add("Name");
         fNames.add("Contact Num.");
         fNames.add("Contact Email");
-        fNames.add("Free School Meals");
+        // Build 232 Free School Meals checkbox moved to Case object
+        //fNames.add("Free School Meals");
+        fNames.add("Special Needs");
         return fNames;
     }
 
-
+    /* Build 208 Moved to CRISExport
     public static List<List<Object>> getContactData(ArrayList<Document> documents) {
         LocalDB localDB = LocalDB.getInstance();
         Client client = null;
@@ -491,6 +497,8 @@ public class Contact extends Document implements Serializable {
         }
         return content;
     }
+
+     */
 
     public static List<Request> getExportSheetConfiguration(int sheetID) {
         List<Request> requests = new ArrayList<>();
@@ -618,7 +626,8 @@ public class Contact extends Document implements Serializable {
                     row.add(getContactEmailAddress());
                 }
                 // Build 181
-                row.add(displayExportBoolean(freeSchoolMeals));
+                // Build 232 Free School Meals checkbox moved to Case object
+                //row.add(displayExportBoolean(freeSchoolMeals));
                 // Build 183
                 row.add(displayExportBoolean(specialNeeds));
                 break;
@@ -648,7 +657,8 @@ public class Contact extends Document implements Serializable {
                     row.add(getContactEmailAddress());
                 }
                 //freeSchoolMeals
-                row.add("");
+                // Build 232 Free School Meals checkbox moved to Case object
+                //row.add("");
                 //specialNeeds
                 row.add("");
                 break;
@@ -661,7 +671,8 @@ public class Contact extends Document implements Serializable {
                 row.add(String.format("'%s", getContactContactNumber()));
                 row.add(getContactEmailAddress());
                 //freeSchoolMeals
-                row.add("");
+                // Build 232 Free School Meals checkbox moved to Case object
+                //row.add("");
                 //specialNeeds
                 row.add("");
         }

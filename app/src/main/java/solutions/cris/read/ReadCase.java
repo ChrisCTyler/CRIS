@@ -1,14 +1,25 @@
 package solutions.cris.read;
 
-import android.app.Fragment;
+// Build 200 Use the androidX Fragment class
+//import android.app.Fragment;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.constraintlayout.widget.ConstraintSet;
+import androidx.fragment.app.Fragment;
+
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuItemCompat;
 import androidx.appcompat.widget.ShareActionProvider;
 import androidx.appcompat.widget.Toolbar;
+
 import android.text.InputType;
+import android.text.Layout;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -24,13 +35,16 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
+import java.util.UUID;
 
 import solutions.cris.R;
 import solutions.cris.db.LocalDB;
 import solutions.cris.list.ListActivity;
 import solutions.cris.object.Case;
 import solutions.cris.object.Client;
+import solutions.cris.object.Document;
 import solutions.cris.object.User;
 import solutions.cris.utils.LocalSettings;
 
@@ -54,10 +68,19 @@ public class ReadCase extends Fragment {
 
     private static final SimpleDateFormat sDate = new SimpleDateFormat("dd.MM.yyyy", Locale.UK);
 
+    public static final String PLAN_FINANCE_HINT_DISPLAYED = "solutions.cris.PlanFinanceHintDisplayed";
+
     private Case editDocument;
     private View parent;
     private Client client;
     private LocalDB localDB;
+    // Build 232 Add Plan/FinSupp Hint
+    private TextView planFinanceHintTextView;
+    private boolean planFinanceHintTextDisplayed = true;
+    // Build 232
+    Button reviewButton;
+    private TextView lastReviewedBy;
+    private TextView lastReviewDateView;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -90,6 +113,21 @@ public class ReadCase extends Fragment {
 
         localDB = LocalDB.getInstance();
 
+        // Set up the Plan/Finance hint text
+        planFinanceHintTextView = getActivity().findViewById(R.id.plan_finance_hint_text);
+        planFinanceHintTextView.setText(getPlanFinanceHintText());
+        // Restore value of hintDisplayed (Set to opposite, toggle to come
+        if (savedInstanceState != null) {
+            planFinanceHintTextDisplayed = !savedInstanceState.getBoolean(PLAN_FINANCE_HINT_DISPLAYED);
+        }
+        togglePlanFinanceHint();
+        planFinanceHintTextView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                togglePlanFinanceHint();
+            }
+        });
+
         // CANCEL BOX
         if (editDocument.getCancelledFlag()) {
             LinearLayout cancelBoxView = (LinearLayout) parent.findViewById(R.id.cancel_box_layout);
@@ -101,7 +139,7 @@ public class ReadCase extends Fragment {
             byText += sDate.format(editDocument.getCancellationDate());
             cancelBy.setText(byText);
             TextView cancelReason = (TextView) parent.findViewById(R.id.cancel_reason);
-            cancelReason.setText(String.format("Reason: %s",editDocument.getCancellationReason()));
+            cancelReason.setText(String.format("Reason: %s", editDocument.getCancellationReason()));
         }
 
         Spinner caseTypeSpinner = (Spinner) parent.findViewById(R.id.case_type_spinner);
@@ -142,7 +180,33 @@ public class ReadCase extends Fragment {
         // Build 139 - Second Group
         CheckBox doNotInvite2Checkbox = (CheckBox) parent.findViewById(R.id.do_not_invite2_flag);
         TextView doNotInvite2ReadText = (TextView) parent.findViewById(R.id.do_not_invite2_read_text);
-
+        // Build 232
+        TextView planFinanceView = (TextView) parent.findViewById(R.id.plan_finance_text);
+        CheckBox pfPupilPremium = (CheckBox) parent.findViewById(R.id.pf_pupil_premium);
+        CheckBox pfFreeSchoolMeals = (CheckBox) parent.findViewById(R.id.pf_free_school_meals);
+        CheckBox pfChildProtectionPlan = (CheckBox) parent.findViewById(R.id.pf_child_protection_plan);
+        CheckBox pfChildInNeedPlan = (CheckBox) parent.findViewById(R.id.pf_child_in_need_plan);
+        CheckBox pfTafEarlyHelpPlan = (CheckBox) parent.findViewById(R.id.pf_taf_early_help_plan);
+        CheckBox pfSocialServicesRecommendation = (CheckBox) parent.findViewById(R.id.pf_social_services_recommendation);
+        CheckBox pfOtherPlanFinancialSupport = (CheckBox) parent.findViewById(R.id.pf_other_plan_financial_support);
+        lastReviewedBy = (TextView) parent.findViewById(R.id.last_reviewed_by_read_text);
+        lastReviewDateView = (TextView) parent.findViewById(R.id.last_review_date_text);
+        reviewButton = (Button) parent.findViewById(R.id.review_button);
+        reviewButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (client.getCurrentCase() == null ||
+                        !client.getCurrentCaseID().equals(editDocument.getDocumentID())) {
+                    reviewUnavailablePopup();
+                } else {
+                    reviewPopup();
+                }
+            }
+        });
+        if (client.getCurrentCase() == null ||
+                !client.getCurrentCaseID().equals(editDocument.getDocumentID())) {
+            reviewButton.setTextColor(ContextCompat.getColor(getActivity(), R.color.grey));
+        }
         caseTypeSpinner.setVisibility(View.GONE);
         caseTypeTextView.setVisibility(View.VISIBLE);
         caseTypeTextView.setFocusable(false);
@@ -189,6 +253,15 @@ public class ReadCase extends Fragment {
         hintIconView.setVisibility(View.GONE);
         cancelButton.setVisibility(View.GONE);
         saveButton.setVisibility(View.GONE);
+        // Build 232
+        planFinanceView.setVisibility(View.VISIBLE);
+        pfPupilPremium.setVisibility(View.GONE);
+        pfFreeSchoolMeals.setVisibility(View.GONE);
+        pfChildProtectionPlan.setVisibility(View.GONE);
+        pfChildInNeedPlan.setVisibility(View.GONE);
+        pfTafEarlyHelpPlan.setVisibility(View.GONE);
+        pfSocialServicesRecommendation.setVisibility(View.GONE);
+        pfOtherPlanFinancialSupport.setVisibility(View.GONE);
 
         // Set the 'local' labels
         LocalSettings localSettings = LocalSettings.getInstance(getActivity());
@@ -211,7 +284,7 @@ public class ReadCase extends Fragment {
 
         caseTypeTextView.setText(editDocument.getCaseType());
         referenceDateView.setText(sDate.format(editDocument.getReferenceDate()));
-        if (editDocument.getCaseSummary().toString().isEmpty()){
+        if (editDocument.getCaseSummary().toString().isEmpty()) {
             caseSummaryView.setText(" ");
         } else {
             caseSummaryView.setText(editDocument.getCaseSummary().toString());
@@ -228,14 +301,14 @@ public class ReadCase extends Fragment {
         if (editDocument.getGroup() != null) {
             groupTextView.setText(editDocument.getGroup().getItemValue());
         }
-        if (editDocument.isDoNotInviteFlag()){
+        if (editDocument.isDoNotInviteFlag()) {
             doNotInviteReadText.setText(" (Do not invite to Sessions)");
         }
         // Build 139 - Second Group
         if (editDocument.getGroup2() != null) {
             group2TextView.setText(editDocument.getGroup2().getItemValue());
         }
-        if (editDocument.isDoNotInvite2Flag()){
+        if (editDocument.isDoNotInvite2Flag()) {
             doNotInvite2ReadText.setText(" (Do not invite to Sessions)");
         }
         if (editDocument.getKeyWorker() != null) {
@@ -265,6 +338,29 @@ public class ReadCase extends Fragment {
         }
         transportRequiredTextView.setText(editDocument.getTransportRequired());
         specialInstructionsView.setText(editDocument.getTransportSpecialInstructions());
+        // Build 232
+        String planFinance = "";
+        if (editDocument.isPupilPremium())
+            planFinance += String.format("%s\n", getString(R.string.prompt_pf_pupil_premium));
+        if (editDocument.isFreeSchoolMeals())
+            planFinance += String.format("%s\n", getString(R.string.prompt_pf_free_school_meals));
+        if (editDocument.isChildProtectionPlan())
+            planFinance += String.format("%s\n", getString(R.string.prompt_pf_child_protection_plan));
+        if (editDocument.isChildInNeedPlan())
+            planFinance += String.format("%s\n", getString(R.string.prompt_pf_child_in_need_plan));
+        if (editDocument.isTafEarlyHelpPlan())
+            planFinance += String.format("%s\n", getString(R.string.prompt_pf_taf_early_help_plan));
+        if (editDocument.isSocialServicesRecommendation())
+            planFinance += String.format("%s\n", getString(R.string.prompt_pf_social_services_recommendation));
+        if (editDocument.isOtherPlanFinancialSupport())
+            planFinance += String.format("%s\n", getString(R.string.prompt_pf_other_plan_financial_support));
+        // Either remove the final carriage return or add a 'none' message
+        if (planFinance.isEmpty()) planFinance = "No Plans or Financial Support recorded";
+        else planFinance = planFinance.substring(0, planFinance.length() - 1);
+        planFinanceView.setText(planFinance);
+        User currentUser = User.getCurrentUser();
+        lastReviewedBy.setText(editDocument.getLastReviewedBy().getFullName());
+        lastReviewDateView.setText(String.format("%s, ", sDate.format(editDocument.getlastReviewDate())));
     }
 
     // MENU BLOCK
@@ -284,6 +380,86 @@ public class ReadCase extends Fragment {
         shareIntent.putExtra(Intent.EXTRA_TEXT, summary);
         shareActionProvider.setShareIntent(shareIntent);
     }
+
+    private void reviewPopup() {
+        String reviewMessage = "If nothing has changed since the last review, click Save to " +
+                "record that you have carried out this review and set the last review date to " +
+                "today.\n\n" +
+                "If anything has changed, please create a Case Update document and make the " +
+                "necessary changes. In this case, the reviewer and review date will be set " +
+                "automatically.";
+        new AlertDialog.Builder(getActivity())
+                .setTitle("Review of Plans and Financial Support")
+                .setMessage(reviewMessage)
+                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        editDocument.setLastReviewDate(new Date());
+                        User currentUser = User.getCurrentUser();
+                        editDocument.setLastReviewedByID(currentUser.getUserID());
+                        // Must also set lastReviewdBy so that save restores the right one
+                        editDocument.setLastReviewedBy(currentUser);
+                        editDocument.save(false);
+                        // Update the view
+                        lastReviewDateView.setText(String.format("%s, ", sDate.format(editDocument.getlastReviewDate())));
+                        lastReviewedBy.setText(editDocument.getLastReviewedBy().getFullName());
+                        reviewButton.setTextColor(ContextCompat.getColor(getActivity(), R.color.grey));
+                        reviewButton.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View view) {
+                                // Do nothing
+                            }
+                        });
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // Do Nothing
+                    }
+                })
+                .show();
+    }
+
+    private void reviewUnavailablePopup() {
+        String reviewMessage = "This is not the most recent Case document. Please carry out " +
+                "the review from that document which shows the current information.\n\n" +
+                "The easiest way to find the most recent Case document is to use the 'Select " +
+                "Documents by Type' option from the menu (three dots) and just show the Case " +
+                "documents";
+        new AlertDialog.Builder(getActivity())
+                .setTitle("Review of Plans and Financial Support")
+                .setMessage(reviewMessage)
+                .setPositiveButton("Return", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // Do Nothing
+                    }
+                })
+                .show();
+    }
+
+    // Build 232
+    private void togglePlanFinanceHint() {
+        if (planFinanceHintTextDisplayed) {
+            planFinanceHintTextView.setMaxLines(2);
+            planFinanceHintTextDisplayed = false;
+        } else {
+            planFinanceHintTextDisplayed = true;
+            planFinanceHintTextView.setMaxLines(planFinanceHintTextView.getLineCount());
+        }
+    }
+
+    private String getPlanFinanceHintText() {
+        return "Press for Review instructions. \n\n" +
+                "If the client's Plans and Financial Support are still the same, click the " +
+                "button to update the reviewed by and date fields.\n\n" +
+                "If the information needs to be changed, create a new Case document, set it to " +
+                "Case Update and make the changes. The reviewed by and date fields will be set " +
+                "automatically.\n\n";
+
+    }
+
 
 }
 
